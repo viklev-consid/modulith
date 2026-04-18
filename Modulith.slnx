@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Api/">
+    <Project Path="src/Api/Modulith.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/AppHost/">
+    <Project Path="src/AppHost/Modulith.AppHost.csproj" />
+  </Folder>
+  <Folder Name="/src/ServiceDefaults/">
+    <Project Path="src/ServiceDefaults/Modulith.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/Modulith.Shared.Contracts/Modulith.Shared.Contracts.csproj" />
+    <Project Path="src/Shared/Modulith.Shared.Infrastructure/Modulith.Shared.Infrastructure.csproj" />
+    <Project Path="src/Shared/Modulith.Shared.Kernel/Modulith.Shared.Kernel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Modulith.Architecture.Tests/Modulith.Architecture.Tests.csproj" />
+    <Project Path="tests/Modulith.SmokeTests/Modulith.SmokeTests.csproj" />
+    <Project Path="tests/Modulith.TestSupport/Modulith.TestSupport.csproj" />
+  </Folder>
+</Solution>

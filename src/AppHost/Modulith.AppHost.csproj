@@ -1,0 +1,12 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.1">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>356932a4-aa2d-4ee4-9892-6edc3d60dc28</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Api\Modulith.Api.csproj" />
+  </ItemGroup>
+
+</Project>

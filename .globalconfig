@@ -1,0 +1,22 @@
+is_global = true
+
+# Suppress XML doc warnings — CS1591 is already suppressed via NoWarn in Directory.Build.props
+dotnet_diagnostic.CS1591.severity = none
+
+# IDE0028 — simplify collection initialization (suggestion, not error)
+dotnet_diagnostic.IDE0028.severity = suggestion
+
+# CA1861 — avoid constant arrays as arguments (we allow inline arrays in endpoints for readability)
+dotnet_diagnostic.CA1861.severity = suggestion
+
+# CA1515 — consider making public types internal (modules deliberately expose public types)
+dotnet_diagnostic.CA1515.severity = none
+
+# CA2007 — ConfigureAwait (not needed in ASP.NET Core context)
+dotnet_diagnostic.CA2007.severity = none
+
+# IDE0058 — expression value never used (common in test assertions and fluent builders)
+dotnet_diagnostic.IDE0058.severity = suggestion
+
+# CA1852 — seal internal types (we seal deliberately; this would be redundant noise)
+dotnet_diagnostic.CA1852.severity = suggestion

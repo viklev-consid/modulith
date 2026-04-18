@@ -1,0 +1,57 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+# File-scoped namespaces — required
+csharp_style_namespace_declarations = file_scoped:error
+
+# No regions
+dotnet_diagnostic.IDE0065.severity = error
+
+# Prefer primary constructors where applicable (suggestion only — not an error)
+csharp_style_prefer_primary_constructors = true:suggestion
+
+# Expression body preferences
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = when_on_single_line:suggestion
+
+# var preferences
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Braces
+csharp_prefer_braces = true:warning
+
+# Trailing commas
+dotnet_style_allow_multiple_blank_lines_experimental = false:warning
+
+# Organize usings
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# Naming conventions
+dotnet_naming_rule.private_fields_no_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_no_underscore.style = camel_case_style
+dotnet_naming_rule.private_fields_no_underscore.severity = warning
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.camel_case_style.capitalization = camel_case
+
+# Severity overrides to keep strict build quiet on generated/imported code
+dotnet_diagnostic.CA1062.severity = none
