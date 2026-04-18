@@ -16,6 +16,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Modulith.Architecture.Tests/Modulith.Architecture.Tests.csproj" />
+    <Project Path="tests/Modulith.Shared.Tests/Modulith.Shared.Tests.csproj" />
     <Project Path="tests/Modulith.SmokeTests/Modulith.SmokeTests.csproj" />
     <Project Path="tests/Modulith.TestSupport/Modulith.TestSupport.csproj" />
   </Folder>
