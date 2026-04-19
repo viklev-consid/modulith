@@ -1,8 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <ProjectReference Include="..\Modules\Users\Modulith.Modules.Users\Modulith.Modules.Users.csproj" />
     <ProjectReference Include="..\ServiceDefaults\Modulith.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Shared\Modulith.Shared.Infrastructure\Modulith.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="WolverineFx" />
   </ItemGroup>
 
 </Project>

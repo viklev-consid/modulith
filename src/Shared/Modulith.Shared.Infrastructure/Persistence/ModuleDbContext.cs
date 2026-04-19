@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulith.Shared.Kernel.Domain;
 
 namespace Modulith.Shared.Infrastructure.Persistence;
 
@@ -8,5 +9,11 @@ public abstract class ModuleDbContext(DbContextOptions options) : DbContext(opti
     {
         base.OnConfiguring(optionsBuilder);
         optionsBuilder.UseSnakeCaseNamingConvention();
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.Ignore<DomainEvent>();
     }
 }
