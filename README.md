@@ -13,7 +13,7 @@ Modulith is opinionated. It encodes a set of decisions that have been made delib
 - **Rich domain model** with invariants enforced via factory methods and private setters
 - **Result pattern** for expected failures, exceptions reserved for truly exceptional cases
 - **ProblemDetails** for all error responses via `IExceptionHandler`
-- **JWT bearer authentication** with a lightweight Users module (no ASP.NET Identity)
+- **JWT bearer authentication** with a lightweight Users module (no ASP.NET Identity) — register, login, password reset, change password, email change with confirmation, refresh token rotation, logout, and logout-everywhere
 - **FluentValidation** for request validation
 - **Scalar** for OpenAPI documentation
 - **API versioning** via `Asp.Versioning`

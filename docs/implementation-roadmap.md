@@ -511,6 +511,263 @@ Verify the generated files compile and integrate.
 
 ---
 
+## Phase 9.5: Users module — baseline auth flows
+
+**Goal:** Expand the Users module to the production-ready baseline — password reset, change password, email change, refresh tokens, and logout. The Users aggregate and its auth surface should be feature-complete before modeling other modules against it.
+
+Phase 9.5 established the vertical slice shape with register/login/me. This phase proves that shape holds for a realistic set of interconnected features within a single module — tokens, rotation, revocation, cross-slice shared primitive.
+
+Reference docs:
+
+- [`adr/0028-auth-flows-baseline.md`](adr/0028-auth-flows-baseline.md)
+- [`adr/0029-refresh-tokens-and-logout.md`](adr/0029-refresh-tokens-and-logout.md)
+- [`how-to/implement-auth-flows.md`](how-to/implement-auth-flows.md)
+- [`src/Modules/Users/CLAUDE.md`](../src/Modules/Users/CLAUDE.md)
+
+---
+
+### 9.5.1 Domain additions
+
+Add to `Modulith.Modules.Users/Domain/`:
+
+**`SingleUseToken` value object** (aggregate-internal entity stored in its own table):
+
+- `TokenHash` (byte[], SHA-256)
+- `Purpose` (enum: `PasswordReset`, `EmailChange`)
+- `UserId`
+- `IssuedAt`, `ExpiresAt`
+- `ConsumedAt` (nullable)
+- Factory: `Create(UserId, TokenPurpose, TimeSpan lifetime, IClock) → (SingleUseToken, string rawValue)`
+- Method: `Consume(IClock)`
+- Method: `IsValid(IClock) : bool`
+
+**`RefreshToken` entity:**
+
+- `Id` (RefreshTokenId)
+- `UserId`
+- `TokenHash` (byte[], SHA-256)
+- `IssuedAt`, `ExpiresAt`, `RevokedAt?`, `RotatedTo?` (RefreshTokenId)
+- `DeviceFingerprint?`, `CreatedFromIp?`
+- Factory: `Issue(UserId, TimeSpan lifetime, IClock, string? ua, IPAddress? ip) → (RefreshToken, string rawValue)`
+- Method: `Revoke(IClock)`
+- Method: `MarkRotatedTo(RefreshTokenId, IClock)`
+- Method: `IsActive(IClock) : bool`
+
+**Additions to `User` aggregate:**
+
+- `VerifyPassword(string) : bool` (constant-time via BCrypt)
+- `SetPassword(string) : Result` (applies password policy, hashes, raises `PasswordChanged` internal event)
+- Existing `ChangeEmail(Email) : Result` stays as-is
+
+**`PendingEmailChange` entity:**
+
+- `TokenHash` (byte[])
+- `NewEmail` (Email)
+- Expired entries swept together with the corresponding `SingleUseToken`.
+
+**New domain events:**
+
+- `PasswordResetRequested` (internal), maps to `PasswordResetRequestedV1` (public — includes raw token for Notifications only)
+- `PasswordReset` → `PasswordResetV1`
+- `PasswordChanged` → `PasswordChangedV1`
+- `EmailChangeRequested` → `EmailChangeRequestedV1`
+- `EmailChanged` → `EmailChangedV1`
+- `UserLoggedOutAllDevices` → `UserLoggedOutAllDevicesV1`
+
+### 9.5.2 Persistence
+
+Add entity configurations and a migration:
+
+```bash
+dotnet ef migrations add AddTokensAndRefreshTokens \
+  --project src/Modules/Users/Modulith.Modules.Users \
+  --context UsersDbContext \
+  --output-dir Persistence/Migrations
+```
+
+Tables added to the `users` schema:
+
+- `user_tokens` (for `SingleUseToken`)
+- `refresh_tokens`
+- `pending_email_changes`
+
+Indexes:
+
+- `user_tokens(token_hash, purpose)` — unique
+- `refresh_tokens(token_hash)` — unique
+- `refresh_tokens(user_id, revoked_at)` — partial index on `revoked_at IS NULL` for active-session queries
+- `refresh_tokens(expires_at)` — for sweep job
+
+### 9.5.3 Feature slices
+
+Add under `Features/`:
+
+- **`ForgotPassword/`** — public, `POST /v1/users/password/forgot`
+- **`ResetPassword/`** — public, `POST /v1/users/password/reset`
+- **`ChangePassword/`** — authenticated, `POST /v1/users/me/password`
+- **`RequestEmailChange/`** — authenticated, `POST /v1/users/me/email/request`
+- **`ConfirmEmailChange/`** — authenticated, `POST /v1/users/me/email/confirm`
+- **`RefreshToken/`** — public (refresh-token-authed), `POST /v1/users/token/refresh`
+- **`Logout/`** — authenticated, `POST /v1/users/logout`
+- **`LogoutAll/`** — authenticated, `POST /v1/users/logout/all`
+
+Also update:
+
+- **`Login/`** — now issues both access and refresh tokens, enforces `MaxActiveRefreshTokensPerUser`.
+
+Each slice follows the six-file pattern (Request/Response/Command/Handler/Validator/Endpoint).
+
+Rate-limit policies per [`adr/0018-rate-limiting.md`](adr/0018-rate-limiting.md):
+
+| Slice | Policy |
+|---|---|
+| ForgotPassword, ResetPassword, ChangePassword | `auth` |
+| RefreshToken, ConfirmEmailChange | `auth` |
+| Logout, LogoutAll, RequestEmailChange | `write` |
+
+### 9.5.4 Options additions
+
+Extend `UsersOptions`:
+
+```csharp
+[Range(1, 1440)]
+public int AccessTokenLifetimeMinutes { get; init; } = 15;
+
+[Range(1, 365)]
+public int RefreshTokenLifetimeDays { get; init; } = 30;
+
+[Range(1, 100)]
+public int MaxActiveRefreshTokensPerUser { get; init; } = 10;
+
+public TimeSpan PasswordResetTokenLifetime { get; init; } = TimeSpan.FromMinutes(30);
+public TimeSpan EmailChangeTokenLifetime { get; init; } = TimeSpan.FromMinutes(30);
+```
+
+### 9.5.5 Scheduled sweep job
+
+Wolverine scheduled message:
+
+```csharp
+public sealed record SweepExpiredTokens;
+
+internal sealed class SweepExpiredTokensHandler
+{
+    // Run daily: delete user_tokens and refresh_tokens where expires_at < now - 7 days
+    // AND (revoked_at IS NOT NULL OR consumed_at IS NOT NULL OR expires_at < now)
+}
+```
+
+Register in Wolverine as a recurring message.
+
+### 9.5.6 Notifications module integration
+
+The Notifications module subscribes to:
+
+- `PasswordResetRequestedV1` → send reset email with raw token
+- `PasswordResetV1` → send confirmation to old email address
+- `PasswordChangedV1` → send confirmation
+- `EmailChangeRequestedV1` → send confirmation to *new* address with token
+- `EmailChangedV1` → send alert to *old* address
+
+Razor templates for each. Marketing-category consent does not apply to these — they are transactional/security notifications (non-opt-out per ADR-0014).
+
+### 9.5.7 Audit module integration
+
+Audit subscribes to all auth-related public events:
+
+- `UserLoggedInV1`, `UserLoggedOutAllDevicesV1`
+- `PasswordResetV1`, `PasswordChangedV1`
+- `EmailChangedV1`
+- `UserErasureRequestedV1`
+
+Each becomes an `AuditEntry` with `Action`, `Actor`, `EntityId`, `OccurredAt`.
+
+### 9.5.8 Current user abstraction updates
+
+Extend `ICurrentUser` to expose:
+
+- `CurrentRefreshTokenId?` — the refresh token used to authenticate this request (when applicable). Populated by a middleware that maps the access token's `jti` claim (or a separate claim) back to the refresh token.
+
+This is needed by the `ChangePassword` slice to preserve the current session while revoking others.
+
+### 9.5.9 Security tests
+
+Add integration tests covering:
+
+- **Enumeration resistance**: ForgotPassword returns identical response for known vs unknown email. Response body and status code match.
+- **Token anti-reuse**: using a reset token twice fails the second time with the same error as a bad token.
+- **Token hashing**: DB inspection after a reset request shows no plaintext token in `user_tokens`.
+- **Refresh rotation**: successful refresh revokes the old token and returns a new one.
+- **Refresh reuse detection**: presenting a rotated refresh token revokes the entire chain.
+- **Sensitive event revocation**: password reset, password change, and email change revoke refresh tokens per the ADR-0028 table.
+- **Email change alerts old address**: an `EmailChangedV1` event is published with both old and new email.
+- **MaxActiveRefreshTokensPerUser enforcement**: logging in beyond the limit revokes the oldest token.
+- **Concurrent refresh**: two simultaneous requests with the same refresh token — one succeeds, one fails (or both succeed with the second's result superseding, depending on impl; pick and document).
+
+### 9.5.10 Unit tests
+
+Add domain tests for:
+
+- `SingleUseToken.Create` returns token whose hash matches `SHA256(rawValue)`.
+- `SingleUseToken.IsValid` behavior across consumed / expired / active states.
+- `RefreshToken.Issue` likewise.
+- `RefreshToken.MarkRotatedTo` sets both `RevokedAt` and `RotatedTo`.
+- `User.SetPassword` rejects via password policy when too short.
+- `User.VerifyPassword` is constant-time (hard to unit-test directly; structural test that it calls `BCrypt.Verify`).
+
+### 9.5.11 Architectural tests
+
+Add or extend:
+
+- `SingleUseToken` has no public setters (it's an aggregate-internal entity).
+- `RefreshToken` has no public setters.
+- No type in Users module stores raw tokens (checked via static analysis of string column names — heuristic).
+- Forbid `DateTime.UtcNow` in the module; require `IClock` (general arch rule, this phase adds reliance on it).
+
+### 9.5.12 Update module CLAUDE.md
+
+Replace the Phase 4 stub `src/Modules/Users/CLAUDE.md` with the version shipped in `src/Modules/Users/CLAUDE.md` (this addendum's companion file). It documents:
+
+- Current scope (all flows now implemented)
+- Security invariants
+- Explicit extension points (2FA, email confirmation gating, account lockout, breach password check, external IdPs, multi-tenancy, admin impersonation)
+- Footguns specific to this module
+
+### 9.5.13 Verify
+
+- All tests pass (unit, architectural, integration).
+- `dotnet run --project src/AppHost` — stack comes up, seeded users can register → login → rotate tokens → change password → reset password via email captured in Mailpit → log out everywhere.
+- Manual walk-through of the full lifecycle via Scalar UI.
+- Review logs to confirm no raw tokens are emitted.
+
+**Commit.** Message: "feat(users): password reset, change, email change, refresh tokens, and logout".
+
+---
+
+## Already-built modules may need small additions
+
+- Notifications: add subscribers + templates for the new events
+- Audit: add subscribers for new events (automatic if audit has a generic subscription pattern)
+- Phase 9 scaffolders: verify they produce the correct shape for the new slices (especially validator-on-Request)
+
+---
+
+## What this phase does NOT include
+
+The extension points in `src/Modules/Users/CLAUDE.md` are deliberate non-goals:
+
+- Two-factor authentication
+- Email confirmation as an access gate
+- Account lockout
+- Breach password check
+- External identity providers (OIDC federation)
+- Multi-tenancy / organization membership
+- Admin impersonation
+
+These are extension points documented with suggested shapes but not implemented. Adding any of them is a separate, deliberate decision.
+
+---
+
 ## Phase 10: Smoke tests + CI
 
 **Goal:** Full stack tested, CI wired.
