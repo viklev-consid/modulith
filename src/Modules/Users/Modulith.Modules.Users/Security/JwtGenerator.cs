@@ -4,16 +4,17 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Modulith.Modules.Users.Domain;
+using Modulith.Shared.Infrastructure.Auth;
 
 namespace Modulith.Modules.Users.Security;
 
-internal sealed class JwtGenerator(IOptions<UsersOptions> options) : IJwtGenerator
+internal sealed class JwtGenerator(IOptions<JwtOptions> options) : IJwtGenerator
 {
-    private readonly UsersOptions _options = options.Value;
+    private readonly JwtOptions _options = options.Value;
 
     public string Generate(UserId userId, string email, string displayName)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.JwtKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -25,10 +26,10 @@ internal sealed class JwtGenerator(IOptions<UsersOptions> options) : IJwtGenerat
         };
 
         var token = new JwtSecurityToken(
-            issuer: _options.JwtIssuer,
-            audience: _options.JwtAudience,
+            issuer: _options.Issuer,
+            audience: _options.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_options.JwtExpirationMinutes),
+            expires: DateTime.UtcNow.AddMinutes(_options.AccessTokenLifetimeMinutes),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

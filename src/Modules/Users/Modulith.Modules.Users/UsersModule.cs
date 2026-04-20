@@ -26,11 +26,6 @@ public static class UsersModule
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
-        services.AddOptions<UsersOptions>()
-            .Bind(configuration.GetSection("Modules:Users"))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddSingleton<IClock, SystemClock>();

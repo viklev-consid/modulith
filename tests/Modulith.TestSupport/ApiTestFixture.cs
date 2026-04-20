@@ -36,9 +36,9 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         builder.UseEnvironment("Test");
 
         builder.UseSetting("ConnectionStrings:db", ConnectionString);
-        builder.UseSetting("Modules:Users:JwtIssuer", TestJwtIssuer);
-        builder.UseSetting("Modules:Users:JwtAudience", TestJwtAudience);
-        builder.UseSetting("Modules:Users:JwtKey", TestJwtKey);
+        builder.UseSetting("Jwt:Issuer", TestJwtIssuer);
+        builder.UseSetting("Jwt:Audience", TestJwtAudience);
+        builder.UseSetting("Jwt:SigningKey", TestJwtKey);
     }
 
     async Task IAsyncLifetime.InitializeAsync()
