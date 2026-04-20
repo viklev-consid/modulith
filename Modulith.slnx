@@ -7,9 +7,17 @@
     <Project Path="src/AppHost/Modulith.AppHost.csproj" />
   </Folder>
   <Folder Name="/src/Modules/">
+    <Folder Name="/src/Modules/Audit/">
+      <Project Path="src/Modules/Audit/Modulith.Modules.Audit/Modulith.Modules.Audit.csproj" />
+      <Project Path="src/Modules/Audit/Modulith.Modules.Audit.Contracts/Modulith.Modules.Audit.Contracts.csproj" />
+    </Folder>
     <Folder Name="/src/Modules/Catalog/">
       <Project Path="src/Modules/Catalog/Modulith.Modules.Catalog/Modulith.Modules.Catalog.csproj" />
       <Project Path="src/Modules/Catalog/Modulith.Modules.Catalog.Contracts/Modulith.Modules.Catalog.Contracts.csproj" />
+    </Folder>
+    <Folder Name="/src/Modules/Notifications/">
+      <Project Path="src/Modules/Notifications/Modulith.Modules.Notifications/Modulith.Modules.Notifications.csproj" />
+      <Project Path="src/Modules/Notifications/Modulith.Modules.Notifications.Contracts/Modulith.Modules.Notifications.Contracts.csproj" />
     </Folder>
     <Folder Name="/src/Modules/Users/">
       <Project Path="src/Modules/Users/Modulith.Modules.Users/Modulith.Modules.Users.csproj" />
@@ -31,6 +39,8 @@
     <Project Path="tests/Modulith.TestSupport/Modulith.TestSupport.csproj" />
     <Project Path="tests/Modules/Catalog/Modulith.Modules.Catalog.UnitTests/Modulith.Modules.Catalog.UnitTests.csproj" />
     <Project Path="tests/Modules/Catalog/Modulith.Modules.Catalog.IntegrationTests/Modulith.Modules.Catalog.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/Audit/Modulith.Modules.Audit.IntegrationTests/Modulith.Modules.Audit.IntegrationTests.csproj" />
+    <Project Path="tests/Modules/Notifications/Modulith.Modules.Notifications.IntegrationTests/Modulith.Modules.Notifications.IntegrationTests.csproj" />
     <Project Path="tests/Modules/Users/Modulith.Modules.Users.UnitTests/Modulith.Modules.Users.UnitTests.csproj" />
     <Project Path="tests/Modules/Users/Modulith.Modules.Users.IntegrationTests/Modulith.Modules.Users.IntegrationTests.csproj" />
   </Folder>

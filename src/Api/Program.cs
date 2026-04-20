@@ -10,7 +10,9 @@ using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
 using Modulith.Api.Infrastructure.Exceptions;
 using Modulith.Api.Infrastructure.FeatureFlags;
+using Modulith.Modules.Audit;
 using Modulith.Modules.Catalog;
+using Modulith.Modules.Notifications;
 using Modulith.Modules.Users;
 using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Identity;
@@ -101,7 +103,9 @@ builder.Services.AddOpenApi();
 // 7. Module registration
 builder.Services
     .AddUsersModule(builder.Configuration, builder.Environment)
-    .AddCatalogModule(builder.Configuration, builder.Environment);
+    .AddCatalogModule(builder.Configuration, builder.Environment)
+    .AddAuditModule(builder.Configuration)
+    .AddNotificationsModule(builder.Configuration);
 
 // 8. API versioning
 builder.Services.AddApiVersioning(opts =>
@@ -197,6 +201,8 @@ builder.UseWolverine(opts =>
     // Register internal handlers per module (internal types require explicit inclusion)
     opts.AddUsersHandlers();
     opts.AddCatalogHandlers();
+    opts.AddAuditHandlers();
+    opts.AddNotificationsHandlers();
 });
 
 // Shared infrastructure services
@@ -232,6 +238,8 @@ app.UseHttpsRedirection();
 // 14. Module endpoint registrations
 app.MapUsersEndpoints();
 app.MapCatalogEndpoints();
+app.MapAuditEndpoints();
+app.MapNotificationsEndpoints();
 
 // 15. Dev seeders (idempotent)
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))

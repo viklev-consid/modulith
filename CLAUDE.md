@@ -100,6 +100,7 @@ Mistakes you will make if you aren't warned.
 - **Don't throw for expected failures.** `Result.Fail(...)` for validation, missing entities, business rule violations. Exceptions are bugs or infrastructure.
 - **Don't put business logic in handlers.** Handlers orchestrate; aggregates enforce invariants. If a handler has more than a few lines of branching, the logic belongs on the aggregate.
 - **Don't forget the outbox.** If a handler publishes integration events, the outbox ensures they're sent even on failure. Wolverine's `AutoApplyTransactions` handles this, but only if the handler is discovered correctly. Verify with an integration test.
+- **Don't make Wolverine handler types `internal`.** Wolverine requires handlers to be `public`, `concrete`, and closed. An `internal` handler compiles but throws `ArgumentOutOfRangeException: Handler types must be public` at startup. If a constructor parameter type is `internal`, make the type `public` — not the handler `internal`. Being `public` inside an internal project doesn't violate boundary rules; other modules still can't reference it.
 - **Don't skip the `.Contracts` project for a new module.** Even if nothing is exposed yet, the project must exist. Other modules will eventually subscribe.
 - **Don't bypass `IBlobStore`.** No direct `File.WriteAllBytes` for user content. The abstraction exists for a reason and the two-phase commit lifecycle depends on it.
 - **Don't add ASP.NET Identity.** We use a lightweight custom `User` aggregate by deliberate choice (ADR-0007).

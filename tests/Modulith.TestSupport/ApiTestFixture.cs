@@ -39,7 +39,11 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Jwt:Issuer", TestJwtIssuer);
         builder.UseSetting("Jwt:Audience", TestJwtAudience);
         builder.UseSetting("Jwt:SigningKey", TestJwtKey);
+
+        builder.ConfigureServices(services => ConfigureTestServices(services));
     }
+
+    protected virtual void ConfigureTestServices(IServiceCollection services) { }
 
     async Task IAsyncLifetime.InitializeAsync()
     {

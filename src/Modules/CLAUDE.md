@@ -112,6 +112,8 @@ The three permitted patterns (see ADR-0005):
 - Module B references `Orders.Contracts`, writes a handler in `Integration/`.
 - Wolverine's outbox delivers the event.
 
+> **Handler visibility:** All Wolverine handler classes — feature handlers and integration subscribers alike — must be `public`. An `internal` handler compiles but causes `ArgumentOutOfRangeException: Handler types must be public` at startup. If a dependency type is `internal`, make that type `public` rather than making the handler `internal`.
+
 **Queries:**
 - Module A exposes `GetUserByIdQuery` in `Users.Contracts.Queries`.
 - Module B sends via `IMessageBus.InvokeAsync<UserDto>(query)`.

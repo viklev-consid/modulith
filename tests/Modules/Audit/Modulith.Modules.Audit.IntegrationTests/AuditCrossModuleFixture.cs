@@ -4,16 +4,16 @@ using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Users.Persistence;
-using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.TestSupport;
 using Modulith.TestSupport.Fakes;
+using Modulith.Shared.Infrastructure.Notifications;
 
-namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
+namespace Modulith.Modules.Audit.IntegrationTests;
 
-[CollectionDefinition("CrossModule")]
-public sealed class CrossModuleCollection : ICollectionFixture<CrossModuleApiFixture> { }
+[CollectionDefinition("AuditCrossModule")]
+public sealed class AuditCrossModuleCollection : ICollectionFixture<AuditCrossModuleFixture> { }
 
-public sealed class CrossModuleApiFixture : ApiTestFixture
+public sealed class AuditCrossModuleFixture : ApiTestFixture
 {
     // Suppress SMTP dial attempts from the Notifications handler.
     protected override void ConfigureTestServices(IServiceCollection services)

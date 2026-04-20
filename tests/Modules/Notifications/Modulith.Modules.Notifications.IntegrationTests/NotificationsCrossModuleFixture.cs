@@ -8,17 +8,18 @@ using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.TestSupport;
 using Modulith.TestSupport.Fakes;
 
-namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
+namespace Modulith.Modules.Notifications.IntegrationTests;
 
-[CollectionDefinition("CrossModule")]
-public sealed class CrossModuleCollection : ICollectionFixture<CrossModuleApiFixture> { }
+[CollectionDefinition("NotificationsCrossModule")]
+public sealed class NotificationsCrossModuleCollection : ICollectionFixture<NotificationsCrossModuleFixture> { }
 
-public sealed class CrossModuleApiFixture : ApiTestFixture
+public sealed class NotificationsCrossModuleFixture : ApiTestFixture
 {
-    // Suppress SMTP dial attempts from the Notifications handler.
+    public FakeEmailSender EmailSender { get; } = new FakeEmailSender();
+
     protected override void ConfigureTestServices(IServiceCollection services)
     {
-        services.AddSingleton<IEmailSender, FakeEmailSender>();
+        services.AddSingleton<IEmailSender>(EmailSender);
     }
 
     protected override async Task MigrateAsync(IServiceProvider services)
