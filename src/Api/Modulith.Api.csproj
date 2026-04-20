@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Modules\Catalog\Modulith.Modules.Catalog\Modulith.Modules.Catalog.csproj" />
     <ProjectReference Include="..\Modules\Users\Modulith.Modules.Users\Modulith.Modules.Users.csproj" />
     <ProjectReference Include="..\ServiceDefaults\Modulith.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Shared\Modulith.Shared.Infrastructure\Modulith.Shared.Infrastructure.csproj" />
