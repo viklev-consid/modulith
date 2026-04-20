@@ -33,6 +33,8 @@ This directory contains ADRs documenting every significant design decision in Mo
 | [0025](0025-problem-details-for-errors.md) | ProblemDetails for All Error Responses | Accepted |
 | [0026](0026-module-seeders.md) | IModuleSeeder Contract for Deterministic Seed Data | Accepted |
 | [0027](0027-agentic-development-support.md) | First-Class Support for Agentic Development | Accepted |
+| [0028](0028-auth-flows-baseline.md) | Baseline Authentication Flows | Accepted |
+| [0029](0029-refresh-tokens-and-logout.md) | Refresh Tokens for Logout and Session Management | Accepted |
 
 ## Reading order
 
@@ -44,12 +46,14 @@ If you read five, read these in order:
 4. [0004 — Result Pattern](0004-result-pattern.md)
 5. [0015 — Architectural Tests](0015-architectural-tests.md)
 
-If you read ten, add:
+If you read more, add:
 
 6. [0005 — Module Communication](0005-module-communication-patterns.md)
 7. [0009 — Rich Domain Model](0009-rich-domain-model.md)
 8. [0023 — DbContext Per Module](0023-per-module-dbcontext.md)
 9. [0007 — No ASP.NET Identity](0007-no-aspnet-identity.md)
 10. [0027 — Agentic Development](0027-agentic-development-support.md)
+11. [0028 — Auth Flows Baseline](0028-auth-flows-baseline.md)
+12. [0029 — Refresh Tokens](0029-refresh-tokens-and-logout.md)
 
 Everything else is domain-specific and can be read as needed.
