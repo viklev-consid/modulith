@@ -8,7 +8,7 @@ using Wolverine;
 
 namespace Modulith.Modules.Catalog.Features.CreateProduct;
 
-internal sealed class CreateProductHandler(CatalogDbContext db, IMessageBus bus)
+public sealed class CreateProductHandler(CatalogDbContext db, IMessageBus bus)
 {
     public async Task<ErrorOr<CreateProductResponse>> Handle(CreateProductCommand cmd, CancellationToken ct)
     {

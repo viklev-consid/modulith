@@ -11,11 +11,11 @@ internal static class LoginEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapPost(UsersRoutes.Login,
-            async (LoginRequest request, IValidator<LoginRequest> validator, IMessageBus bus, CancellationToken ct) =>
+            async (LoginRequest request, [Microsoft.AspNetCore.Mvc.FromServices] IValidator<LoginRequest> validator, IMessageBus bus, CancellationToken ct) =>
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
-                    return Results.ValidationProblem(validation.ToDictionary());
+                    return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
 
                 var command = new LoginCommand(request.Email, request.Password);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<LoginResponse>>(command, ct);

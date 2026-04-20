@@ -6,7 +6,7 @@ using Modulith.Modules.Catalog.Persistence;
 
 namespace Modulith.Modules.Catalog.Features.GetProductById;
 
-internal sealed class GetProductByIdHandler(CatalogDbContext db)
+public sealed class GetProductByIdHandler(CatalogDbContext db)
 {
     public async Task<ErrorOr<GetProductByIdResponse>> Handle(GetProductByIdQuery query, CancellationToken ct)
     {

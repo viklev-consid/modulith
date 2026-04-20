@@ -16,6 +16,7 @@ using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
+using Wolverine;
 
 namespace Modulith.Modules.Users;
 
@@ -42,12 +43,20 @@ public static class UsersModule
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtGenerator, JwtGenerator>();
 
-        services.AddValidatorsFromAssemblyContaining<RegisterValidator>(ServiceLifetime.Scoped);
+        services.AddValidatorsFromAssemblyContaining<RegisterValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 
         if (environment.IsDevelopment())
             services.AddScoped<IModuleSeeder, UsersDevSeeder>();
 
         return services;
+    }
+
+    public static WolverineOptions AddUsersHandlers(this WolverineOptions opts)
+    {
+        opts.Discovery.IncludeType<RegisterHandler>();
+        opts.Discovery.IncludeType<LoginHandler>();
+        opts.Discovery.IncludeType<GetCurrentUserHandler>();
+        return opts;
     }
 
     public static IEndpointRouteBuilder MapUsersEndpoints(this IEndpointRouteBuilder app)

@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Modules\Catalog\Modulith.Modules.Catalog\Modulith.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Modules\Users\Modulith.Modules.Users\Modulith.Modules.Users.csproj" />
     <ProjectReference Include="..\..\..\Modulith.TestSupport\Modulith.TestSupport.csproj" />
   </ItemGroup>
 

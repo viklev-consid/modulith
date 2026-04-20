@@ -9,7 +9,7 @@ using Wolverine;
 
 namespace Modulith.Modules.Users.Features.Register;
 
-internal sealed class RegisterHandler(
+public sealed class RegisterHandler(
     UsersDbContext db,
     IPasswordHasher passwordHasher,
     IJwtGenerator jwtGenerator,

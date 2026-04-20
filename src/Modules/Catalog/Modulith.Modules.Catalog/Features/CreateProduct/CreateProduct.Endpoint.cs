@@ -11,11 +11,11 @@ internal static class CreateProductEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapPost(CatalogRoutes.Products,
-            async (CreateProductRequest request, IValidator<CreateProductRequest> validator, IMessageBus bus, CancellationToken ct) =>
+            async (CreateProductRequest request, [Microsoft.AspNetCore.Mvc.FromServices] IValidator<CreateProductRequest> validator, IMessageBus bus, CancellationToken ct) =>
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
-                    return Results.ValidationProblem(validation.ToDictionary());
+                    return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
 
                 var command = new CreateProductCommand(request.Sku, request.Name, request.Price, request.Currency);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<CreateProductResponse>>(command, ct);
