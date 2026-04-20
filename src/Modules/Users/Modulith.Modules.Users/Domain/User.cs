@@ -1,5 +1,6 @@
 using ErrorOr;
 using Modulith.Modules.Users.Domain.Events;
+using Modulith.Modules.Users.Errors;
 using Modulith.Shared.Kernel.Domain;
 using Modulith.Shared.Kernel.Interfaces;
 
@@ -30,10 +31,10 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public static ErrorOr<User> Create(Email email, PasswordHash passwordHash, string displayName)
     {
         if (string.IsNullOrWhiteSpace(displayName))
-            return Error.Validation("Users.DisplayName.Empty", "Display name cannot be empty.");
+            return UsersErrors.DisplayNameEmpty;
 
         if (displayName.Length > 100)
-            return Error.Validation("Users.DisplayName.TooLong", "Display name cannot exceed 100 characters.");
+            return UsersErrors.DisplayNameTooLong;
 
         var user = new User(UserId.New(), email, passwordHash, displayName.Trim());
         user.RaiseEvent(new UserRegistered(user.Id, email.Value, displayName.Trim()));
@@ -43,7 +44,7 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public ErrorOr<Success> ChangeEmail(Email newEmail)
     {
         if (Email == newEmail)
-            return Error.Conflict("Users.Email.Same", "The new email address is the same as the current one.");
+            return UsersErrors.EmailSame;
 
         var oldEmail = Email;
         Email = newEmail;

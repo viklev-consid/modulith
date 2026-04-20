@@ -11,7 +11,7 @@ namespace Modulith.Modules.Users.Features.GetCurrentUser;
 internal static class GetCurrentUserEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
-        app.MapGet("/v1/users/me",
+        app.MapGet(UsersRoutes.Me,
             async (ICurrentUser currentUser, IMessageBus bus, CancellationToken ct) =>
             {
                 if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))

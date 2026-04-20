@@ -10,7 +10,7 @@ namespace Modulith.Modules.Users.Features.Register;
 internal static class RegisterEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
-        app.MapPost("/v1/users/register",
+        app.MapPost(UsersRoutes.Register,
             async (RegisterRequest request, IValidator<RegisterRequest> validator, IMessageBus bus, CancellationToken ct) =>
             {
                 var validation = await validator.ValidateAsync(request, ct);

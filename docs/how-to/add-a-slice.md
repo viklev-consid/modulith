@@ -96,7 +96,7 @@ internal sealed class CancelOrderHandler
     {
         var order = await _db.Orders.FindAsync([cmd.OrderId], ct);
         if (order is null)
-            return Errors.Orders.NotFound(cmd.OrderId);
+            return OrdersErrors.NotFound(cmd.OrderId);
 
         var result = order.Cancel(cmd.Reason);
         if (result.IsError)
@@ -113,7 +113,7 @@ internal sealed class CancelOrderHandler
 Key points:
 
 - Return `ErrorOr<T>`, never throw for expected failures.
-- Errors come from a module-local `Errors` static class (canonical set per module).
+- Errors come from the module's `{Module}Errors` static class in `Errors/{Module}Errors.cs`. No inline strings.
 - Wolverine's `AutoApplyTransactions` policy wraps the handler in a DB transaction automatically.
 - Integration events are raised by the aggregate; Wolverine's outbox publishes them post-commit.
 
@@ -155,7 +155,7 @@ namespace Modulith.Modules.Orders.Features.CancelOrder;
 internal static class CancelOrderEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
-        app.MapPost("/v{version:apiVersion}/orders/{id:guid}/cancel",
+        app.MapPost(OrdersRoutes.CancelOrder,
             async (Guid id, CancelOrderRequest req, IMessageBus bus, CancellationToken ct) =>
             {
                 var command = new CancelOrderCommand(new OrderId(id), req.Reason);
@@ -175,9 +175,30 @@ internal static class CancelOrderEndpoint
 ```
 
 - Endpoint depends only on `IMessageBus`. No direct handler dependency.
+- Route strings come from `{Module}Routes` — a module-level constants file at `src/Modules/{Module}/Modulith.Modules.{Module}/{Module}Routes.cs`. Never inline route strings.
 - `ToProblemDetailsOr(Results.Ok)` is the shared extension that maps `ErrorOr` to HTTP (200 on success, appropriate ProblemDetails on failure).
 - OpenAPI metadata (`Produces`, `ProducesProblem`) is explicit — drives the Scalar docs.
 - Rate limit policy applied by name.
+
+### Add or update route constants
+
+Routes live in a module-level `{Module}Routes.cs`, not inlined in endpoint files. If the file doesn't exist yet, create it:
+
+```csharp
+// src/Modules/Orders/Modulith.Modules.Orders/OrdersRoutes.cs
+namespace Modulith.Modules.Orders;
+
+internal static class OrdersRoutes
+{
+    public const string GroupTag = "Orders";
+    public const string Prefix = "/v1/orders";
+    public const string PlaceOrder = Prefix;
+    public const string CancelOrder = $"{Prefix}/{{id:guid}}/cancel";
+    public const string GetOrderById = $"{Prefix}/{{id:guid}}";
+}
+```
+
+If the file already exists, add the new route constant to it.
 
 ### 7. Register the endpoint
 

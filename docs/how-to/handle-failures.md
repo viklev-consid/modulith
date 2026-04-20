@@ -39,37 +39,57 @@ public async Task<ErrorOr<OrderDto>> Handle(...)
 
 ```csharp
 if (order is null)
-    return Errors.Orders.NotFound(orderId);
+    return OrdersErrors.NotFound(orderId);
 
 if (order.Status == OrderStatus.Shipped)
-    return Errors.Orders.CannotCancelShipped;
+    return OrdersErrors.CannotCancelShipped;
 ```
 
 ### Module-local error catalog
 
-Each module defines a static `Errors` class with all of its error constants:
+Each module keeps all its errors in a single `{Module}Errors.cs` file under an `Errors/` folder:
+
+```
+src/Modules/Orders/Modulith.Modules.Orders/Errors/OrdersErrors.cs
+```
 
 ```csharp
-// src/Modules/Orders/Modulith.Modules.Orders/Domain/Errors.cs
-namespace Modulith.Modules.Orders.Domain;
+// Errors/OrdersErrors.cs
+using ErrorOr;
 
-internal static class Errors
+namespace Modulith.Modules.Orders.Errors;
+
+internal static class OrdersErrors
 {
-    public static class Orders
-    {
-        public static Error NotFound(OrderId id) =>
-            Error.NotFound("orders.not_found", $"Order {id.Value} was not found.");
+    // Order aggregate
+    public static Error NotFound(OrderId id) =>
+        Error.NotFound("Orders.NotFound", $"Order {id.Value} was not found.");
 
-        public static readonly Error CannotCancelShipped =
-            Error.Conflict("orders.cannot_cancel_shipped", "A shipped order cannot be cancelled.");
+    public static readonly Error CannotCancelShipped =
+        Error.Conflict("Orders.CannotCancelShipped", "A shipped order cannot be cancelled.");
 
-        public static readonly Error EmptyItems =
-            Error.Validation("orders.empty_items", "Order must contain at least one item.");
-    }
+    public static readonly Error EmptyItems =
+        Error.Validation("Orders.EmptyItems", "Order must contain at least one item.");
 }
 ```
 
-Stable error codes (`orders.not_found`) are the programmatic contract. Clients pattern-match on them.
+Rules:
+- **One file per module** — `{Module}Errors.cs` in `Errors/`. No inline strings anywhere else.
+- **Error codes are `{Module}.{PascalCaseName}`** — e.g. `Orders.CannotCancelShipped`. Treat them as a public API: once a client depends on a code, changing it is a breaking change.
+- **Domain types reference the errors class**, not inline strings. Add `using Modulith.Modules.Orders.Errors;` to domain files as needed — referencing module-internal code from the domain is permitted.
+- Use `static readonly Error` for fixed errors. Use a static method returning `Error` when the message needs runtime data (e.g. an ID).
+
+Usage in handlers and aggregates:
+
+```csharp
+if (order is null)
+    return OrdersErrors.NotFound(cmd.OrderId);
+
+if (order.Status == OrderStatus.Shipped)
+    return OrdersErrors.CannotCancelShipped;
+```
+
+Stable error codes are the programmatic contract. Clients pattern-match on them.
 
 ---
 
@@ -115,7 +135,7 @@ public async Task<ErrorOr<Response>> Handle(Command cmd, CancellationToken ct)
     }
     catch (DbUpdateConcurrencyException)
     {
-        return Errors.Orders.ConcurrencyConflict;
+        return OrdersErrors.ConcurrencyConflict;
     }
 }
 ```

@@ -10,7 +10,7 @@ namespace Modulith.Modules.Users.Features.Login;
 internal static class LoginEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
-        app.MapPost("/v1/users/login",
+        app.MapPost(UsersRoutes.Login,
             async (LoginRequest request, IValidator<LoginRequest> validator, IMessageBus bus, CancellationToken ct) =>
             {
                 var validation = await validator.ValidateAsync(request, ct);
