@@ -104,7 +104,7 @@ using Modulith.Modules.Users.Contracts.Events;
 
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
 
-internal sealed class OnUserEmailChangedHandler
+public sealed class OnUserEmailChangedHandler  // Must be public — Wolverine rejects internal handler types.
 {
     private readonly NotificationsDbContext _db;
 
@@ -116,6 +116,8 @@ internal sealed class OnUserEmailChangedHandler
     }
 }
 ```
+
+**Handler visibility:** Wolverine requires handler types to be `public`, `concrete`, and closed (non-generic). An `internal` handler compiles fine but throws `ArgumentOutOfRangeException` at startup. This applies to every handler type — feature handlers, integration subscribers, and outbox publishers.
 
 Wolverine discovers the handler by assembly scanning. The handler will be invoked whenever a `UserEmailChangedV1` is published, regardless of which module published it.
 
@@ -188,6 +190,7 @@ Wolverine supports running both versions in parallel. Each version is a distinct
 
 ## Common mistakes
 
+- **Making the handler `internal`.**  Wolverine requires handler types to be `public`. If a constructor parameter forces you toward `internal` (e.g. an `internal` interface), the fix is to make the interface `public` — not to make the handler `internal`. The `public` keyword here doesn't mean "exported for other modules to use"; it just satisfies the CLR visibility Wolverine needs.
 - **Publishing the internal event directly.** The arch test catches this — internal events must not be public, and public events must be in `.Contracts/Events`.
 - **Reusing domain types in public events.** `UserId` in a public event leaks internal types. Use `Guid`.
 - **Forgetting the version suffix.** Arch test catches this.
