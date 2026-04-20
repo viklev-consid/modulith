@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Modulith",
+  "classifications": ["Modulith", "Slice", "Feature"],
+  "identity": "Modulith.Slice",
+  "name": "Modulith Feature Slice",
+  "shortName": "modulith-slice",
+  "description": "Scaffolds the six files of a vertical feature slice inside an existing module.",
+  "sourceName": "FeatureName",
+  "symbols": {
+    "module": {
+      "type": "parameter",
+      "datatype": "string",
+      "replaces": "ModuleName",
+      "isRequired": true,
+      "description": "The PascalCase module name this slice belongs to (e.g. Catalog, Orders)."
+    },
+    "moduleNameLower": {
+      "type": "derived",
+      "valueSource": "module",
+      "valueTransform": "lowerCaseInvariant",
+      "replaces": "modulenamelower"
+    },
+    "featureNameLower": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "lowerCaseInvariant",
+      "replaces": "featurenamelower"
+    }
+  },
+  "sources": [
+    {
+      "include": ["**/*"],
+      "exclude": [".template.config/**"]
+    }
+  ]
+}

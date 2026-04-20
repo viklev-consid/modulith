@@ -17,7 +17,7 @@ For the architectural reasoning, see [`adr/0002-vertical-slice-architecture.md`]
 ## The scaffold (preferred)
 
 ```bash
-dotnet new slice --module Orders --name CancelOrder --verb Post
+dotnet new modulith-slice --module Orders --name CancelOrder --verb Post
 ```
 
 This produces six files under `src/Modules/Orders/Modulith.Modules.Orders/Features/CancelOrder/`:

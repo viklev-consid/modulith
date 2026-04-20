@@ -56,7 +56,7 @@ See [`docs/architecture.md`](../../docs/architecture.md) for full detail.
 Prefer the scaffold:
 
 ```bash
-dotnet new module --name Inventory
+dotnet new modulith-module --name Inventory
 ```
 
 This produces:
@@ -85,7 +85,7 @@ If you add the module manually (without the template), confirm all of the above 
 Prefer the scaffold:
 
 ```bash
-dotnet new slice --module Orders --name CancelOrder
+dotnet new modulith-slice --module Orders --name CancelOrder
 ```
 
 This produces the six files (`Request`, `Response`, `Command`, `Handler`, `Validator`, `Endpoint`) with correct namespaces and stub content, plus an integration test stub.

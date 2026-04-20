@@ -50,7 +50,7 @@ If a slice needs cross-module data, publish a domain event from the owning modul
 When the `dotnet new` templates are available, use them:
 
 ```bash
-dotnet new slice --module Orders --name CancelOrder
+dotnet new modulith-slice --module Orders --name CancelOrder
 ```
 
 ---
@@ -80,10 +80,10 @@ dotnet ef migrations add <Name> \
   --output-dir Persistence/Migrations
 
 # Scaffold a new slice (once dotnet new templates are wired up)
-dotnet new slice --module <Module> --name <FeatureName>
+dotnet new modulith-slice --module <Module> --name <FeatureName>
 
 # Scaffold a new module (once dotnet new templates are wired up)
-dotnet new module --name <ModuleName>
+dotnet new modulith-module --name <ModuleName>
 ```
 
 ---

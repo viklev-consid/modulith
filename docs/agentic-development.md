@@ -48,10 +48,10 @@ Two `dotnet new` item templates ship with Modulith:
 
 ```bash
 # Add a feature slice
-dotnet new slice --module Orders --name CancelOrder
+dotnet new modulith-slice --module Orders --name CancelOrder
 
 # Add a new module
-dotnet new module --name Inventory
+dotnet new modulith-module --name Inventory
 ```
 
 These generate the exact file set with correct namespaces, placeholder registrations, and stub tests. Agents should prefer these to manual scaffolding — manual scaffolding is how small inconsistencies creep in.

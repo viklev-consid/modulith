@@ -28,7 +28,7 @@ If you're unsure, ask.
 ## The scaffold (preferred)
 
 ```bash
-dotnet new module --name Inventory
+dotnet new modulith-module --name Inventory
 ```
 
 This produces:
