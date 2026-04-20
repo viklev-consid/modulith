@@ -5,9 +5,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Modulith.Modules.Users.ConsentManagement;
+using Modulith.Modules.Users.Features.DeleteAccount;
+using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
+using Modulith.Modules.Users.Gdpr;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Modules.Users.Seeding;
@@ -43,6 +47,11 @@ public static class UsersModule
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtGenerator, JwtGenerator>();
 
+        services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
+        services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
+        services.AddScoped<IPersonalDataEraser, UsersPersonalDataEraser>();
+        services.AddScoped<PersonalDataOrchestrator>();
+
         services.AddValidatorsFromAssemblyContaining<RegisterValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 
         if (environment.IsDevelopment())
@@ -56,6 +65,8 @@ public static class UsersModule
         opts.Discovery.IncludeType<RegisterHandler>();
         opts.Discovery.IncludeType<LoginHandler>();
         opts.Discovery.IncludeType<GetCurrentUserHandler>();
+        opts.Discovery.IncludeType<ExportPersonalDataHandler>();
+        opts.Discovery.IncludeType<DeleteAccountHandler>();
         return opts;
     }
 
@@ -64,6 +75,8 @@ public static class UsersModule
         RegisterEndpoint.Map(app);
         LoginEndpoint.Map(app);
         GetCurrentUserEndpoint.Map(app);
+        ExportPersonalDataEndpoint.Map(app);
+        DeleteAccountEndpoint.Map(app);
         return app;
     }
 }

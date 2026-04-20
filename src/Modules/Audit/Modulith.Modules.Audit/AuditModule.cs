@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Features.GetAuditTrail;
+using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Shared.Infrastructure.Persistence;
+using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Audit;
@@ -25,6 +27,9 @@ public static class AuditModule
                 b => b.MigrationsHistoryTable("__ef_migrations_history", "audit"));
             opts.AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>());
         });
+
+        services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
+        services.AddScoped<IPersonalDataEraser, AuditPersonalDataEraser>();
 
         return services;
     }

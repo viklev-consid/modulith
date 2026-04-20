@@ -7,6 +7,7 @@ namespace Modulith.Modules.Users.Persistence;
 public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : ModuleDbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<Consent> Consents => Set<Consent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -2,11 +2,12 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Modulith.Modules.Notifications.Consent;
+using Modulith.Modules.Notifications.Gdpr;
 using Modulith.Modules.Notifications.Integration.Subscribers;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
+using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Notifications;
@@ -22,7 +23,6 @@ public static class NotificationsModule
             .ValidateOnStart();
 
         services.AddScoped<IEmailSender, SmtpEmailSender>();
-        services.AddScoped<IConsentRegistry, AlwaysGrantedConsentRegistry>();
 
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
@@ -33,6 +33,9 @@ public static class NotificationsModule
                 b => b.MigrationsHistoryTable("__ef_migrations_history", "notifications"));
             opts.AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>());
         });
+
+        services.AddScoped<IPersonalDataExporter, NotificationsPersonalDataExporter>();
+        services.AddScoped<IPersonalDataEraser, NotificationsPersonalDataEraser>();
 
         return services;
     }

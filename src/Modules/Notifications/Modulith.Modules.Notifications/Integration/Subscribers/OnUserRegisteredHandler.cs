@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Modulith.Modules.Notifications.Consent;
 using Modulith.Modules.Notifications.Domain;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Templates;
+using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Kernel.Interfaces;
@@ -17,7 +17,7 @@ public sealed class OnUserRegisteredHandler(
 {
     public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
     {
-        if (!consentRegistry.HasConsented(@event.UserId, NotificationType.WelcomeEmail))
+        if (!await consentRegistry.HasConsentedAsync(@event.UserId, ConsentKeys.WelcomeEmail, ct))
             return;
 
         // Idempotency guard — safe to re-run on Wolverine retries.

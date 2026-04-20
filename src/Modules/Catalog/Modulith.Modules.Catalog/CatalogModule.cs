@@ -8,11 +8,13 @@ using Microsoft.Extensions.Hosting;
 using Modulith.Modules.Catalog.Features.CreateProduct;
 using Modulith.Modules.Catalog.Features.GetProductById;
 using Modulith.Modules.Catalog.Features.ListProducts;
+using Modulith.Modules.Catalog.Gdpr;
 using Modulith.Modules.Catalog.Integration.Subscribers;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Catalog.Seeding;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
+using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Catalog;
@@ -40,6 +42,9 @@ public static class CatalogModule
         });
 
         services.AddValidatorsFromAssemblyContaining<CreateProductValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
+
+        services.AddScoped<IPersonalDataExporter, CatalogPersonalDataExporter>();
+        services.AddScoped<IPersonalDataEraser, CatalogPersonalDataEraser>();
 
         if (environment.IsDevelopment())
             services.AddScoped<IModuleSeeder, CatalogDevSeeder>();
