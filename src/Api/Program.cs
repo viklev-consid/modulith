@@ -10,6 +10,7 @@ using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
 using Modulith.Api.Infrastructure.Exceptions;
 using Modulith.Api.Infrastructure.FeatureFlags;
+using Modulith.Modules.Catalog;
 using Modulith.Modules.Users;
 using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Identity;
@@ -98,7 +99,9 @@ builder.Services.AddAuthorization(opts =>
 builder.Services.AddOpenApi();
 
 // 7. Module registration
-builder.Services.AddUsersModule(builder.Configuration, builder.Environment);
+builder.Services
+    .AddUsersModule(builder.Configuration, builder.Environment)
+    .AddCatalogModule(builder.Configuration, builder.Environment);
 
 // 8. API versioning
 builder.Services.AddApiVersioning(opts =>
@@ -193,6 +196,7 @@ builder.UseWolverine(opts =>
 
     // Discover handlers in module assemblies
     opts.Discovery.IncludeAssembly(typeof(UsersModule).Assembly);
+    opts.Discovery.IncludeAssembly(typeof(CatalogModule).Assembly);
 
     // Each module adds its own EF Core outbox during registration:
     // opts.PersistMessagesWithEfCore<SomeModuleDbContext>();
@@ -230,6 +234,7 @@ app.UseHttpsRedirection();
 
 // 14. Module endpoint registrations
 app.MapUsersEndpoints();
+app.MapCatalogEndpoints();
 
 // 15. Dev seeders (idempotent)
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))

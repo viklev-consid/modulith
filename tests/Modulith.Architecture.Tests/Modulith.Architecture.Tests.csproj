@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Catalog\Modulith.Modules.Catalog\Modulith.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Modulith.Modules.Catalog.Contracts\Modulith.Modules.Catalog.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Modules\Users\Modulith.Modules.Users\Modulith.Modules.Users.csproj" />
     <ProjectReference Include="..\..\src\Modules\Users\Modulith.Modules.Users.Contracts\Modulith.Modules.Users.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Shared\Modulith.Shared.Kernel\Modulith.Shared.Kernel.csproj" />
