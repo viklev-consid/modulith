@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);CA1707</NoWarn>
+    <!-- CA1707: xUnit uses MethodName_Scenario_Expected convention; underscores allowed in test names. -->
+    <NoWarn>$(NoWarn);CA1707;CA1716</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
