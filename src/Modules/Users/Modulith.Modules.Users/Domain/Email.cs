@@ -1,4 +1,5 @@
 using ErrorOr;
+using Modulith.Modules.Users.Errors;
 
 namespace Modulith.Modules.Users.Domain;
 
@@ -7,16 +8,16 @@ public sealed record Email(string Value)
     public static ErrorOr<Email> Create(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return Error.Validation("Users.Email.Empty", "Email address cannot be empty.");
+            return UsersErrors.EmailEmpty;
 
         var normalized = value.Trim().ToLowerInvariant();
 
         if (normalized.Length > 254)
-            return Error.Validation("Users.Email.TooLong", "Email address cannot exceed 254 characters.");
+            return UsersErrors.EmailTooLong;
 
         var atIndex = normalized.IndexOf('@');
         if (atIndex <= 0 || atIndex == normalized.Length - 1)
-            return Error.Validation("Users.Email.Invalid", "Email address format is invalid.");
+            return UsersErrors.EmailInvalid;
 
         return new Email(normalized);
     }
