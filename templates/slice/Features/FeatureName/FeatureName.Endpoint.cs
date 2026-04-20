@@ -10,7 +10,7 @@ namespace Modulith.Modules.ModuleName.Features.FeatureName;
 internal static class FeatureNameEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
-        app.MapPost("/v1/modulenamelower/featurenamelower",
+        app.MapPost($"{ModuleNameRoutes.Prefix}/featurenamelower",
             async (
                 FeatureNameRequest request,
                 [Microsoft.AspNetCore.Mvc.FromServices] IValidator<FeatureNameRequest> validator,
