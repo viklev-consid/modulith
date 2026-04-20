@@ -54,7 +54,7 @@ dotnet new modulith-slice --module Orders --name CancelOrder
 dotnet new modulith-module --name Inventory
 ```
 
-These generate the exact file set with correct namespaces, placeholder registrations, and stub tests. Agents should prefer these to manual scaffolding — manual scaffolding is how small inconsistencies creep in.
+These generate the exact file set with correct namespaces and placeholder registrations. Agents should prefer these to manual scaffolding — manual scaffolding is how small inconsistencies creep in.
 
 ### Fast, specific feedback loops
 
@@ -69,7 +69,7 @@ These generate the exact file set with correct namespaces, placeholder registrat
 
 ### Worked examples
 
-Once modules are implemented, `docs/examples/` will contain non-trivial worked slices covering:
+`docs/examples/` will contain non-trivial worked slices once more modules are complete (Phase 11). Planned coverage:
 
 - Simple CRUD within a module
 - Cross-module event publishing and subscription

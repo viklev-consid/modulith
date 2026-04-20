@@ -30,10 +30,6 @@ Modulith is opinionated. It encodes a set of decisions that have been made delib
 
 ## Quick start
 
-> This template is documentation-first. Implementation will follow. See [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) for the planned build order.
-
-Once implemented:
-
 ```bash
 # Clone and enter the directory
 git clone <your-fork> my-api
@@ -64,7 +60,7 @@ dotnet test
 
 ## Status
 
-Documentation-complete. Implementation pending. This README will be updated as implementation progresses.
+Phases 1–9 complete (shared primitives, API host, architectural tests, Users, Catalog, cross-module events, Audit, Notifications, GDPR flows, `dotnet new` templates). See [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) for what remains.
 
 ## License
 

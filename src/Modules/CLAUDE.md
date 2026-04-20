@@ -61,20 +61,20 @@ dotnet new modulith-module --name Inventory
 
 This produces:
 
-- `src/Modules/Inventory/Modulith.Modules.Inventory/` with the standard folder structure
-- `src/Modules/Inventory/Modulith.Modules.Inventory.Contracts/` with an empty `Events/` folder
-- `tests/Modules/Inventory/Modulith.Modules.Inventory.UnitTests/`
-- `tests/Modules/Inventory/Modulith.Modules.Inventory.IntegrationTests/`
+- `src/Modules/Inventory/Modulith.Modules.Inventory/` (internal project)
+- `src/Modules/Inventory/Modulith.Modules.Inventory.Contracts/` with an `Events/` folder
 - Correct project references, csproj metadata, and namespace conventions
-- Stub `InventoryModule.cs` with `AddInventoryModule` and `MapInventoryEndpoints` extensions
-- Stub `InventoryDbContext.cs` pointing at the `inventory` schema
-- Stub `CLAUDE.md` for the module
+- `InventoryModule.cs` with `AddInventoryModule`, `AddInventoryHandlers` (Wolverine), and `MapInventoryEndpoints` extensions
+- `InventoryDbContext.cs` with the `inventory` schema
+- `InventoryRoutes.cs` with route prefix constants
+- `InventoryErrors.cs` stub for ErrorOr error definitions
+
+Test projects, `CLAUDE.md`, `InventoryOptions.cs`, and domain/feature subfolders must be added manually after scaffolding.
 
 After scaffolding:
 
-1. Register the module in `Api/Program.cs` (in the `AddXxxModule` block).
-2. Register the endpoints in `Api/Program.cs` (in the `MapXxxEndpoints` block).
-3. Add `InventoryOptions` and bind from `Modules:Inventory`.
+1. Register the module in `Api/Program.cs` (`AddInventoryModule`, `AddInventoryHandlers`, `MapInventoryEndpoints`).
+2. Add `InventoryOptions` and bind from `Modules:Inventory` if the module has configuration.
 
 If you add the module manually (without the template), confirm all of the above are present before committing. The architectural tests will catch missing pieces, but not all of them.
 
@@ -88,7 +88,7 @@ Prefer the scaffold:
 dotnet new modulith-slice --module Orders --name CancelOrder
 ```
 
-This produces the six files (`Request`, `Response`, `Command`, `Handler`, `Validator`, `Endpoint`) with correct namespaces and stub content, plus an integration test stub.
+This produces the six files (`Request`, `Response`, `Command`, `Handler`, `Validator`, `Endpoint`) with correct namespaces and stub content. The integration test must be written manually.
 
 After scaffolding:
 
@@ -170,12 +170,13 @@ See ADR-0023.
 
 ## Module registration
 
-Each module has a `<Module>Module.cs` with two extension methods:
+Each module has a `<Module>Module.cs` with three extension methods:
 
 ```csharp
 public static IServiceCollection Add<Module>Module(
     this IServiceCollection services,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    IWebHostEnvironment environment)
 {
     // Bind options
     services.AddOptions<<Module>Options>()
@@ -186,24 +187,30 @@ public static IServiceCollection Add<Module>Module(
     // Register DbContext
     services.AddDbContext<<Module>DbContext>(...);
 
-    // Register module-internal services
-    // (Wolverine discovers handlers via assembly scanning)
+    // Register validators from this assembly
+    services.AddValidatorsFromAssemblyContaining<<Module>DbContext>(
+        ServiceLifetime.Scoped, includeInternalTypes: true);
 
     return services;
+}
+
+public static WolverineOptions Add<Module>Handlers(this WolverineOptions opts)
+{
+    // Explicit handler registration (Wolverine does not auto-scan across assemblies)
+    opts.Discovery.IncludeType<SomeHandler>();
+    return opts;
 }
 
 public static IEndpointRouteBuilder Map<Module>Endpoints(
     this IEndpointRouteBuilder app)
 {
-    // Register endpoints from each slice
-    PlaceOrderEndpoint.Map(app);
-    CancelOrderEndpoint.Map(app);
+    SomeEndpoint.Map(app);
     // ...
     return app;
 }
 ```
 
-`Api/Program.cs` calls both in its composition phase.
+`Api/Program.cs` calls all three: `Add<Module>Module` in the services block, `Add<Module>Handlers` inside `UseWolverine(opts => ...)`, and `Map<Module>Endpoints` in the pipeline block.
 
 ---
 

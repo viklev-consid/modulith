@@ -480,7 +480,7 @@ Full flows: export, erase, verify data is gone (or anonymized where appropriate)
 
 ---
 
-## Phase 9: dotnet new templates
+## Phase 9: dotnet new templates ✓
 
 **Goal:** `dotnet new modulith-slice` and `dotnet new modulith-module` work.
 

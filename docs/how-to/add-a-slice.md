@@ -17,7 +17,7 @@ For the architectural reasoning, see [`adr/0002-vertical-slice-architecture.md`]
 ## The scaffold (preferred)
 
 ```bash
-dotnet new modulith-slice --module Orders --name CancelOrder --verb Post
+dotnet new modulith-slice --module Orders --name CancelOrder
 ```
 
 This produces six files under `src/Modules/Orders/Modulith.Modules.Orders/Features/CancelOrder/`:
@@ -29,11 +29,7 @@ This produces six files under `src/Modules/Orders/Modulith.Modules.Orders/Featur
 - `CancelOrder.Validator.cs`
 - `CancelOrder.Endpoint.cs`
 
-Plus an integration test stub:
-
-- `tests/Modules/Orders/Modulith.Modules.Orders.IntegrationTests/Features/CancelOrderTests.cs`
-
-All with correct namespaces and placeholder content.
+All with correct namespaces and stub content. The integration test file must be written manually — see Step 8 below.
 
 ---
 
