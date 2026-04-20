@@ -1,6 +1,10 @@
 ## .NET
 bin/
 obj/
+# Defensive: EF Core design-time tooling on macOS occasionally creates
+# directories with a literal backslash in the name (e.g. `bin\Debug`).
+bin\\*
+obj\\*
 *.user
 *.suo
 .vs/
