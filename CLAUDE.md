@@ -47,10 +47,10 @@ High-level:
 
 If a slice needs cross-module data, publish a domain event from the owning module and subscribe to it in the consuming module's `Integration/` folder. Never reach across.
 
-When the `dotnet new` templates are available, use them:
+Use the `dotnet new` templates:
 
 ```bash
-dotnet new slice --module Orders --name CancelOrder
+dotnet new modulith-slice --module Orders --name CancelOrder
 ```
 
 ---
@@ -79,11 +79,11 @@ dotnet ef migrations add <Name> \
   --context OrdersDbContext \
   --output-dir Persistence/Migrations
 
-# Scaffold a new slice (once dotnet new templates are wired up)
-dotnet new slice --module <Module> --name <FeatureName>
+# Scaffold a new slice
+dotnet new modulith-slice --module <Module> --name <FeatureName>
 
-# Scaffold a new module (once dotnet new templates are wired up)
-dotnet new module --name <ModuleName>
+# Scaffold a new module
+dotnet new modulith-module --name <ModuleName>
 ```
 
 ---

@@ -47,8 +47,8 @@ Failure messages name the rule, the type, and the fix:
 Item templates for slices and modules:
 
 ```bash
-dotnet new slice --module Orders --name CancelOrder
-dotnet new module --name Inventory
+dotnet new modulith-slice --module Orders --name CancelOrder
+dotnet new modulith-module --name Inventory
 ```
 
 Produces correct file structure, namespaces, registrations. Agents (and humans) prefer scaffolding to manual creation — manual creation is where small inconsistencies enter.

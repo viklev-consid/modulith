@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Modulith",
+  "classifications": ["Modulith", "Module"],
+  "identity": "Modulith.Module",
+  "name": "Modulith Module",
+  "shortName": "modulith-module",
+  "description": "Scaffolds a complete Modulith module: internal project, contracts project, DbContext, module registration, and errors type.",
+  "sourceName": "ModuleName",
+  "symbols": {
+    "moduleNameLower": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "lowerCaseInvariant",
+      "replaces": "modulenamelower"
+    }
+  },
+  "sources": [
+    {
+      "include": ["**/*"],
+      "exclude": [".template.config/**"]
+    }
+  ]
+}

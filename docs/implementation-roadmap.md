@@ -480,9 +480,9 @@ Full flows: export, erase, verify data is gone (or anonymized where appropriate)
 
 ---
 
-## Phase 9: dotnet new templates
+## Phase 9: dotnet new templates ✓
 
-**Goal:** `dotnet new slice` and `dotnet new module` work.
+**Goal:** `dotnet new modulith-slice` and `dotnet new modulith-module` work.
 
 ### 9.1 Slice template
 
@@ -501,8 +501,8 @@ Full flows: export, erase, verify data is gone (or anonymized where appropriate)
 dotnet new install ./templates/slice
 dotnet new install ./templates/module
 
-dotnet new module --name TestModule
-dotnet new slice --module TestModule --name TestFeature
+dotnet new modulith-module --name TestModule
+dotnet new modulith-slice --module TestModule --name TestFeature
 ```
 
 Verify the generated files compile and integrate.
@@ -607,7 +607,7 @@ At the end of this roadmap:
 - Scalar at `/scalar/v1` shows versioned, documented endpoints.
 - Register → login → do things → erase account all work end-to-end.
 - Cross-module event flow observable in the Aspire dashboard (traces connect).
-- `dotnet new module` and `dotnet new slice` produce correct scaffolds.
+- `dotnet new modulith-module` and `dotnet new modulith-slice` produce correct scaffolds.
 - CI runs three tiers reliably.
 - Documentation matches code.
 

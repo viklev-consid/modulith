@@ -28,31 +28,34 @@ If you're unsure, ask.
 ## The scaffold (preferred)
 
 ```bash
-dotnet new module --name Inventory
+dotnet new modulith-module --name Inventory
 ```
 
 This produces:
 
 - `src/Modules/Inventory/Modulith.Modules.Inventory/` (internal project)
-- `src/Modules/Inventory/Modulith.Modules.Inventory.Contracts/` (public project)
-- `tests/Modules/Inventory/Modulith.Modules.Inventory.UnitTests/`
-- `tests/Modules/Inventory/Modulith.Modules.Inventory.IntegrationTests/`
+- `src/Modules/Inventory/Modulith.Modules.Inventory.Contracts/` (public project with `Events/` folder)
 
-Plus:
+With the following files already populated:
 
-- Correct csproj references
-- Stub `InventoryModule.cs` with registration extensions
-- Stub `InventoryDbContext.cs` with the `inventory` schema
-- Stub `InventoryOptions.cs` with validation wiring
-- Stub `CLAUDE.md` for the module
-- Empty `Features/`, `Domain/`, `Integration/`, `Seeding/`, `Persistence/Configurations/`, `Persistence/Migrations/`
-- Empty `Events/` in the Contracts project
+- `InventoryModule.cs` — `AddInventoryModule`, `AddInventoryHandlers` (Wolverine handler discovery), and `MapInventoryEndpoints` extension methods
+- `InventoryDbContext.cs` — inherits `ModuleDbContext`, `inventory` schema wired via `HasDefaultSchema`
+- `InventoryRoutes.cs` — route constants with `GroupTag` and `Prefix`
+- `InventoryErrors.cs` — stub static errors class using `ErrorOr`
+- Correct csproj references and package list for both projects
+
+**Not produced by the scaffold — add manually after scaffolding:**
+
+- Test projects (`UnitTests`, `IntegrationTests`) — see Step 10 below
+- `InventoryOptions.cs` — add if the module requires configuration (see Step 4 below)
+- `CLAUDE.md` for the module — see Step 9 below
+- `Domain/`, `Features/`, `Integration/`, `Seeding/`, `Persistence/Configurations/`, `Persistence/Migrations/` folders — create as you add content
 
 ---
 
 ## Doing it manually
 
-If you must (e.g., the scaffold doesn't exist yet or you're customizing), here's the full set:
+If you must (e.g., you're customising beyond the scaffold), here's the full set:
 
 ### 1. Create the project directories
 
