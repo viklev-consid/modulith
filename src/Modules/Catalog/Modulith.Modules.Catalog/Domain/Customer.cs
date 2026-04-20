@@ -26,4 +26,10 @@ public sealed class Customer : Entity<CustomerId>, IAuditableEntity
 
     public static Customer FromUserRegistered(Guid userId, string email, string displayName)
         => new(CustomerId.New(), userId, email, displayName);
+
+    public void Anonymize()
+    {
+        Email = "deleted@example.com";
+        DisplayName = "Deleted User";
+    }
 }

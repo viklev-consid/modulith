@@ -45,4 +45,10 @@ public sealed class AuditEntry : Entity<AuditEntryId>
             resourceId,
             payload,
             occurredAt);
+
+    public void AnonymizeActor(string anonymizedPayload)
+    {
+        ActorId = null;
+        Payload = anonymizedPayload;
+    }
 }
