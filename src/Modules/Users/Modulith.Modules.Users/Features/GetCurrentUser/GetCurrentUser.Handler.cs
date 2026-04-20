@@ -1,0 +1,21 @@
+using ErrorOr;
+using Modulith.Modules.Users.Errors;
+using Modulith.Modules.Users.Persistence;
+
+namespace Modulith.Modules.Users.Features.GetCurrentUser;
+
+internal sealed class GetCurrentUserHandler(UsersDbContext db)
+{
+    public async Task<ErrorOr<GetCurrentUserResponse>> Handle(GetCurrentUserQuery query, CancellationToken ct)
+    {
+        var user = await db.Users.FindAsync([query.UserId], ct);
+        if (user is null)
+            return UsersErrors.UserNotFound;
+
+        return new GetCurrentUserResponse(
+            user.Id.Value,
+            user.Email.Value,
+            user.DisplayName,
+            user.CreatedAt);
+    }
+}

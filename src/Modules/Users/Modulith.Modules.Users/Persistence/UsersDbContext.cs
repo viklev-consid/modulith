@@ -1,0 +1,17 @@
+using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Users.Domain;
+using Modulith.Shared.Infrastructure.Persistence;
+
+namespace Modulith.Modules.Users.Persistence;
+
+public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : ModuleDbContext(options)
+{
+    public DbSet<User> Users => Set<User>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.HasDefaultSchema("users");
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(UsersDbContext).Assembly);
+    }
+}

@@ -3,19 +3,16 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <!-- CA1707: xUnit uses MethodName_Scenario_Expected convention; underscores allowed in test names. -->
-    <NoWarn>$(NoWarn);CA1707;CA1716</NoWarn>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\Users\Modulith.Modules.Users\Modulith.Modules.Users.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Users\Modulith.Modules.Users.Contracts\Modulith.Modules.Users.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Shared\Modulith.Shared.Kernel\Modulith.Shared.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Modules\Users\Modulith.Modules.Users\Modulith.Modules.Users.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="NetArchTest.Rules" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>

@@ -8,12 +8,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
-using Modulith.Api.Infrastructure.Auth;
 using Modulith.Api.Infrastructure.Exceptions;
 using Modulith.Api.Infrastructure.FeatureFlags;
+using Modulith.Modules.Users;
+using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Logging;
 using Modulith.Shared.Infrastructure.Messaging;
+using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
 using Scalar.AspNetCore;
@@ -95,7 +97,10 @@ builder.Services.AddAuthorization(opts =>
 // 6. OpenAPI + Scalar
 builder.Services.AddOpenApi();
 
-// 7. API versioning
+// 7. Module registration
+builder.Services.AddUsersModule(builder.Configuration, builder.Environment);
+
+// 8. API versioning
 builder.Services.AddApiVersioning(opts =>
 {
     opts.DefaultApiVersion = new ApiVersion(1, 0);
@@ -106,7 +111,7 @@ builder.Services.AddApiVersioning(opts =>
         new HeaderApiVersionReader("X-Api-Version"));
 });
 
-// 8. Rate limiting with tiered policies (in-memory; for distributed limiting use ingress-layer)
+// 9. Rate limiting with tiered policies (in-memory; for distributed limiting use ingress-layer)
 builder.Services.AddRateLimiter(opts =>
 {
     opts.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
@@ -167,16 +172,16 @@ builder.Services.AddRateLimiter(opts =>
     };
 });
 
-// 9. HybridCache backed by Redis (gracefully degrades to L1-only without Redis)
+// 10. HybridCache backed by Redis (gracefully degrades to L1-only without Redis)
 builder.AddRedisDistributedCache("cache");
 builder.Services.AddHybridCache();
 
-// 10. Feature management with per-user targeting
+// 11. Feature management with per-user targeting
 builder.Services
     .AddFeatureManagement()
     .WithTargeting<CurrentUserTargetingContextAccessor>();
 
-// 11. Wolverine — messaging, outbox, background jobs
+// 12. Wolverine — messaging, outbox, background jobs
 builder.UseWolverine(opts =>
 {
     opts.Policies.AutoApplyTransactions();
@@ -185,6 +190,9 @@ builder.UseWolverine(opts =>
     opts.Policies.AddMiddleware<FluentValidationMiddleware>(_ => true);
     opts.Policies.AddMiddleware<AuditMiddleware>(_ => true);
     opts.Policies.AddMiddleware<CacheInvalidationMiddleware>(_ => true);
+
+    // Discover handlers in module assemblies
+    opts.Discovery.IncludeAssembly(typeof(UsersModule).Assembly);
 
     // Each module adds its own EF Core outbox during registration:
     // opts.PersistMessagesWithEfCore<SomeModuleDbContext>();
@@ -200,7 +208,7 @@ var app = builder.Build();
 // Health and liveness endpoints — exempt from rate limiting via Aspire ServiceDefaults
 app.MapDefaultEndpoints();
 
-// 12. Global exception handler (converts unhandled exceptions to ProblemDetails with traceId)
+// 13. Global exception handler (converts unhandled exceptions to ProblemDetails with traceId)
 app.UseExceptionHandler();
 
 app.UseRateLimiter();
@@ -220,9 +228,17 @@ else
 
 app.UseHttpsRedirection();
 
-// 13. Module endpoint registrations — added here as modules are wired up:
-// app.MapUsersEndpoints();
-// app.MapCatalogEndpoints();
+// 14. Module endpoint registrations
+app.MapUsersEndpoints();
+
+// 15. Dev seeders (idempotent)
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var seeders = scope.ServiceProvider.GetServices<IModuleSeeder>();
+    foreach (var seeder in seeders)
+        await seeder.SeedAsync();
+}
 
 app.Run();
 
@@ -238,3 +254,6 @@ static RateLimitPartition<string> PerUserPartition(string policy, HttpContext ct
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             QueueLimit = 0
         });
+
+// Needed for WebApplicationFactory<Program> in integration tests.
+public partial class Program { }

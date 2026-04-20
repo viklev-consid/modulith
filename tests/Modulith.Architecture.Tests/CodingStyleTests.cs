@@ -47,6 +47,7 @@ public sealed class CodingStyleTests
     private static bool IsGeneratedFile(string path) =>
         path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar) ||
         path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar) ||
+        path.Contains(Path.DirectorySeparatorChar + "Migrations" + Path.DirectorySeparatorChar) ||
         path.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase);
 

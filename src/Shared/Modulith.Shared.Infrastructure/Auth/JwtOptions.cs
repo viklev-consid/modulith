@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Modulith.Api.Infrastructure.Auth;
+namespace Modulith.Shared.Infrastructure.Auth;
 
 public sealed class JwtOptions
 {
