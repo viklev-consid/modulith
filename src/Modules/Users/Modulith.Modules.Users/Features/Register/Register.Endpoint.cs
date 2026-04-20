@@ -11,11 +11,11 @@ internal static class RegisterEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapPost(UsersRoutes.Register,
-            async (RegisterRequest request, IValidator<RegisterRequest> validator, IMessageBus bus, CancellationToken ct) =>
+            async (RegisterRequest request, [Microsoft.AspNetCore.Mvc.FromServices] IValidator<RegisterRequest> validator, IMessageBus bus, CancellationToken ct) =>
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
-                    return Results.ValidationProblem(validation.ToDictionary());
+                    return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
 
                 var command = new RegisterCommand(request.Email, request.Password, request.DisplayName);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<RegisterResponse>>(command, ct);

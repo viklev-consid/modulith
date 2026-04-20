@@ -7,7 +7,7 @@ using Modulith.Modules.Users.Security;
 
 namespace Modulith.Modules.Users.Features.Login;
 
-internal sealed class LoginHandler(
+public sealed class LoginHandler(
     UsersDbContext db,
     IPasswordHasher passwordHasher,
     IJwtGenerator jwtGenerator)

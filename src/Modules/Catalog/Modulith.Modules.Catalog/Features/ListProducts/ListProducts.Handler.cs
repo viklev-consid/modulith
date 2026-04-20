@@ -4,7 +4,7 @@ using Modulith.Modules.Catalog.Persistence;
 
 namespace Modulith.Modules.Catalog.Features.ListProducts;
 
-internal sealed class ListProductsHandler(CatalogDbContext db)
+public sealed class ListProductsHandler(CatalogDbContext db)
 {
     public async Task<ErrorOr<ListProductsResponse>> Handle(ListProductsQuery query, CancellationToken ct)
     {

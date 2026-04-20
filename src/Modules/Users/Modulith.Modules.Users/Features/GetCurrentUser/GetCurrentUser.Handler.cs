@@ -4,7 +4,7 @@ using Modulith.Modules.Users.Persistence;
 
 namespace Modulith.Modules.Users.Features.GetCurrentUser;
 
-internal sealed class GetCurrentUserHandler(UsersDbContext db)
+public sealed class GetCurrentUserHandler(UsersDbContext db)
 {
     public async Task<ErrorOr<GetCurrentUserResponse>> Handle(GetCurrentUserQuery query, CancellationToken ct)
     {

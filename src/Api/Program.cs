@@ -194,12 +194,9 @@ builder.UseWolverine(opts =>
     opts.Policies.AddMiddleware<AuditMiddleware>(_ => true);
     opts.Policies.AddMiddleware<CacheInvalidationMiddleware>(_ => true);
 
-    // Discover handlers in module assemblies
-    opts.Discovery.IncludeAssembly(typeof(UsersModule).Assembly);
-    opts.Discovery.IncludeAssembly(typeof(CatalogModule).Assembly);
-
-    // Each module adds its own EF Core outbox during registration:
-    // opts.PersistMessagesWithEfCore<SomeModuleDbContext>();
+    // Register internal handlers per module (internal types require explicit inclusion)
+    opts.AddUsersHandlers();
+    opts.AddCatalogHandlers();
 });
 
 // Shared infrastructure services
