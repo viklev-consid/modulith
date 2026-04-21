@@ -28,7 +28,10 @@ public sealed class AuditableEntitySaveChangesInterceptor(
 
     private void UpdateAuditFields(DbContext? context)
     {
-        if (context is null) return;
+        if (context is null)
+        {
+            return;
+        }
 
         var now = clock.UtcNow;
         var actor = currentUser.Id;

@@ -32,7 +32,9 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         await client.ConnectAsync(_options.Host, _options.Port, secureSocketOptions, ct);
 
         if (_options.Username is not null)
+        {
             await client.AuthenticateAsync(_options.Username, _options.Password ?? string.Empty, ct);
+        }
 
         await client.SendAsync(mail, ct);
         await client.DisconnectAsync(quit: true, ct);

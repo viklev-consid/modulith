@@ -10,16 +10,23 @@ public sealed class FluentValidationMiddleware(IServiceProvider serviceProvider)
         CancellationToken cancellationToken)
     {
         if (envelope.Message is not { } message)
+        {
             return HandlerContinuation.Continue;
+        }
 
         var validatorType = typeof(IValidator<>).MakeGenericType(message.GetType());
         if (serviceProvider.GetService(validatorType) is not IValidator validator)
+        {
             return HandlerContinuation.Continue;
+        }
 
         var context = new ValidationContext<object>(message);
         var result = await validator.ValidateAsync(context, cancellationToken);
 
-        if (result.IsValid) return HandlerContinuation.Continue;
+        if (result.IsValid)
+        {
+            return HandlerContinuation.Continue;
+        }
 
         throw new ValidationException(result.Errors);
     }
