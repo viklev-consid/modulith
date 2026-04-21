@@ -54,6 +54,7 @@ dotnet test
 - [`docs/agentic-development.md`](docs/agentic-development.md) — how this template is set up for AI agent development
 - [`docs/adr/`](docs/adr/) — Architecture Decision Records explaining *why* each major decision was made
 - [`docs/how-to/`](docs/how-to/) — practical guides for common tasks
+- [`docs/examples/`](docs/examples/) — worked patterns extracted from real modules (query slice, command+event, cross-module subscriber, scheduled job, security-sensitive slice)
 - [`COMPLIANCE.md`](COMPLIANCE.md) — GDPR posture and compliance considerations
 - [`CONFIG.md`](CONFIG.md) — configuration hierarchy and secrets management
 - [`CLAUDE.md`](CLAUDE.md) — operating manual for AI agents working in this codebase
