@@ -59,7 +59,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
             "/v1/users/register",
             new RegisterRequest("notify@example.com", "Password1!", "Notify User"));
 
-        // Wolverine processes the UserRegisteredV1 event asynchronously; poll for up to 10 s.
+        // Wolverine processes UserRegisteredV1 asynchronously — poll for up to 10 s.
         using var http = new HttpClient();
         MailpitMessagesResponse? result = null;
 
