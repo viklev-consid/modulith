@@ -54,6 +54,48 @@ public sealed class AuditModuleTests
     }
 
     [Fact]
+    public void AuditDomain_HasNoFluentValidationReferences()
+    {
+        var result = Types.InAssembly(AuditAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("FluentValidation")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Audit Domain/ must not reference FluentValidation. " +
+            $"Domain validation uses the Result pattern; FluentValidation belongs in feature slice Validators. " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
+    public void AuditDomain_HasNoFeatureManagementReferences()
+    {
+        var result = Types.InAssembly(AuditAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("Microsoft.FeatureManagement")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Audit Domain/ must not reference Microsoft.FeatureManagement. " +
+            $"Feature flags belong at the edges (endpoint routing, handler selection). " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
+    public void AuditDomain_HasNoCachingReferences()
+    {
+        var result = Types.InAssembly(AuditAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("Microsoft.Extensions.Caching")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Audit Domain/ must not reference Microsoft.Extensions.Caching. " +
+            $"Cache interaction belongs in handlers and infrastructure, not domain types. " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
     public void AuditEntry_HasNoPublicSetters()
     {
         var publicSetters = typeof(AuditEntry)
