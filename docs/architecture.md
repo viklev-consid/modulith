@@ -26,9 +26,9 @@ The architecture is designed to be easy to split into separate services later, b
 │                    + durable outbox + scheduled jobs                  │
 │                                  │                                    │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐          │
-│  │  Users   │   │ Catalog  │   │  Orders  │   │  Audit   │   ...    │
-│  │ Module   │   │  Module  │   │  Module  │   │  Module  │          │
-│  │          │   │          │   │          │   │          │          │
+│  │  Users   │   │ Catalog  │   │  Notifi- │   │  Audit   │   ...    │
+│  │ Module   │   │  Module  │   │ cations  │   │  Module  │          │
+│  │          │   │          │   │  Module  │   │          │          │
 │  │  own DB  │   │  own DB  │   │  own DB  │   │  own DB  │          │
 │  │  schema  │   │  schema  │   │  schema  │   │  schema  │          │
 │  └──────────┘   └──────────┘   └──────────┘   └──────────┘          │
@@ -64,6 +64,9 @@ Modulith.sln
 │       ├── Users/
 │       │   ├── Modulith.Modules.Users/                # Internal
 │       │   └── Modulith.Modules.Users.Contracts/      # Public messages
+│       ├── Catalog/
+│       │   ├── Modulith.Modules.Catalog/
+│       │   └── Modulith.Modules.Catalog.Contracts/
 │       ├── Notifications/
 │       │   ├── Modulith.Modules.Notifications/
 │       │   └── Modulith.Modules.Notifications.Contracts/

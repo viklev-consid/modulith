@@ -350,7 +350,7 @@ internal sealed class ConfirmEmailChangeHandler
 
 ## Refresh token rotation
 
-### Login slice (updated from Phase 4)
+### Login slice
 
 ```csharp
 internal sealed class LoginHandler
@@ -517,8 +517,6 @@ For web clients storing refresh tokens:
 - **Preferred:** `HttpOnly; Secure; SameSite=Strict` cookie set by the login endpoint. The refresh endpoint reads the cookie. No JS access — immune to XSS token theft.
 - **Acceptable:** `localStorage`, with awareness that XSS compromises the token. Strong CSP required.
 - **Never:** URL query parameters. Logged everywhere.
-
-The template's reference client guidance document these patterns in `docs/how-to/client-integration.md` (added in Phase 4.5).
 
 ---
 

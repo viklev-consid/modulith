@@ -60,7 +60,7 @@ dotnet test
 
 ## Status
 
-Phases 1–9 complete (shared primitives, API host, architectural tests, Users, Catalog, cross-module events, Audit, Notifications, GDPR flows, `dotnet new` templates). See [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) for what remains.
+Phases 0–10 complete: solution skeleton, shared primitives, API host, architectural tests, Users module (full auth baseline: register, login, password reset, email change, refresh token rotation, logout), Catalog, cross-module event flow, Audit, Notifications, GDPR flows, `dotnet new` templates, and CI pipeline. See [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) for Phase 12 polish items.
 
 ## License
 
