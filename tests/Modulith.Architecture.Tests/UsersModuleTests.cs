@@ -67,6 +67,48 @@ public sealed class UsersModuleTests
     }
 
     [Fact]
+    public void RefreshToken_HasNoPublicSetters()
+    {
+        var publicSetters = typeof(RefreshToken)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.SetMethod?.IsPublic == true)
+            .Select(p => p.Name)
+            .ToList();
+
+        Assert.True(publicSetters.Count == 0,
+            $"FAIL: RefreshToken entity must not have public setters. " +
+            $"Found public setters on: {string.Join(", ", publicSetters)}.");
+    }
+
+    [Fact]
+    public void SingleUseToken_HasNoPublicSetters()
+    {
+        var publicSetters = typeof(SingleUseToken)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.SetMethod?.IsPublic == true)
+            .Select(p => p.Name)
+            .ToList();
+
+        Assert.True(publicSetters.Count == 0,
+            $"FAIL: SingleUseToken entity must not have public setters. " +
+            $"Found public setters on: {string.Join(", ", publicSetters)}.");
+    }
+
+    [Fact]
+    public void PendingEmailChange_HasNoPublicSetters()
+    {
+        var publicSetters = typeof(PendingEmailChange)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.SetMethod?.IsPublic == true)
+            .Select(p => p.Name)
+            .ToList();
+
+        Assert.True(publicSetters.Count == 0,
+            $"FAIL: PendingEmailChange entity must not have public setters. " +
+            $"Found public setters on: {string.Join(", ", publicSetters)}.");
+    }
+
+    [Fact]
     public void UsersContracts_DoesNotReferenceUsersInternal()
     {
         var referencedNames = ContractsAssembly
@@ -96,5 +138,54 @@ public sealed class UsersModuleTests
         Assert.True(eventTypes.Count == 0,
             $"FAIL: Integration events in Contracts/Events must have a version suffix (V1, V2, …). " +
             $"Missing suffix on: {string.Join(", ", eventTypes)}.");
+    }
+
+    [Fact]
+    public void UsersModule_DoesNotUseRawDateTimeUtcNow()
+    {
+        // Verify no production source uses DateTime.UtcNow directly in the Users module.
+        // All code must use IClock to allow testability and deterministic security invariants.
+        //
+        // This test checks for the method reference via IL inspection — any direct call to
+        // DateTime.get_UtcNow in non-test code in the Users assembly is a violation.
+        var violations = UsersAssembly.GetTypes()
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
+                                          BindingFlags.Static | BindingFlags.Instance |
+                                          BindingFlags.DeclaredOnly))
+            .Where(m => m.GetMethodBody() is not null)
+            .Where(m =>
+            {
+                try
+                {
+                    var il = m.GetMethodBody()!.GetILAsByteArray();
+                    if (il is null) return false;
+                    var module = m.Module;
+                    // Check if DateTime.UtcNow is referenced in this method's metadata tokens
+                    for (int i = 0; i < il.Length - 4; i++)
+                    {
+                        if (il[i] is 0x28 or 0x6F) // call or callvirt opcode
+                        {
+                            var token = System.BitConverter.ToInt32(il, i + 1);
+                            try
+                            {
+                                var resolved = module.ResolveMethod(token);
+                                if (resolved?.DeclaringType == typeof(DateTime) &&
+                                    resolved.Name == "get_UtcNow")
+                                    return true;
+                            }
+                            catch { /* token may not resolve */ }
+                        }
+                    }
+                    return false;
+                }
+                catch { return false; }
+            })
+            .Select(m => $"{m.DeclaringType?.Name}.{m.Name}")
+            .ToList();
+
+        Assert.True(violations.Count == 0,
+            $"FAIL: DateTime.UtcNow must not be used directly in the Users module. " +
+            $"Inject and use IClock instead (required for testability and token expiry correctness). " +
+            $"Violations: {string.Join(", ", violations)}");
     }
 }
