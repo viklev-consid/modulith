@@ -50,5 +50,5 @@ internal static class UsersErrors
 
     // Password errors
     public static readonly Error CurrentPasswordIncorrect =
-        Error.Validation("Users.Password.CurrentIncorrect", "The current password is incorrect.");
+        Error.Unauthorized("Users.Password.CurrentIncorrect", "The current password is incorrect.");
 }

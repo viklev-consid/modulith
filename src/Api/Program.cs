@@ -218,7 +218,8 @@ app.MapDefaultEndpoints();
 // 13. Global exception handler (converts unhandled exceptions to ProblemDetails with traceId)
 app.UseExceptionHandler();
 
-app.UseRateLimiter();
+if (!app.Environment.IsEnvironment("Test"))
+    app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
