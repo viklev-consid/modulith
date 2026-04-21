@@ -10,8 +10,14 @@ internal sealed class UsersDevSeeder(UsersDbContext db, IPasswordHasher password
 {
     private static readonly (string Email, string Password, string DisplayName)[] SeedUsers =
     [
-        ("alice@example.com", "Password1!", "Alice Example"),
-        ("bob@example.com",   "Password1!", "Bob Example"),
+        ("alice@example.com",   "Password1!", "Alice Example"),
+        ("bob@example.com",     "Password1!", "Bob Example"),
+        ("charlie@example.com", "Password1!", "Charlie Example"),
+        ("diana@example.com",   "Password1!", "Diana Example"),
+        ("eve@example.com",     "Password1!", "Eve Example"),
+        ("frank@example.com",   "Password1!", "Frank Example"),
+        ("grace@example.com",   "Password1!", "Grace Example"),
+        ("henry@example.com",   "Password1!", "Henry Example"),
     ];
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
