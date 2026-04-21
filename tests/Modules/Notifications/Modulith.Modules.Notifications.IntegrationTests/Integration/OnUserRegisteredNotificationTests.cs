@@ -38,7 +38,11 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
             var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
             log = await db.NotificationLogs
                 .FirstOrDefaultAsync(l => l.UserId == userId, cts.Token);
-            if (log is not null) break;
+            if (log is not null)
+            {
+                break;
+            }
+
             await Task.Delay(200, cts.Token);
         }
 
@@ -73,7 +77,11 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
             using var scope = fixture.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
             var exists = await db.NotificationLogs.AnyAsync(l => l.UserId == userId, cts.Token);
-            if (exists) break;
+            if (exists)
+            {
+                break;
+            }
+
             await Task.Delay(200, cts.Token);
         }
 

@@ -19,14 +19,22 @@ internal sealed class UsersDevSeeder(UsersDbContext db, IPasswordHasher password
         foreach (var (email, password, displayName) in SeedUsers)
         {
             var emailResult = Email.Create(email);
-            if (emailResult.IsError) continue;
+            if (emailResult.IsError)
+            {
+                continue;
+            }
 
             if (await db.Users.AnyAsync(u => u.Email == emailResult.Value, cancellationToken))
+            {
                 continue;
+            }
 
             var passwordHash = new PasswordHash(passwordHasher.Hash(password));
             var userResult = User.Create(emailResult.Value, passwordHash, displayName);
-            if (userResult.IsError) continue;
+            if (userResult.IsError)
+            {
+                continue;
+            }
 
             db.Users.Add(userResult.Value);
         }

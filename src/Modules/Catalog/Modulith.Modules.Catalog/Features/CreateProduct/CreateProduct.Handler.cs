@@ -14,20 +14,28 @@ public sealed class CreateProductHandler(CatalogDbContext db, IMessageBus bus)
     {
         var skuResult = Sku.Create(cmd.Sku);
         if (skuResult.IsError)
+        {
             return skuResult.Errors;
+        }
 
         var sku = skuResult.Value;
 
         if (await db.Products.AnyAsync(p => p.Sku == sku, ct))
+        {
             return CatalogErrors.SkuAlreadyExists;
+        }
 
         var priceResult = Money.Create(cmd.Price, cmd.Currency);
         if (priceResult.IsError)
+        {
             return priceResult.Errors;
+        }
 
         var productResult = Product.Create(sku, cmd.Name, priceResult.Value);
         if (productResult.IsError)
+        {
             return productResult.Errors;
+        }
 
         var product = productResult.Value;
         db.Products.Add(product);

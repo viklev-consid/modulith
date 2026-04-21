@@ -17,7 +17,9 @@ public sealed class LogoutAllHandler(UsersDbContext db, IClock clock, IMessageBu
 
         var userExists = await db.Users.AnyAsync(u => u.Id == userId, ct);
         if (!userExists)
+        {
             return UsersErrors.UserNotFound;
+        }
 
         await db.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)

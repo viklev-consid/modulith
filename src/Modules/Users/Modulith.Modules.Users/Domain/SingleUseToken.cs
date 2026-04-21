@@ -67,7 +67,9 @@ public sealed class SingleUseToken : Entity<SingleUseTokenId>
     public ErrorOr.ErrorOr<ErrorOr.Success> Consume(IClock clock)
     {
         if (!IsValid(clock))
+        {
             return UsersErrors.InvalidOrExpiredToken;
+        }
 
         ConsumedAt = clock.UtcNow;
         return ErrorOr.Result.Success;

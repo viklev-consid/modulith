@@ -21,15 +21,21 @@ public sealed class ResetPasswordHandler(
     {
         var token = await tokenService.FindValidAsync(cmd.Token, TokenPurpose.PasswordReset, ct);
         if (token is null)
+        {
             return UsersErrors.InvalidOrExpiredToken;
+        }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == token.UserId, ct);
         if (user is null)
+        {
             return UsersErrors.InvalidOrExpiredToken;
+        }
 
         var consumeResult = token.Consume(clock);
         if (consumeResult.IsError)
+        {
             return consumeResult.Errors;
+        }
 
         var newHash = new PasswordHash(passwordHasher.Hash(cmd.NewPassword));
         user.SetPassword(newHash);

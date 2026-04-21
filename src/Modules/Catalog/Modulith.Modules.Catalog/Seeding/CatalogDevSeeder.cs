@@ -19,16 +19,27 @@ internal sealed class CatalogDevSeeder(CatalogDbContext db) : IModuleSeeder
         foreach (var (rawSku, name, price, currency) in SeedProducts)
         {
             var skuResult = Sku.Create(rawSku);
-            if (skuResult.IsError) continue;
+            if (skuResult.IsError)
+            {
+                continue;
+            }
 
             if (await db.Products.AnyAsync(p => p.Sku == skuResult.Value, cancellationToken))
+            {
                 continue;
+            }
 
             var priceResult = Money.Create(price, currency);
-            if (priceResult.IsError) continue;
+            if (priceResult.IsError)
+            {
+                continue;
+            }
 
             var productResult = Product.Create(skuResult.Value, name, priceResult.Value);
-            if (productResult.IsError) continue;
+            if (productResult.IsError)
+            {
+                continue;
+            }
 
             db.Products.Add(productResult.Value);
         }

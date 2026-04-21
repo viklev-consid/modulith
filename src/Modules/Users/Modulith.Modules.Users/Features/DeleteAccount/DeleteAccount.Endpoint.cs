@@ -16,7 +16,9 @@ internal static class DeleteAccountEndpoint
             async (ICurrentUser currentUser, IMessageBus bus, CancellationToken ct) =>
             {
                 if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))
+                {
                     return Results.Unauthorized();
+                }
 
                 var command = new DeleteAccountCommand(new UserId(userId));
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<Deleted>>(command, ct);

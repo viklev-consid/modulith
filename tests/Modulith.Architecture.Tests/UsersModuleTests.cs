@@ -158,7 +158,11 @@ public sealed class UsersModuleTests
                 try
                 {
                     var il = m.GetMethodBody()!.GetILAsByteArray();
-                    if (il is null) return false;
+                    if (il is null)
+                    {
+                        return false;
+                    }
+
                     var module = m.Module;
                     // Check if DateTime.UtcNow is referenced in this method's metadata tokens
                     for (int i = 0; i < il.Length - 4; i++)
@@ -171,7 +175,9 @@ public sealed class UsersModuleTests
                                 var resolved = module.ResolveMethod(token);
                                 if (resolved?.DeclaringType == typeof(DateTime) &&
                                     resolved.Name == "get_UtcNow")
+                                {
                                     return true;
+                                }
                             }
                             catch { /* token may not resolve */ }
                         }

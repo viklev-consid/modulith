@@ -21,21 +21,29 @@ public sealed class RequestEmailChangeHandler(
         // Always return the same response to prevent enumeration of email addresses.
         var newEmailResult = Email.Create(cmd.NewEmail);
         if (newEmailResult.IsError)
+        {
             return new RequestEmailChangeResponse();
+        }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
         if (user is null)
+        {
             return new RequestEmailChangeResponse();
+        }
 
         if (!passwordHasher.Verify(cmd.CurrentPassword, user.PasswordHash.Value))
+        {
             return new RequestEmailChangeResponse();
+        }
 
         var newEmail = newEmailResult.Value;
 
         // If email is already taken, return success shape without sending anything.
         var emailTaken = await db.Users.AnyAsync(u => u.Email == newEmail && u.Id != user.Id, ct);
         if (emailTaken)
+        {
             return new RequestEmailChangeResponse();
+        }
 
         // Remove any existing pending change for this user.
         await db.PendingEmailChanges

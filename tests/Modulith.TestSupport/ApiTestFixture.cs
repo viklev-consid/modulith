@@ -79,7 +79,11 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     public async Task ResetDatabaseAsync()
     {
-        if (_respawner is null) return;
+        if (_respawner is null)
+        {
+            return;
+        }
+
         await using var conn = new NpgsqlConnection(ConnectionString);
         await conn.OpenAsync();
         await _respawner.ResetAsync(conn);

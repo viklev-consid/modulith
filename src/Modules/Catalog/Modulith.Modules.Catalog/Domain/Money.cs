@@ -17,15 +17,21 @@ public sealed record Money
     public static ErrorOr<Money> Create(decimal amount, string? currency = "USD")
     {
         if (amount < 0)
+        {
             return CatalogErrors.PriceNegative;
+        }
 
         if (string.IsNullOrWhiteSpace(currency))
+        {
             return CatalogErrors.CurrencyEmpty;
+        }
 
         var normalized = currency.Trim().ToUpperInvariant();
 
         if (normalized.Length != 3)
+        {
             return CatalogErrors.CurrencyInvalid;
+        }
 
         return new Money(amount, normalized);
     }

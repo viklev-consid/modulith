@@ -21,7 +21,9 @@ public sealed class ForgotPasswordHandler(
 
         // Always return the same response regardless of whether the email exists.
         if (emailResult.IsError)
+        {
             return new ForgotPasswordResponse();
+        }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == emailResult.Value, ct);
 

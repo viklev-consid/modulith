@@ -20,7 +20,9 @@ internal static class LoginEndpoint
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
+                {
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
 
                 var ip = httpContext.Connection.RemoteIpAddress?.ToString();
                 var command = new LoginCommand(request.Email, request.Password, ip);

@@ -20,30 +20,42 @@ public sealed class ConfirmEmailChangeHandler(
     {
         var singleUseToken = await tokenService.FindValidAsync(cmd.Token, TokenPurpose.EmailChange, ct);
         if (singleUseToken is null)
+        {
             return UsersErrors.InvalidOrExpiredToken;
+        }
 
         // Token must belong to the requesting user.
         if (singleUseToken.UserId != new UserId(cmd.UserId))
+        {
             return UsersErrors.InvalidOrExpiredToken;
+        }
 
         var pending = await db.PendingEmailChanges
             .FirstOrDefaultAsync(p => p.UserId == singleUseToken.UserId && p.TokenId == singleUseToken.Id, ct);
 
         if (pending is null)
+        {
             return UsersErrors.InvalidOrExpiredToken;
+        }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == singleUseToken.UserId, ct);
         if (user is null)
+        {
             return UsersErrors.InvalidOrExpiredToken;
+        }
 
         var consumeResult = singleUseToken.Consume(clock);
         if (consumeResult.IsError)
+        {
             return consumeResult.Errors;
+        }
 
         var oldEmail = user.Email.Value;
         var changeResult = user.ChangeEmail(pending.NewEmail);
         if (changeResult.IsError)
+        {
             return changeResult.Errors;
+        }
 
         db.PendingEmailChanges.Remove(pending);
 

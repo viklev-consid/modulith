@@ -25,17 +25,23 @@ public sealed class RegisterHandler(
     {
         var emailResult = Email.Create(cmd.Email);
         if (emailResult.IsError)
+        {
             return emailResult.Errors;
+        }
 
         var email = emailResult.Value;
 
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
+        {
             return UsersErrors.EmailAlreadyRegistered;
+        }
 
         var passwordHash = new PasswordHash(passwordHasher.Hash(cmd.Password));
         var userResult = User.Create(email, passwordHash, cmd.DisplayName);
         if (userResult.IsError)
+        {
             return userResult.Errors;
+        }
 
         var user = userResult.Value;
         db.Users.Add(user);

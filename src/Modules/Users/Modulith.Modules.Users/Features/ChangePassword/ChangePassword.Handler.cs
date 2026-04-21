@@ -20,10 +20,14 @@ public sealed class ChangePasswordHandler(
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
         if (user is null)
+        {
             return UsersErrors.UserNotFound;
+        }
 
         if (!passwordHasher.Verify(cmd.CurrentPassword, user.PasswordHash.Value))
+        {
             return UsersErrors.CurrentPasswordIncorrect;
+        }
 
         var newHash = new PasswordHash(passwordHasher.Hash(cmd.NewPassword));
         user.SetPassword(newHash);
@@ -32,7 +36,9 @@ public sealed class ChangePasswordHandler(
         var query = db.RefreshTokens.Where(t => t.UserId == user.Id && t.RevokedAt == null);
 
         if (cmd.ActiveRefreshTokenId is not null && Guid.TryParse(cmd.ActiveRefreshTokenId, out var keepId))
+        {
             query = query.Where(t => t.Id != new RefreshTokenId(keepId));
+        }
 
         await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
 

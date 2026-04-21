@@ -19,8 +19,10 @@ internal static class ForgotPasswordEndpoint
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
+                {
                     // Return 200 even on bad input — anti-enumeration; no useful information to return
                     return Results.Ok(new ForgotPasswordResponse());
+                }
 
                 var command = new ForgotPasswordCommand(request.Email);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<ForgotPasswordResponse>>(command, ct);

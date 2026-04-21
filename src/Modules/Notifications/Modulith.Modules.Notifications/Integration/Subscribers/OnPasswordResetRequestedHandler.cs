@@ -20,7 +20,9 @@ public sealed class OnPasswordResetRequestedHandler(
             ct);
 
         if (alreadySent)
+        {
             return;
+        }
 
         // The raw token is passed through as-is; the consuming client constructs the
         // full reset URL from its own base URL and this token.

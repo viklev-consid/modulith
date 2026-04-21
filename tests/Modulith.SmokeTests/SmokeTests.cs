@@ -71,7 +71,9 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
                 $"{fixture.MailpitApiUrl}/api/v1/messages");
 
             if (result?.Messages?.Length > 0)
+            {
                 break;
+            }
         }
 
         Assert.NotNull(result);

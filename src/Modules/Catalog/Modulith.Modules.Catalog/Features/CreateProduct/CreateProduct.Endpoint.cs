@@ -15,7 +15,9 @@ internal static class CreateProductEndpoint
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
+                {
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
 
                 var command = new CreateProductCommand(request.Sku, request.Name, request.Price, request.Currency);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<CreateProductResponse>>(command, ct);

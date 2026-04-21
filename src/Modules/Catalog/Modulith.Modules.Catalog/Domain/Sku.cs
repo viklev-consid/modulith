@@ -12,12 +12,16 @@ public sealed record Sku
     public static ErrorOr<Sku> Create(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             return CatalogErrors.SkuEmpty;
+        }
 
         var normalized = value.Trim().ToUpperInvariant();
 
         if (normalized.Length > 50)
+        {
             return CatalogErrors.SkuTooLong;
+        }
 
         return new Sku(normalized);
     }

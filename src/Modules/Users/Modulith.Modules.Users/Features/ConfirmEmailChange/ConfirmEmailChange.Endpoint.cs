@@ -21,10 +21,14 @@ internal static class ConfirmEmailChangeEndpoint
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
+                {
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
 
                 if (!Guid.TryParse(currentUser.Id, out var userId))
+                {
                     return Results.Unauthorized();
+                }
 
                 var command = new ConfirmEmailChangeCommand(userId, request.Token);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<ConfirmEmailChangeResponse>>(command, ct);

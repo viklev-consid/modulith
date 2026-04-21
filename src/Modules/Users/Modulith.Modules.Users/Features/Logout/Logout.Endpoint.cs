@@ -19,7 +19,9 @@ internal static class LogoutEndpoint
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
+                {
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
 
                 var command = new LogoutCommand(request.RefreshToken);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<LogoutResponse>>(command, ct);

@@ -21,10 +21,14 @@ internal static class RequestEmailChangeEndpoint
             {
                 var validation = await validator.ValidateAsync(request, ct);
                 if (!validation.IsValid)
+                {
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
 
                 if (!Guid.TryParse(currentUser.Id, out var userId))
+                {
                     return Results.Unauthorized();
+                }
 
                 var command = new RequestEmailChangeCommand(userId, request.NewEmail, request.CurrentPassword);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<RequestEmailChangeResponse>>(command, ct);

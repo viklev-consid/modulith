@@ -13,7 +13,9 @@ public sealed class CatalogPersonalDataExporter(CatalogDbContext db) : IPersonal
             .FirstOrDefaultAsync(c => c.UserId == user.UserId, ct);
 
         if (customer is null)
+        {
             return new PersonalDataExport(user.UserId, "Catalog", new Dictionary<string, object?>());
+        }
 
         var data = new Dictionary<string, object?>
         {
