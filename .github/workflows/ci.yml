@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  # ── Tier 1: Fast ─────────────────────────────────────────────────────────
+  # Runs on every push and PR. Build + unit + architectural tests only.
+  # No Docker, no containers. Target: < 1 minute.
+  fast:
+    name: Fast (build + unit + arch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Fast tests
+        run: dotnet test --no-build --configuration Release --filter "Category!=Integration&Category!=Smoke"
+
+  # ── Tier 2: Integration ──────────────────────────────────────────────────
+  # Runs on pull requests (after fast passes). Full integration tests.
+  # Needs Docker for Testcontainers (Postgres).
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    needs: fast
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Integration tests
+        run: dotnet test --no-build --configuration Release --filter "Category=Integration"
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+
+  # ── Tier 3: Smoke ────────────────────────────────────────────────────────
+  # Runs on pushes to main and on manual dispatch. Full-stack smoke tests.
+  # Needs Docker for Testcontainers (Postgres + Mailpit).
+  smoke:
+    name: Smoke
+    runs-on: ubuntu-latest
+    needs: integration
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Smoke tests
+        run: dotnet test --no-build --configuration Release --filter "Category=Smoke"
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
