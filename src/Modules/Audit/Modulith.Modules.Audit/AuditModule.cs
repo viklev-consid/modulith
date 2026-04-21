@@ -31,6 +31,9 @@ public static class AuditModule
         services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
         services.AddScoped<IPersonalDataEraser, AuditPersonalDataEraser>();
 
+        services.AddHealthChecks()
+            .AddDbContextCheck<AuditDbContext>("audit-db", tags: ["ready"]);
+
         return services;
     }
 

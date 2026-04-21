@@ -46,6 +46,9 @@ public static class CatalogModule
         services.AddScoped<IPersonalDataExporter, CatalogPersonalDataExporter>();
         services.AddScoped<IPersonalDataEraser, CatalogPersonalDataEraser>();
 
+        services.AddHealthChecks()
+            .AddDbContextCheck<CatalogDbContext>("catalog-db", tags: ["ready"]);
+
         if (environment.IsDevelopment())
         {
             services.AddScoped<IModuleSeeder, CatalogDevSeeder>();

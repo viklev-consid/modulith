@@ -68,6 +68,9 @@ public static class UsersModule
         services.AddScoped<IPersonalDataEraser, UsersPersonalDataEraser>();
         services.AddScoped<PersonalDataOrchestrator>();
 
+        services.AddHealthChecks()
+            .AddDbContextCheck<UsersDbContext>("users-db", tags: ["ready"]);
+
         services.AddValidatorsFromAssemblyContaining<RegisterValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 
         if (environment.IsDevelopment())
