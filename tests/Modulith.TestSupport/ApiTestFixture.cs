@@ -49,6 +49,10 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
     {
         await _postgres.StartAsync();
 
+        // Allow subclasses to start additional containers (e.g. Mailpit) before the host
+        // is built, so their ports are available inside ConfigureWebHost.
+        await StartAdditionalContainersAsync();
+
         // Trigger host build (reads ConnectionString set above) then migrate.
         using var scope = Services.CreateScope();
         await MigrateAsync(scope.ServiceProvider);
@@ -62,6 +66,12 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
             SchemasToInclude = GetSchemasToReset(),
         });
     }
+
+    /// <summary>
+    /// Override to start extra containers (e.g. Mailpit) before the WebApplicationFactory
+    /// host is built. Ports are knowable here and usable in ConfigureWebHost overrides.
+    /// </summary>
+    protected virtual Task StartAdditionalContainersAsync() => Task.CompletedTask;
 
     protected abstract Task MigrateAsync(IServiceProvider services);
 
@@ -120,5 +130,9 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
     async Task IAsyncLifetime.DisposeAsync()
     {
         await _postgres.DisposeAsync();
+        await DisposeAdditionalContainersAsync();
     }
+
+    /// <summary>Override to dispose extra containers started in StartAdditionalContainersAsync.</summary>
+    protected virtual Task DisposeAdditionalContainersAsync() => Task.CompletedTask;
 }

@@ -2,11 +2,27 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CA1707;CA1711</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Audit\Modulith.Modules.Audit\Modulith.Modules.Audit.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Modulith.Modules.Catalog\Modulith.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\Modulith.Modules.Notifications\Modulith.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Users\Modulith.Modules.Users\Modulith.Modules.Users.csproj" />
+    <ProjectReference Include="..\Modulith.TestSupport\Modulith.TestSupport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Respawn" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
