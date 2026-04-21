@@ -14,4 +14,7 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
 
     public bool IsAuthenticated =>
         httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+
+    public string? ActiveRefreshTokenId =>
+        httpContextAccessor.HttpContext?.User?.FindFirstValue("rtid");
 }

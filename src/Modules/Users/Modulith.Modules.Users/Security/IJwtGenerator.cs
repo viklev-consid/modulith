@@ -4,5 +4,5 @@ namespace Modulith.Modules.Users.Security;
 
 public interface IJwtGenerator
 {
-    string Generate(UserId userId, string email, string displayName);
+    string Generate(UserId userId, string email, string displayName, Guid refreshTokenId);
 }
