@@ -6,12 +6,21 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Modulith.Modules.Users.ConsentManagement;
+using Modulith.Modules.Users.Features.ChangePassword;
+using Modulith.Modules.Users.Features.ConfirmEmailChange;
 using Modulith.Modules.Users.Features.DeleteAccount;
 using Modulith.Modules.Users.Features.ExportPersonalData;
+using Modulith.Modules.Users.Features.ForgotPassword;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.Login;
+using Modulith.Modules.Users.Features.Logout;
+using Modulith.Modules.Users.Features.LogoutAll;
+using Modulith.Modules.Users.Features.RefreshToken;
 using Modulith.Modules.Users.Features.Register;
+using Modulith.Modules.Users.Features.RequestEmailChange;
+using Modulith.Modules.Users.Features.ResetPassword;
 using Modulith.Modules.Users.Gdpr;
+using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Modules.Users.Seeding;
@@ -31,6 +40,11 @@ public static class UsersModule
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
+        services.AddOptions<UsersOptions>()
+            .Bind(configuration.GetSection("Modules:Users"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddSingleton<IClock, SystemClock>();
@@ -46,6 +60,8 @@ public static class UsersModule
 
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtGenerator, JwtGenerator>();
+        services.AddScoped<IRefreshTokenIssuer, RefreshTokenIssuer>();
+        services.AddScoped<ISingleUseTokenService, SingleUseTokenService>();
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
@@ -67,6 +83,18 @@ public static class UsersModule
         opts.Discovery.IncludeType<GetCurrentUserHandler>();
         opts.Discovery.IncludeType<ExportPersonalDataHandler>();
         opts.Discovery.IncludeType<DeleteAccountHandler>();
+
+        // Auth flow handlers — Phase 9.5
+        opts.Discovery.IncludeType<ForgotPasswordHandler>();
+        opts.Discovery.IncludeType<ResetPasswordHandler>();
+        opts.Discovery.IncludeType<ChangePasswordHandler>();
+        opts.Discovery.IncludeType<RequestEmailChangeHandler>();
+        opts.Discovery.IncludeType<ConfirmEmailChangeHandler>();
+        opts.Discovery.IncludeType<RefreshTokenHandler>();
+        opts.Discovery.IncludeType<LogoutHandler>();
+        opts.Discovery.IncludeType<LogoutAllHandler>();
+        opts.Discovery.IncludeType<SweepExpiredTokensHandler>();
+
         return opts;
     }
 
@@ -77,6 +105,17 @@ public static class UsersModule
         GetCurrentUserEndpoint.Map(app);
         ExportPersonalDataEndpoint.Map(app);
         DeleteAccountEndpoint.Map(app);
+
+        // Auth flow endpoints — Phase 9.5
+        ForgotPasswordEndpoint.Map(app);
+        ResetPasswordEndpoint.Map(app);
+        ChangePasswordEndpoint.Map(app);
+        RequestEmailChangeEndpoint.Map(app);
+        ConfirmEmailChangeEndpoint.Map(app);
+        RefreshTokenEndpoint.Map(app);
+        LogoutEndpoint.Map(app);
+        LogoutAllEndpoint.Map(app);
+
         return app;
     }
 }

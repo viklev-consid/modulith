@@ -86,6 +86,15 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         return client;
     }
 
+    /// <summary>Creates an authenticated client using an existing JWT (e.g. from a real login response).</summary>
+    public HttpClient CreateAuthenticatedClientWithToken(string accessToken)
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        return client;
+    }
+
     public static string GenerateTestToken(Guid userId, string email, string displayName)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtKey));

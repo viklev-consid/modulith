@@ -43,6 +43,11 @@ public static class NotificationsModule
     public static WolverineOptions AddNotificationsHandlers(this WolverineOptions opts)
     {
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
+        opts.Discovery.IncludeType<OnPasswordResetRequestedHandler>();
+        opts.Discovery.IncludeType<OnPasswordResetHandler>();
+        opts.Discovery.IncludeType<OnPasswordChangedHandler>();
+        opts.Discovery.IncludeType<OnEmailChangeRequestedHandler>();
+        opts.Discovery.IncludeType<OnEmailChangedHandler>();
         return opts;
     }
 

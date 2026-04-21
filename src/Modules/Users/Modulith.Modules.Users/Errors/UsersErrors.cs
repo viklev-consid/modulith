@@ -33,4 +33,22 @@ internal static class UsersErrors
 
     public static readonly Error UserNotFound =
         Error.NotFound("Users.UserNotFound", "User was not found.");
+
+    // Token errors — single generic error to prevent token oracle attacks
+    public static readonly Error InvalidOrExpiredToken =
+        Error.Validation("Users.Token.InvalidOrExpired", "The token is invalid, expired, or has already been used.");
+
+    // Refresh token errors
+    public static readonly Error RefreshTokenNotFound =
+        Error.Unauthorized("Users.RefreshToken.NotFound", "The refresh token is invalid.");
+
+    public static readonly Error RefreshTokenExpired =
+        Error.Unauthorized("Users.RefreshToken.Expired", "The refresh token has expired. Please log in again.");
+
+    public static readonly Error RefreshTokenRevoked =
+        Error.Unauthorized("Users.RefreshToken.Revoked", "The refresh token has been revoked.");
+
+    // Password errors
+    public static readonly Error CurrentPasswordIncorrect =
+        Error.Unauthorized("Users.Password.CurrentIncorrect", "The current password is incorrect.");
 }

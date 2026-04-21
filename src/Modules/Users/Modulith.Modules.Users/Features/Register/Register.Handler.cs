@@ -1,5 +1,6 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
@@ -15,6 +16,8 @@ public sealed class RegisterHandler(
     UsersDbContext db,
     IPasswordHasher passwordHasher,
     IJwtGenerator jwtGenerator,
+    IRefreshTokenIssuer refreshTokenIssuer,
+    IOptions<UsersOptions> options,
     IMessageBus bus,
     IClock clock)
 {
@@ -40,11 +43,21 @@ public sealed class RegisterHandler(
         // Grant default consents on registration.
         db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.WelcomeEmail, clock.UtcNow));
 
+        // Issue refresh token alongside initial access token.
+        var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
+
         await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName));
 
-        var token = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName);
-        return new RegisterResponse(user.Id.Value, token);
+        var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
+        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, refreshToken.Id.Value);
+
+        return new RegisterResponse(
+            user.Id.Value,
+            accessToken,
+            accessTokenExpiresAt,
+            rawRefreshToken,
+            refreshToken.ExpiresAt);
     }
 }

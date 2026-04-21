@@ -8,4 +8,14 @@ internal static class UsersRoutes
     public const string Login = $"{Prefix}/login";
     public const string Me = $"{Prefix}/me";
     public const string PersonalData = $"{Me}/personal-data";
+
+    // Auth flows — Phase 9.5
+    public const string ForgotPassword = $"{Prefix}/password/forgot";
+    public const string ResetPassword = $"{Prefix}/password/reset";
+    public const string ChangePassword = $"{Me}/password";
+    public const string RequestEmailChange = $"{Me}/email/request";
+    public const string ConfirmEmailChange = $"{Me}/email/confirm";
+    public const string RefreshToken = $"{Prefix}/token/refresh";
+    public const string Logout = $"{Prefix}/logout";
+    public const string LogoutAll = $"{Prefix}/logout/all";
 }

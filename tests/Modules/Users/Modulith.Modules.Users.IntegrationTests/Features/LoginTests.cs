@@ -27,6 +27,7 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(body);
         Assert.NotEmpty(body.AccessToken);
+        Assert.NotEmpty(body.RefreshToken);
     }
 
     [Fact]
