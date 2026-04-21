@@ -136,7 +136,7 @@ internal sealed class ForgotPasswordHandler
                 _options.Value.PasswordResetTokenLifetime,
                 _clock);
 
-            _db.UserTokens.Add(token);
+            _db.SingleUseTokens.Add(token);
             await _db.SaveChangesAsync(ct);
 
             await _bus.PublishAsync(new PasswordResetRequestedV1(
@@ -172,7 +172,7 @@ internal sealed class ResetPasswordHandler
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(cmd.RawToken));
 
-        var token = await _db.UserTokens
+        var token = await _db.SingleUseTokens
             .SingleOrDefaultAsync(t =>
                 t.TokenHash == hash && t.Purpose == TokenPurpose.PasswordReset, ct);
 
@@ -277,8 +277,8 @@ internal sealed class RequestEmailChangeHandler
             user.Id, TokenPurpose.EmailChange, _options.Value.EmailChangeTokenLifetime, _clock);
 
         // Store the requested new email alongside the token
-        _db.PendingEmailChanges.Add(new PendingEmailChange(token.TokenHash, cmd.NewEmail));
-        _db.UserTokens.Add(token);
+        _db.PendingEmailChanges.Add(new PendingEmailChange(user.Id, cmd.NewEmail, token.Id));
+        _db.SingleUseTokens.Add(token);
 
         await _db.SaveChangesAsync(ct);
 
@@ -301,7 +301,7 @@ internal sealed class ConfirmEmailChangeHandler
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(cmd.RawToken));
 
-        var token = await _db.UserTokens
+        var token = await _db.SingleUseTokens
             .SingleOrDefaultAsync(t =>
                 t.TokenHash == hash
                 && t.Purpose == TokenPurpose.EmailChange
@@ -311,7 +311,7 @@ internal sealed class ConfirmEmailChangeHandler
             return Errors.Users.InvalidOrExpiredToken;
 
         var pending = await _db.PendingEmailChanges
-            .SingleOrDefaultAsync(p => p.TokenHash == hash, ct);
+            .SingleOrDefaultAsync(p => p.TokenId == token.Id, ct);
         if (pending is null)
             return Errors.Users.InvalidOrExpiredToken;
 
