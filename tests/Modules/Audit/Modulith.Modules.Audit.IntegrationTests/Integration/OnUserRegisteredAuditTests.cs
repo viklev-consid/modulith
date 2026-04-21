@@ -38,7 +38,11 @@ public sealed class OnUserRegisteredAuditTests(AuditCrossModuleFixture fixture) 
             var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
             entry = await db.AuditEntries
                 .FirstOrDefaultAsync(e => e.ActorId == userId && e.EventType == "user.registered", cts.Token);
-            if (entry is not null) break;
+            if (entry is not null)
+            {
+                break;
+            }
+
             await Task.Delay(200, cts.Token);
         }
 
@@ -69,7 +73,10 @@ public sealed class OnUserRegisteredAuditTests(AuditCrossModuleFixture fixture) 
             var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
             entryFound = await db.AuditEntries.AnyAsync(
                 e => e.ActorId == userId, cts.Token);
-            if (!entryFound) await Task.Delay(200, cts.Token);
+            if (!entryFound)
+            {
+                await Task.Delay(200, cts.Token);
+            }
         }
         Assert.True(entryFound, "Audit entry was not created within the timeout.");
 

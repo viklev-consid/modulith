@@ -18,7 +18,9 @@ public sealed class OnUserRegisteredHandler(
     public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
     {
         if (!await consentRegistry.HasConsentedAsync(@event.UserId, ConsentKeys.WelcomeEmail, ct))
+        {
             return;
+        }
 
         // Idempotency guard — safe to re-run on Wolverine retries.
         var alreadySent = await db.NotificationLogs.AnyAsync(
@@ -26,7 +28,9 @@ public sealed class OnUserRegisteredHandler(
             ct);
 
         if (alreadySent)
+        {
             return;
+        }
 
         var message = new EmailMessage(
             To: @event.Email,

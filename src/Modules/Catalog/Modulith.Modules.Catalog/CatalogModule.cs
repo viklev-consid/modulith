@@ -47,7 +47,9 @@ public static class CatalogModule
         services.AddScoped<IPersonalDataEraser, CatalogPersonalDataEraser>();
 
         if (environment.IsDevelopment())
+        {
             services.AddScoped<IModuleSeeder, CatalogDevSeeder>();
+        }
 
         return services;
     }

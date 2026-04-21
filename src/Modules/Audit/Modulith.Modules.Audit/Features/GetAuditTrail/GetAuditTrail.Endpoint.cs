@@ -20,7 +20,9 @@ internal static class GetAuditTrailEndpoint
                 int pageSize = 20) =>
             {
                 if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))
+                {
                     return Results.Unauthorized();
+                }
 
                 var query = new GetAuditTrailQuery(userId, page, pageSize);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetAuditTrailResponse>>(query, ct);

@@ -24,7 +24,9 @@ public sealed class OnEmailChangedHandler(
             ct);
 
         if (alreadySent)
+        {
             return;
+        }
 
         // Send to the OLD email — that is the address that needs the alert.
         var message = new EmailMessage(

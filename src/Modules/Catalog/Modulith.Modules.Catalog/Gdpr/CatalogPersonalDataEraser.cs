@@ -13,7 +13,9 @@ public sealed class CatalogPersonalDataEraser(CatalogDbContext db) : IPersonalDa
             .FirstOrDefaultAsync(c => c.UserId == user.UserId, ct);
 
         if (customer is null)
+        {
             return new ErasureResult(user.UserId, ErasureStrategy.Anonymize, 0);
+        }
 
         customer.Anonymize();
         await db.SaveChangesAsync(ct);

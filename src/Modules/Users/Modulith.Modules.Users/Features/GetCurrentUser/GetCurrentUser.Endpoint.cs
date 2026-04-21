@@ -15,7 +15,9 @@ internal static class GetCurrentUserEndpoint
             async (ICurrentUser currentUser, IMessageBus bus, CancellationToken ct) =>
             {
                 if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))
+                {
                     return Results.Unauthorized();
+                }
 
                 var query = new GetCurrentUserQuery(new UserId(userId));
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetCurrentUserResponse>>(query, ct);

@@ -20,7 +20,9 @@ public sealed class OnEmailChangeRequestedHandler(
             ct);
 
         if (alreadySent)
+        {
             return;
+        }
 
         var message = new EmailMessage(
             To: @event.NewEmail,

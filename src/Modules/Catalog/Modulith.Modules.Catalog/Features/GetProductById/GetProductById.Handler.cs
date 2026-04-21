@@ -17,7 +17,9 @@ public sealed class GetProductByIdHandler(CatalogDbContext db)
             .FirstOrDefaultAsync(p => p.Id == productId, ct);
 
         if (product is null)
+        {
             return CatalogErrors.ProductNotFound;
+        }
 
         return new GetProductByIdResponse(
             product.Id.Value,

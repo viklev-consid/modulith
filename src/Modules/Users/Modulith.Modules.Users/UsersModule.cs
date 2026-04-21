@@ -71,7 +71,9 @@ public static class UsersModule
         services.AddValidatorsFromAssemblyContaining<RegisterValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 
         if (environment.IsDevelopment())
+        {
             services.AddScoped<IModuleSeeder, UsersDevSeeder>();
+        }
 
         return services;
     }

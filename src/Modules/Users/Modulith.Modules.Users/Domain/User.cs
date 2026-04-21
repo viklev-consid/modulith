@@ -31,10 +31,14 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public static ErrorOr<User> Create(Email email, PasswordHash passwordHash, string displayName)
     {
         if (string.IsNullOrWhiteSpace(displayName))
+        {
             return UsersErrors.DisplayNameEmpty;
+        }
 
         if (displayName.Length > 100)
+        {
             return UsersErrors.DisplayNameTooLong;
+        }
 
         var user = new User(UserId.New(), email, passwordHash, displayName.Trim());
         user.RaiseEvent(new UserRegistered(user.Id, email.Value, displayName.Trim()));
@@ -44,7 +48,9 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public ErrorOr<Success> ChangeEmail(Email newEmail)
     {
         if (Email == newEmail)
+        {
             return UsersErrors.EmailSame;
+        }
 
         var oldEmail = Email;
         Email = newEmail;

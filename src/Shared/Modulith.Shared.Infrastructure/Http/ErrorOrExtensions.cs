@@ -10,7 +10,9 @@ public static class ErrorOrExtensions
         Func<T, IResult> onSuccess)
     {
         if (!result.IsError)
+        {
             return onSuccess(result.Value);
+        }
 
         return result.FirstError.Type switch
         {

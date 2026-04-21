@@ -10,7 +10,9 @@ public sealed class GetCurrentUserHandler(UsersDbContext db)
     {
         var user = await db.Users.FindAsync([query.UserId], ct);
         if (user is null)
+        {
             return UsersErrors.UserNotFound;
+        }
 
         return new GetCurrentUserResponse(
             user.Id.Value,

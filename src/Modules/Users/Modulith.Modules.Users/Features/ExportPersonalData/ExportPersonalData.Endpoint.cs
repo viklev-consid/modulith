@@ -15,7 +15,9 @@ internal static class ExportPersonalDataEndpoint
             async (ICurrentUser currentUser, IMessageBus bus, CancellationToken ct) =>
             {
                 if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))
+                {
                     return Results.Unauthorized();
+                }
 
                 var query = new ExportPersonalDataQuery(new UserId(userId));
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<ExportPersonalDataResponse>>(query, ct);

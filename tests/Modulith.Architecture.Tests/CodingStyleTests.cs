@@ -12,14 +12,22 @@ public sealed class CodingStyleTests
         foreach (var directory in new[] { "src", "tests" })
         {
             var searchPath = Path.Combine(repoRoot, directory);
-            if (!Directory.Exists(searchPath)) continue;
+            if (!Directory.Exists(searchPath))
+            {
+                continue;
+            }
 
             foreach (var file in Directory.EnumerateFiles(searchPath, "*.cs", SearchOption.AllDirectories))
             {
-                if (IsGeneratedFile(file)) continue;
+                if (IsGeneratedFile(file))
+                {
+                    continue;
+                }
 
                 if (ContainsBlockScopedNamespace(file))
+                {
                     violations.Add(Path.GetRelativePath(repoRoot, file));
+                }
             }
         }
 
@@ -39,7 +47,9 @@ public sealed class CodingStyleTests
             var trimmed = line.TrimStart();
             if (trimmed.StartsWith("namespace ", StringComparison.Ordinal) &&
                 !trimmed.TrimEnd().EndsWith(';'))
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -57,7 +67,10 @@ public sealed class CodingStyleTests
         while (dir is not null)
         {
             if (File.Exists(Path.Combine(dir.FullName, "Directory.Build.props")))
+            {
                 return dir.FullName;
+            }
+
             dir = dir.Parent;
         }
         throw new InvalidOperationException(

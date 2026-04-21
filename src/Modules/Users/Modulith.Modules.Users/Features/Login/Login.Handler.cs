@@ -24,14 +24,20 @@ public sealed class LoginHandler(
     {
         var emailResult = Email.Create(cmd.Email);
         if (emailResult.IsError)
+        {
             return UsersErrors.InvalidCredentials;
+        }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == emailResult.Value, ct);
         if (user is null)
+        {
             return UsersErrors.InvalidCredentials;
+        }
 
         if (!passwordHasher.Verify(cmd.Password, user.PasswordHash.Value))
+        {
             return UsersErrors.InvalidCredentials;
+        }
 
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
 

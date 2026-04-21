@@ -8,7 +8,10 @@ public sealed partial class AuditMiddleware(ICurrentUser currentUser, ILogger<Au
 {
     public Task AfterAsync(Envelope envelope, CancellationToken cancellationToken)
     {
-        if (envelope.Message is not { } message) return Task.CompletedTask;
+        if (envelope.Message is not { } message)
+        {
+            return Task.CompletedTask;
+        }
 
         LogMessageHandled(logger, message.GetType().Name, currentUser.Id ?? "system");
         return Task.CompletedTask;

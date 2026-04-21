@@ -29,7 +29,9 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
     private static string RedactEmailFromPayload(string payload, string? displayName)
     {
         if (string.IsNullOrEmpty(payload))
+        {
             return payload;
+        }
 
         try
         {

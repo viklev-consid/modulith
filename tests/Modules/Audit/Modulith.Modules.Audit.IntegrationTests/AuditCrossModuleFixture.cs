@@ -4,9 +4,9 @@ using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.TestSupport;
 using Modulith.TestSupport.Fakes;
-using Modulith.Shared.Infrastructure.Notifications;
 
 namespace Modulith.Modules.Audit.IntegrationTests;
 

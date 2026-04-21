@@ -219,7 +219,9 @@ app.MapDefaultEndpoints();
 app.UseExceptionHandler();
 
 if (!app.Environment.IsEnvironment("Test"))
+{
     app.UseRateLimiter();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -248,7 +250,9 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
     await using var scope = app.Services.CreateAsyncScope();
     var seeders = scope.ServiceProvider.GetServices<IModuleSeeder>();
     foreach (var seeder in seeders)
+    {
         await seeder.SeedAsync();
+    }
 }
 
 app.Run();

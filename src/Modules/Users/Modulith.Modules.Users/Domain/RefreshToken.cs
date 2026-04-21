@@ -80,7 +80,9 @@ public sealed class RefreshToken : Entity<RefreshTokenId>
     public void Revoke(IClock clock)
     {
         if (RevokedAt is null)
+        {
             RevokedAt = clock.UtcNow;
+        }
     }
 
     /// <summary>

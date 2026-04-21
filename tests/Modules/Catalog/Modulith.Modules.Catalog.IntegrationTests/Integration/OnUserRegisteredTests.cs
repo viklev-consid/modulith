@@ -38,7 +38,11 @@ public sealed class OnUserRegisteredTests(CrossModuleApiFixture fixture) : IAsyn
             using var scope = fixture.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
             customer = await db.Customers.FirstOrDefaultAsync(c => c.UserId == userId, cts.Token);
-            if (customer is not null) break;
+            if (customer is not null)
+            {
+                break;
+            }
+
             await Task.Delay(200, cts.Token);
         }
 

@@ -33,10 +33,14 @@ public sealed class Product : AggregateRoot<ProductId>, IAuditableEntity
     public static ErrorOr<Product> Create(Sku sku, string name, Money price)
     {
         if (string.IsNullOrWhiteSpace(name))
+        {
             return CatalogErrors.ProductNameEmpty;
+        }
 
         if (name.Length > 200)
+        {
             return CatalogErrors.ProductNameTooLong;
+        }
 
         var product = new Product(ProductId.New(), sku, name.Trim(), price);
         product.RaiseEvent(new ProductCreated(product.Id, sku.Value, name.Trim()));
@@ -46,7 +50,9 @@ public sealed class Product : AggregateRoot<ProductId>, IAuditableEntity
     public ErrorOr<Success> Deactivate()
     {
         if (!IsActive)
+        {
             return CatalogErrors.ProductAlreadyInactive;
+        }
 
         IsActive = false;
         RaiseEvent(new ProductDeactivated(Id));

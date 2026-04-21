@@ -17,7 +17,9 @@ internal static class LogoutAllEndpoint
                 CancellationToken ct) =>
             {
                 if (!Guid.TryParse(currentUser.Id, out var userId))
+                {
                     return Results.Unauthorized();
+                }
 
                 var command = new LogoutAllCommand(userId);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<LogoutAllResponse>>(command, ct);

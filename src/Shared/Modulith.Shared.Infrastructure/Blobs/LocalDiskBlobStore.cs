@@ -35,7 +35,9 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
         var metaPath = GetMetaPath(reference.Container, reference.Key);
 
         if (!File.Exists(filePath))
+        {
             throw new FileNotFoundException($"Blob not found: {reference.Container}/{reference.Key}");
+        }
 
         var metaJson = await File.ReadAllTextAsync(metaPath, ct);
         var metadata = JsonSerializer.Deserialize<BlobMetadata>(metaJson)
@@ -50,8 +52,15 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
         var filePath = GetFilePath(reference.Container, reference.Key);
         var metaPath = GetMetaPath(reference.Container, reference.Key);
 
-        if (File.Exists(filePath)) File.Delete(filePath);
-        if (File.Exists(metaPath)) File.Delete(metaPath);
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+
+        if (File.Exists(metaPath))
+        {
+            File.Delete(metaPath);
+        }
 
         return Task.CompletedTask;
     }
@@ -84,7 +93,10 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
 
     private static string SanitizeContainer(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "files";
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "files";
+        }
         return string.Concat(value.Where(c => char.IsLetterOrDigit(c) || c == '-')).ToLowerInvariant();
     }
 }

@@ -20,7 +20,9 @@ public sealed class OnPasswordChangedHandler(
             ct);
 
         if (alreadySent)
+        {
             return;
+        }
 
         var message = new EmailMessage(
             To: @event.Email,

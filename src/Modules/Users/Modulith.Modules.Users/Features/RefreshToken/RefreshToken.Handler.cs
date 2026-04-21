@@ -25,7 +25,9 @@ public sealed class RefreshTokenHandler(
             .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
 
         if (existing is null)
+        {
             return UsersErrors.RefreshTokenNotFound;
+        }
 
         // Reuse detection: a rotated token being presented again means the old token
         // was stolen. Revoke the entire chain and force re-login.
@@ -40,14 +42,20 @@ public sealed class RefreshTokenHandler(
         }
 
         if (existing.RevokedAt is not null)
+        {
             return UsersErrors.RefreshTokenRevoked;
+        }
 
         if (existing.ExpiresAt <= now)
+        {
             return UsersErrors.RefreshTokenExpired;
+        }
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == existing.UserId, ct);
         if (user is null)
+        {
             return UsersErrors.UserNotFound;
+        }
 
         // Issue replacement token before marking the old one as rotated.
         var (newRefreshToken, rawNewRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
