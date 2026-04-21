@@ -9,6 +9,9 @@ namespace Modulith.Modules.Users.Features.Logout;
 public sealed class LogoutHandler(UsersDbContext db, IClock clock)
 {
     public async Task<ErrorOr<LogoutResponse>> Handle(LogoutCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(LogoutHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<LogoutResponse>> HandleCoreAsync(LogoutCommand cmd, CancellationToken ct)
     {
         var hash = Domain.RefreshToken.HashRawValue(cmd.RawRefreshToken);
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry;
 using Modulith.Modules.Notifications.Gdpr;
 using Modulith.Modules.Notifications.Integration.Subscribers;
 using Modulith.Modules.Notifications.Persistence;
@@ -39,6 +40,10 @@ public static class NotificationsModule
 
         services.AddHealthChecks()
             .AddDbContextCheck<NotificationsDbContext>("notifications-db", tags: ["ready"]);
+
+        services.AddOpenTelemetry()
+            .WithTracing(t => t.AddSource(NotificationsTelemetry.SourceName))
+            .WithMetrics(m => m.AddMeter(NotificationsTelemetry.MeterName));
 
         return services;
     }

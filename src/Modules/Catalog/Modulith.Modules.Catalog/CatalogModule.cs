@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry;
 using Modulith.Modules.Catalog.Features.CreateProduct;
 using Modulith.Modules.Catalog.Features.GetProductById;
 using Modulith.Modules.Catalog.Features.ListProducts;
@@ -48,6 +49,10 @@ public static class CatalogModule
 
         services.AddHealthChecks()
             .AddDbContextCheck<CatalogDbContext>("catalog-db", tags: ["ready"]);
+
+        services.AddOpenTelemetry()
+            .WithTracing(t => t.AddSource(CatalogTelemetry.SourceName))
+            .WithMetrics(m => m.AddMeter(CatalogTelemetry.MeterName));
 
         if (environment.IsDevelopment())
         {

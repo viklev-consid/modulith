@@ -22,6 +22,9 @@ public sealed class RegisterHandler(
     IClock clock)
 {
     public async Task<ErrorOr<RegisterResponse>> Handle(RegisterCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(RegisterHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<RegisterResponse>> HandleCoreAsync(RegisterCommand cmd, CancellationToken ct)
     {
         var emailResult = Email.Create(cmd.Email);
         if (emailResult.IsError)
@@ -55,6 +58,7 @@ public sealed class RegisterHandler(
         await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
 
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, refreshToken.Id.Value);

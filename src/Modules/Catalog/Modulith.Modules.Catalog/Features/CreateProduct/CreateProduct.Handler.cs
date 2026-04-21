@@ -11,6 +11,9 @@ namespace Modulith.Modules.Catalog.Features.CreateProduct;
 public sealed class CreateProductHandler(CatalogDbContext db, IMessageBus bus)
 {
     public async Task<ErrorOr<CreateProductResponse>> Handle(CreateProductCommand cmd, CancellationToken ct)
+        => await CatalogTelemetry.InstrumentAsync(nameof(CreateProductHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<CreateProductResponse>> HandleCoreAsync(CreateProductCommand cmd, CancellationToken ct)
     {
         var skuResult = Sku.Create(cmd.Sku);
         if (skuResult.IsError)
@@ -47,6 +50,7 @@ public sealed class CreateProductHandler(CatalogDbContext db, IMessageBus bus)
             product.Name,
             product.Price.Amount,
             product.Price.Currency));
+        CatalogTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ProductCreatedV1)));
 
         return new CreateProductResponse(
             product.Id.Value,

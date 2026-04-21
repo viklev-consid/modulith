@@ -16,6 +16,9 @@ public sealed class ForgotPasswordHandler(
     IMessageBus bus)
 {
     public async Task<ErrorOr<ForgotPasswordResponse>> Handle(ForgotPasswordCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(ForgotPasswordHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<ForgotPasswordResponse>> HandleCoreAsync(ForgotPasswordCommand cmd, CancellationToken ct)
     {
         var emailResult = Email.Create(cmd.Email);
 
@@ -40,6 +43,7 @@ public sealed class ForgotPasswordHandler(
                 user.Id.Value,
                 user.Email.Value,
                 rawToken));
+            UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetRequestedV1)));
         }
 
         return new ForgotPasswordResponse();

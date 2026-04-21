@@ -10,6 +10,9 @@ public sealed class OnUserLoggedOutAllDevicesHandler(AuditDbContext db, IClock c
 {
     public async Task Handle(UserLoggedOutAllDevicesV1 @event, CancellationToken ct)
     {
+        using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnUserLoggedOutAllDevicesHandler));
+        AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedOutAllDevicesV1)));
+
         var payload = JsonSerializer.Serialize(new { @event.UserId });
         var entry = AuditEntry.Create(
             eventType: "user.logged_out_all_devices",

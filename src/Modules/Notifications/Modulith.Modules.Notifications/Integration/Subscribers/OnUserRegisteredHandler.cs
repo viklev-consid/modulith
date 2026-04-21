@@ -17,6 +17,9 @@ public sealed class OnUserRegisteredHandler(
 {
     public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
     {
+        using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnUserRegisteredHandler));
+        NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
+
         if (!await consentRegistry.HasConsentedAsync(@event.UserId, ConsentKeys.WelcomeEmail, ct))
         {
             return;

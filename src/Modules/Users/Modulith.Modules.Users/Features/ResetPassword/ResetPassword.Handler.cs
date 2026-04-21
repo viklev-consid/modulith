@@ -18,6 +18,9 @@ public sealed class ResetPasswordHandler(
     IMessageBus bus)
 {
     public async Task<ErrorOr<ResetPasswordResponse>> Handle(ResetPasswordCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(ResetPasswordHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<ResetPasswordResponse>> HandleCoreAsync(ResetPasswordCommand cmd, CancellationToken ct)
     {
         var token = await tokenService.FindValidAsync(cmd.Token, TokenPurpose.PasswordReset, ct);
         if (token is null)
@@ -48,6 +51,7 @@ public sealed class ResetPasswordHandler(
         await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new PasswordResetV1(user.Id.Value, user.Email.Value));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetV1)));
 
         return new ResetPasswordResponse();
     }

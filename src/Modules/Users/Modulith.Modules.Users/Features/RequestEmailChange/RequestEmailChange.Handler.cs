@@ -17,6 +17,9 @@ public sealed class RequestEmailChangeHandler(
     IMessageBus bus)
 {
     public async Task<ErrorOr<RequestEmailChangeResponse>> Handle(RequestEmailChangeCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(RequestEmailChangeHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<RequestEmailChangeResponse>> HandleCoreAsync(RequestEmailChangeCommand cmd, CancellationToken ct)
     {
         // Always return the same response to prevent enumeration of email addresses.
         var newEmailResult = Email.Create(cmd.NewEmail);
@@ -60,6 +63,7 @@ public sealed class RequestEmailChangeHandler(
         await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new EmailChangeRequestedV1(user.Id.Value, newEmail.Value, rawToken));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangeRequestedV1)));
 
         return new RequestEmailChangeResponse();
     }

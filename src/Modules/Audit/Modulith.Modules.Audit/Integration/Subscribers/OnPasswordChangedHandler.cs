@@ -10,6 +10,9 @@ public sealed class OnPasswordChangedHandler(AuditDbContext db, IClock clock)
 {
     public async Task Handle(PasswordChangedV1 @event, CancellationToken ct)
     {
+        using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnPasswordChangedHandler));
+        AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordChangedV1)));
+
         var payload = JsonSerializer.Serialize(new { @event.UserId, @event.Email });
         var entry = AuditEntry.Create(
             eventType: "user.password_changed",

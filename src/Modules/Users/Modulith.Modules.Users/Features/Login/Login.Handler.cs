@@ -21,6 +21,9 @@ public sealed class LoginHandler(
     IClock clock)
 {
     public async Task<ErrorOr<LoginResponse>> Handle(LoginCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(LoginHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<LoginResponse>> HandleCoreAsync(LoginCommand cmd, CancellationToken ct)
     {
         var emailResult = Email.Create(cmd.Email);
         if (emailResult.IsError)
@@ -47,6 +50,7 @@ public sealed class LoginHandler(
             user.Id.Value,
             user.Email.Value,
             cmd.IpAddress ?? string.Empty));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
 
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, refreshToken.Id.Value);

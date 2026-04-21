@@ -10,6 +10,9 @@ public sealed class OnUserEmailChangedHandler(AuditDbContext db, IClock clock)
 {
     public async Task Handle(UserEmailChangedV1 @event, CancellationToken ct)
     {
+        using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnUserEmailChangedHandler));
+        AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserEmailChangedV1)));
+
         var payload = JsonSerializer.Serialize(@event);
         var entry = AuditEntry.Create(
             eventType: "user.email_changed",

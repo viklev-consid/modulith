@@ -10,6 +10,9 @@ public sealed class OnUserRegisteredHandler(AuditDbContext db, IClock clock)
 {
     public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
     {
+        using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnUserRegisteredHandler));
+        AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
+
         var payload = JsonSerializer.Serialize(@event);
         var entry = AuditEntry.Create(
             eventType: "user.registered",
