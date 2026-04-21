@@ -25,6 +25,7 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.NotNull(body);
         Assert.NotEqual(Guid.Empty, body.UserId);
         Assert.NotEmpty(body.AccessToken);
+        Assert.NotEmpty(body.RefreshToken);
     }
 
     [Fact]
