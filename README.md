@@ -14,6 +14,7 @@ Modulith is opinionated. It encodes a set of decisions that have been made delib
 - **Result pattern** for expected failures, exceptions reserved for truly exceptional cases
 - **ProblemDetails** for all error responses via `IExceptionHandler`
 - **JWT bearer authentication** with a lightweight Users module (no ASP.NET Identity) — register, login, password reset, change password, email change with confirmation, refresh token rotation, logout, and logout-everywhere
+- **Role-based access control (RBAC)** — `admin` / `user` roles, `PermissionCatalog` auto-discovers all `*Permissions` types from `*.Contracts` assemblies at startup, per-permission `AuthorizationPolicy` instances registered automatically, `PermissionClaimsTransformation` adds permission claims per request from the JWT role claim
 - **FluentValidation** for request validation
 - **Scalar** for OpenAPI documentation
 - **API versioning** via `Asp.Versioning`

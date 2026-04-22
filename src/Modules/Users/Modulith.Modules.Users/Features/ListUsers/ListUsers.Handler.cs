@@ -14,10 +14,14 @@ public sealed class ListUsersHandler(UsersDbContext db)
     private async Task<ErrorOr<ListUsersResponse>> HandleCoreAsync(ListUsersQuery query, CancellationToken ct)
     {
         if (query.Page <= 0 || query.Page > PageRequest.MaxPage)
+        {
             return UsersErrors.PageInvalid;
+        }
 
         if (query.PageSize <= 0 || query.PageSize > PageRequest.MaxPageSize)
+        {
             return UsersErrors.PageSizeInvalid;
+        }
 
         var pagination = PageRequest.Of(query.Page, query.PageSize);
 

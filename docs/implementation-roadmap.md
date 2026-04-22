@@ -1036,7 +1036,7 @@ Document both in `docs/how-to/auth/bootstrap-admin.md`.
 
 Add `src/Api/Infrastructure/OpenApi/`:
 
-- **`BearerSecuritySchemeTransformer : IOpenApiDocumentTransformer`** — registers a `Bearer` security scheme (type `http`, scheme `bearer`, bearer format `JWT`) on the document's components.
+- **`BearerSecuritySchemeTransformer : IOpenApiDocumentTransformer`** — adds a `Bearer` security scheme (type `http`, scheme `bearer`, bearer format `JWT`) to the document's components, merging with any existing schemes rather than replacing the whole map. Safe to use alongside other document transformers that register their own schemes.
 - **`AuthorizationOperationTransformer : IOpenApiOperationTransformer`** — for each operation, inspect the endpoint's metadata for `IAuthorizeData`. If present, attach a `Bearer` security requirement. Anonymous endpoints remain requirement-free.
 
 Wire in `Program.cs`:

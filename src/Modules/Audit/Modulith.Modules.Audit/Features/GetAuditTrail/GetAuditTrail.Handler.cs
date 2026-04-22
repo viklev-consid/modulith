@@ -16,10 +16,14 @@ public sealed class GetAuditTrailHandler(AuditDbContext db)
     private async Task<ErrorOr<GetAuditTrailResponse>> HandleCoreAsync(GetAuditTrailQuery query, CancellationToken ct)
     {
         if (query.Page <= 0 || query.Page > PageRequest.MaxPage)
+        {
             return AuditErrors.PageInvalid;
+        }
 
         if (query.PageSize <= 0 || query.PageSize > PageRequest.MaxPageSize)
+        {
             return AuditErrors.PageSizeInvalid;
+        }
 
         var pagination = PageRequest.Of(query.Page, query.PageSize);
 

@@ -2,22 +2,21 @@
 
 #nullable disable
 
-namespace Modulith.Modules.Users.Persistence.Migrations
+namespace Modulith.Modules.Users.Persistence.Migrations;
+
+/// <inheritdoc />
+public partial class AddConcurrencyToken : Migration
 {
     /// <inheritdoc />
-    public partial class AddConcurrencyToken : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            // xmin is a PostgreSQL system column present on every table.
-            // No DDL is required — this migration exists only to align the EF model snapshot.
-        }
+        // xmin is a PostgreSQL system column present on every table.
+        // No DDL is required — this migration exists only to align the EF model snapshot.
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            // Nothing to undo.
-        }
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        // Nothing to undo.
     }
 }
