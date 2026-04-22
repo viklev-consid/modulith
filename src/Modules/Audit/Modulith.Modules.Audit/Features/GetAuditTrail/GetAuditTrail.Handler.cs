@@ -9,6 +9,9 @@ namespace Modulith.Modules.Audit.Features.GetAuditTrail;
 public sealed class GetAuditTrailHandler(AuditDbContext db)
 {
     public async Task<ErrorOr<GetAuditTrailResponse>> Handle(GetAuditTrailQuery query, CancellationToken ct)
+        => await AuditTelemetry.InstrumentAsync(nameof(GetAuditTrailHandler), () => HandleCoreAsync(query, ct));
+
+    private async Task<ErrorOr<GetAuditTrailResponse>> HandleCoreAsync(GetAuditTrailQuery query, CancellationToken ct)
     {
         var baseQuery = db.AuditEntries
             .AsNoTracking()

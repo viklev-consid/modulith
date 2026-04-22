@@ -15,6 +15,9 @@ public sealed class OnPasswordResetHandler(
 {
     public async Task Handle(PasswordResetV1 @event, CancellationToken ct)
     {
+        using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnPasswordResetHandler));
+        NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetV1)));
+
         var alreadySent = await db.NotificationLogs.AnyAsync(
             l => l.UserId == @event.UserId && l.NotificationType == NotificationType.PasswordResetConfirmation,
             ct);

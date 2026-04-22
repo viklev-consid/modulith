@@ -52,6 +52,48 @@ public sealed class CatalogModuleTests
     }
 
     [Fact]
+    public void CatalogDomain_HasNoFluentValidationReferences()
+    {
+        var result = Types.InAssembly(CatalogAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("FluentValidation")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Catalog Domain/ must not reference FluentValidation. " +
+            $"Domain validation uses the Result pattern; FluentValidation belongs in feature slice Validators. " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
+    public void CatalogDomain_HasNoFeatureManagementReferences()
+    {
+        var result = Types.InAssembly(CatalogAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("Microsoft.FeatureManagement")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Catalog Domain/ must not reference Microsoft.FeatureManagement. " +
+            $"Feature flags belong at the edges (endpoint routing, handler selection). " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
+    public void CatalogDomain_HasNoCachingReferences()
+    {
+        var result = Types.InAssembly(CatalogAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("Microsoft.Extensions.Caching")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Catalog Domain/ must not reference Microsoft.Extensions.Caching. " +
+            $"Cache interaction belongs in handlers and infrastructure, not domain types. " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
     public void Product_HasNoPublicSetters()
     {
         var publicSetters = typeof(Product)

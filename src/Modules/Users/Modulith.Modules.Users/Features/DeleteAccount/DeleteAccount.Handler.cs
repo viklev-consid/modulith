@@ -11,6 +11,9 @@ public sealed class DeleteAccountHandler(
     PersonalDataOrchestrator orchestrator)
 {
     public async Task<ErrorOr<Deleted>> Handle(DeleteAccountCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(DeleteAccountHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<Deleted>> HandleCoreAsync(DeleteAccountCommand cmd, CancellationToken ct)
     {
         var user = await db.Users.FindAsync([cmd.UserId], ct);
         if (user is null)

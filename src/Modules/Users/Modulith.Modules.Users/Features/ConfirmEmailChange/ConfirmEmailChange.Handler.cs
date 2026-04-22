@@ -17,6 +17,9 @@ public sealed class ConfirmEmailChangeHandler(
     IMessageBus bus)
 {
     public async Task<ErrorOr<ConfirmEmailChangeResponse>> Handle(ConfirmEmailChangeCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(ConfirmEmailChangeHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<ConfirmEmailChangeResponse>> HandleCoreAsync(ConfirmEmailChangeCommand cmd, CancellationToken ct)
     {
         var singleUseToken = await tokenService.FindValidAsync(cmd.Token, TokenPurpose.EmailChange, ct);
         if (singleUseToken is null)
@@ -67,6 +70,7 @@ public sealed class ConfirmEmailChangeHandler(
         await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new EmailChangedV1(user.Id.Value, oldEmail, user.Email.Value));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangedV1)));
 
         return new ConfirmEmailChangeResponse();
     }

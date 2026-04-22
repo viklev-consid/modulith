@@ -15,6 +15,9 @@ public sealed class OnEmailChangeRequestedHandler(
 {
     public async Task Handle(EmailChangeRequestedV1 @event, CancellationToken ct)
     {
+        using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnEmailChangeRequestedHandler));
+        NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangeRequestedV1)));
+
         var alreadySent = await db.NotificationLogs.AnyAsync(
             l => l.UserId == @event.UserId && l.NotificationType == NotificationType.EmailChangeRequest,
             ct);

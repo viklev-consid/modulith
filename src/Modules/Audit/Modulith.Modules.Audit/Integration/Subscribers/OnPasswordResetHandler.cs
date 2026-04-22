@@ -10,6 +10,9 @@ public sealed class OnPasswordResetHandler(AuditDbContext db, IClock clock)
 {
     public async Task Handle(PasswordResetV1 @event, CancellationToken ct)
     {
+        using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnPasswordResetHandler));
+        AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetV1)));
+
         var payload = JsonSerializer.Serialize(new { @event.UserId, @event.Email });
         var entry = AuditEntry.Create(
             eventType: "user.password_reset",

@@ -52,6 +52,48 @@ public sealed class UsersModuleTests
     }
 
     [Fact]
+    public void UsersDomain_HasNoFluentValidationReferences()
+    {
+        var result = Types.InAssembly(UsersAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("FluentValidation")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Domain/ must not reference FluentValidation. " +
+            $"Domain validation uses the Result pattern; FluentValidation belongs in feature slice Validators. " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
+    public void UsersDomain_HasNoFeatureManagementReferences()
+    {
+        var result = Types.InAssembly(UsersAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("Microsoft.FeatureManagement")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Domain/ must not reference Microsoft.FeatureManagement. " +
+            $"Feature flags belong at the edges (endpoint routing, handler selection). " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
+    public void UsersDomain_HasNoCachingReferences()
+    {
+        var result = Types.InAssembly(UsersAssembly)
+            .That().ResideInNamespaceContaining(".Domain")
+            .ShouldNot().HaveDependencyOn("Microsoft.Extensions.Caching")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            $"FAIL: Types in Domain/ must not reference Microsoft.Extensions.Caching. " +
+            $"Cache interaction belongs in handlers and infrastructure, not domain types. " +
+            $"Violations: {string.Join(", ", result.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
     public void User_HasNoPublicSetters()
     {
         var publicSetters = typeof(User)

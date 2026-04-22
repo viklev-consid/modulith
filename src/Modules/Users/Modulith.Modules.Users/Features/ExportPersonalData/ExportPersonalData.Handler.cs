@@ -12,6 +12,10 @@ public sealed class ExportPersonalDataHandler(
 {
     public async Task<ErrorOr<ExportPersonalDataResponse>> Handle(
         ExportPersonalDataQuery query, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(ExportPersonalDataHandler), () => HandleCoreAsync(query, ct));
+
+    private async Task<ErrorOr<ExportPersonalDataResponse>> HandleCoreAsync(
+        ExportPersonalDataQuery query, CancellationToken ct)
     {
         var user = await db.Users.FindAsync([query.UserId], ct);
         if (user is null)

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry;
 using Modulith.Modules.Users.ConsentManagement;
 using Modulith.Modules.Users.Features.ChangePassword;
 using Modulith.Modules.Users.Features.ConfirmEmailChange;
@@ -67,6 +68,13 @@ public static class UsersModule
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
         services.AddScoped<IPersonalDataEraser, UsersPersonalDataEraser>();
         services.AddScoped<PersonalDataOrchestrator>();
+
+        services.AddHealthChecks()
+            .AddDbContextCheck<UsersDbContext>("users-db", tags: ["ready"]);
+
+        services.AddOpenTelemetry()
+            .WithTracing(t => t.AddSource(UsersTelemetry.SourceName))
+            .WithMetrics(m => m.AddMeter(UsersTelemetry.MeterName));
 
         services.AddValidatorsFromAssemblyContaining<RegisterValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 

@@ -17,6 +17,9 @@ public sealed class RefreshTokenHandler(
     IClock clock)
 {
     public async Task<ErrorOr<RefreshTokenResponse>> Handle(RefreshTokenCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(RefreshTokenHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<RefreshTokenResponse>> HandleCoreAsync(RefreshTokenCommand cmd, CancellationToken ct)
     {
         var hash = Domain.RefreshToken.HashRawValue(cmd.RawRefreshToken);
         var now = clock.UtcNow;

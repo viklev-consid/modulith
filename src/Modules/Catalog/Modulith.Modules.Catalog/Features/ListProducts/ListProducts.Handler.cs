@@ -7,6 +7,9 @@ namespace Modulith.Modules.Catalog.Features.ListProducts;
 public sealed class ListProductsHandler(CatalogDbContext db)
 {
     public async Task<ErrorOr<ListProductsResponse>> Handle(ListProductsQuery query, CancellationToken ct)
+        => await CatalogTelemetry.InstrumentAsync(nameof(ListProductsHandler), () => HandleCoreAsync(query, ct));
+
+    private async Task<ErrorOr<ListProductsResponse>> HandleCoreAsync(ListProductsQuery query, CancellationToken ct)
     {
         var products = await db.Products
             .AsNoTracking()

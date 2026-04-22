@@ -15,6 +15,9 @@ public sealed class OnPasswordChangedHandler(
 {
     public async Task Handle(PasswordChangedV1 @event, CancellationToken ct)
     {
+        using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnPasswordChangedHandler));
+        NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordChangedV1)));
+
         var alreadySent = await db.NotificationLogs.AnyAsync(
             l => l.UserId == @event.UserId && l.NotificationType == NotificationType.PasswordChanged,
             ct);

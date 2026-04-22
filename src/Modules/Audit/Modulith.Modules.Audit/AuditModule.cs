@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry;
 using Modulith.Modules.Audit.Features.GetAuditTrail;
 using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
@@ -30,6 +31,13 @@ public static class AuditModule
 
         services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
         services.AddScoped<IPersonalDataEraser, AuditPersonalDataEraser>();
+
+        services.AddHealthChecks()
+            .AddDbContextCheck<AuditDbContext>("audit-db", tags: ["ready"]);
+
+        services.AddOpenTelemetry()
+            .WithTracing(t => t.AddSource(AuditTelemetry.SourceName))
+            .WithMetrics(m => m.AddMeter(AuditTelemetry.MeterName));
 
         return services;
     }

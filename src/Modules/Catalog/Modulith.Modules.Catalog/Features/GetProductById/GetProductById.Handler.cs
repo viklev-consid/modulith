@@ -9,6 +9,9 @@ namespace Modulith.Modules.Catalog.Features.GetProductById;
 public sealed class GetProductByIdHandler(CatalogDbContext db)
 {
     public async Task<ErrorOr<GetProductByIdResponse>> Handle(GetProductByIdQuery query, CancellationToken ct)
+        => await CatalogTelemetry.InstrumentAsync(nameof(GetProductByIdHandler), () => HandleCoreAsync(query, ct));
+
+    private async Task<ErrorOr<GetProductByIdResponse>> HandleCoreAsync(GetProductByIdQuery query, CancellationToken ct)
     {
         var productId = new ProductId(query.ProductId);
 

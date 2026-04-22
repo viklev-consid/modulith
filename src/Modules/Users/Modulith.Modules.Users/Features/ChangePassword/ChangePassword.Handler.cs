@@ -17,6 +17,9 @@ public sealed class ChangePasswordHandler(
     IMessageBus bus)
 {
     public async Task<ErrorOr<ChangePasswordResponse>> Handle(ChangePasswordCommand cmd, CancellationToken ct)
+        => await UsersTelemetry.InstrumentAsync(nameof(ChangePasswordHandler), () => HandleCoreAsync(cmd, ct));
+
+    private async Task<ErrorOr<ChangePasswordResponse>> HandleCoreAsync(ChangePasswordCommand cmd, CancellationToken ct)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
         if (user is null)
@@ -45,6 +48,7 @@ public sealed class ChangePasswordHandler(
         await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new PasswordChangedV1(user.Id.Value, user.Email.Value));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordChangedV1)));
 
         return new ChangePasswordResponse();
     }
