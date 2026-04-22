@@ -53,12 +53,6 @@ public sealed class ChangeUserRoleHandler(
             return changeResult.Errors;
         }
 
-        // Revoke all active refresh tokens so the user is forced to re-login
-        // and receives a token carrying the new role.
-        await db.RefreshTokens
-            .Where(t => t.UserId == targetUserId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
-
         try
         {
             await db.SaveChangesAsync(ct);
@@ -68,8 +62,16 @@ public sealed class ChangeUserRoleHandler(
             // Another request modified this user row between our read and our write.
             // The domain event was raised in memory but is discarded — Wolverine's outbox
             // write is part of the same transaction, so it was never committed.
+            // Refresh-token revocation has not yet run, so no spurious logouts occur.
             return UsersErrors.ConcurrencyConflict;
         }
+
+        // Revoke all active refresh tokens only after the role change is committed.
+        // Running this before SaveChanges would allow the revocation to be committed
+        // even when a concurrency conflict causes the role mutation to be rejected.
+        await db.RefreshTokens
+            .Where(t => t.UserId == targetUserId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
 
         await bus.PublishAsync(new UserRoleChangedV1(
             cmd.TargetUserId,
