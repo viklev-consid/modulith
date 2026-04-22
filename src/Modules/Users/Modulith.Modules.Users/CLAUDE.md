@@ -167,6 +167,7 @@ Handlers for these events live in consuming modules (Notifications, Audit, any o
 - **Don't change `User.Email` directly.** `ChangeEmail` is the only state transition. During `Create`, the factory method handles initial assignment.
 - **Don't bypass `SetPassword`.** It applies the password policy and hashes. Direct assignment bypasses both.
 - **Don't forget to revoke refresh tokens on sensitive events.** See the invariants table above. Missing a revocation means an attacker's session survives a password reset.
+- **Role changes have a stale-permission window equal to the access token lifetime (default 15 min).** Revoking refresh tokens prevents new tokens from carrying the old role, but any live access token still authorizes with its embedded role claim until it expires. `GET /v1/users/me` mirrors the token's role claim (not the DB), so the response stays consistent with what the token actually authorizes. This is the accepted stateless-JWT tradeoff. See ADR-0030 if you need immediate revocation.
 - **Don't return specific errors from `ForgotPassword`.** Always the same response shape, always 200.
 - **Don't return specific errors from `RequestEmailChange` when the target email is taken.** Same response as success.
 - **Don't distinguish "invalid token" from "expired token"** in reset/confirm error responses. Use a single `InvalidOrExpiredToken` error — otherwise it's an oracle for token validity.

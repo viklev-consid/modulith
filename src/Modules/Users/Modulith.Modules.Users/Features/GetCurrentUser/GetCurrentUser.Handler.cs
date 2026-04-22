@@ -18,10 +18,9 @@ public sealed class GetCurrentUserHandler(UsersDbContext db, IPermissionCatalog 
             return UsersErrors.UserNotFound;
         }
 
-        var roleName = user.Role.Name;
+        var roleName = query.TokenRole ?? user.Role.Name;
         var permissions = permissionCatalog.GetPermissionsForRole(roleName);
         var permissionsVersion = permissionCatalog.GetPermissionsVersion(roleName);
-
         return new GetCurrentUserResponse(
             user.Id.Value,
             user.Email.Value,

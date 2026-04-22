@@ -22,7 +22,7 @@ internal static class GetCurrentUserEndpoint
                 // User-specific data; must not be stored in shared caches.
                 http.Response.Headers.CacheControl = "private, no-store";
 
-                var query = new GetCurrentUserQuery(new UserId(userId));
+                var query = new GetCurrentUserQuery(new UserId(userId), currentUser.Role);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetCurrentUserResponse>>(query, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })

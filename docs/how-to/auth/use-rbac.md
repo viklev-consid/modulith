@@ -122,6 +122,10 @@ Role changes:
 - Are recorded in the audit trail as `user.role_changed`.
 - Cannot target the caller's own account (self-role-change is rejected with 422).
 
+**Stale-permission window.** Role changes take full effect only when the user's current access token expires and they re-authenticate. Until then, a demoted admin retains their old permissions for up to `AccessTokenLifetimeMinutes` (default: 15 minutes). `GET /v1/users/me` reflects the same role that the token carries — it does not hit the database for the role — so `role` and `permissions` in the `/me` response are always internally consistent with what the token authorizes.
+
+This is the standard stateless-JWT tradeoff. If your threat model requires immediate revocation on demotion, you need server-side access-token versioning (a security stamp checked on every request). That is an architectural shift documented in ADR-0030.
+
 ---
 
 ## See also
