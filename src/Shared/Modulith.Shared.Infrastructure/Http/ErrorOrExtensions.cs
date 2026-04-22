@@ -28,6 +28,10 @@ public static class ErrorOrExtensions
                 title: "Unauthorized",
                 detail: result.FirstError.Description,
                 statusCode: StatusCodes.Status401Unauthorized),
+            ErrorType.Forbidden => Results.Problem(
+                title: "Forbidden",
+                detail: result.FirstError.Description,
+                statusCode: StatusCodes.Status403Forbidden),
             ErrorType.Validation => Results.ValidationProblem(
                 result.Errors
                     .Where(e => e.Type == ErrorType.Validation)

@@ -280,6 +280,85 @@ dotnet test --filter "Category!=Smoke"
 
 ---
 
+## Resource-level authorization (ownership checks)
+
+Some slices need to allow different callers different levels of access to the same resource — for example, an admin can read any user's audit trail while a regular user can read only their own. This is **resource-based authorization** and it lives in the handler, not the endpoint.
+
+### The pattern
+
+Two types in `Shared.Infrastructure.Authorization`:
+
+- **`IResourcePolicy<TResource>`** — determines whether the current caller may access a specific resource instance.
+- **`PermissionOrOwnerPolicy<TResource>`** — covers the common case: elevated permission → full access; no permission → ownership check.
+
+### Adding a policy for a new resource
+
+**1. Define a resource type** (or reuse an existing entity). If protecting a list query, a lightweight scope record is enough:
+
+```csharp
+// Orders module — internal record representing the scope being protected
+internal sealed record OrderResource(Guid OwnerId);
+```
+
+**2. Implement the policy** in the module's `Authorization/` folder:
+
+```csharp
+internal sealed class OrderPolicy : PermissionOrOwnerPolicy<OrderResource>
+{
+    protected override string ElevatedPermission => OrdersPermissions.OrdersRead;
+    protected override string? GetOwnerId(OrderResource r) => r.OwnerId.ToString();
+}
+```
+
+For rules that can't be expressed as a single elevated permission + owner ID (multi-tenant membership, delegated access, etc.) implement `IResourcePolicy<TResource>` directly.
+
+**3. Register in the module's DI setup:**
+
+```csharp
+services.AddSingleton<IResourcePolicy<OrderResource>, OrderPolicy>();
+```
+
+**4. Apply in the handler:**
+
+```csharp
+public sealed class GetOrderHandler(
+    OrdersDbContext db,
+    ICurrentUser currentUser,
+    IResourcePolicy<OrderResource> policy)
+{
+    private async Task<ErrorOr<GetOrderResponse>> HandleCoreAsync(GetOrderQuery query, CancellationToken ct)
+    {
+        var order = await db.Orders.FindAsync([query.OrderId], ct);
+        if (order is null)
+            return OrdersErrors.NotFound;
+
+        var resource = new OrderResource(order.OwnerId);
+        if (!policy.IsAuthorized(currentUser, resource))
+            return OrdersErrors.Forbidden;
+
+        // ...
+    }
+}
+```
+
+**5. Keep the endpoint gate minimal.** The endpoint should require `RequireAuthorization()` (authenticated) only — the handler's policy decides whether the authenticated caller can access this particular resource:
+
+```csharp
+app.MapGet(OrdersRoutes.GetOrder, ...)
+   .RequireAuthorization()   // authenticated only — ownership check is in the handler
+   .RequireRateLimiting("read");
+```
+
+### When to use `PermissionOrOwnerPolicy` vs. a direct implementation
+
+| Scenario | Use |
+|---|---|
+| Elevated permission = full access; else = owner only | `PermissionOrOwnerPolicy<T>` |
+| Multi-field ownership (e.g. org membership) | Implement `IResourcePolicy<T>` directly |
+| No ownership concept — purely permission-gated | `RequireAuthorization(SomePermissions.Const)` on the endpoint, no policy needed |
+
+---
+
 ## Related
 
 - [`add-a-module.md`](add-a-module.md)

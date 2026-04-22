@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Modules.Audit.Contracts.Queries;
 using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Kernel.Interfaces;
@@ -17,22 +16,27 @@ internal static class GetAuditTrailEndpoint
                 ICurrentUser currentUser,
                 IMessageBus bus,
                 CancellationToken ct,
+                Guid? actorId = null,
                 int page = 1,
                 int pageSize = 20) =>
             {
-                if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))
+                if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var callerId))
                 {
                     return Results.Unauthorized();
                 }
 
-                var query = new GetAuditTrailQuery(userId, page, pageSize);
+                // Default to the caller's own trail; admins may pass an explicit actorId.
+                var targetId = actorId ?? callerId;
+
+                var query = new GetAuditTrailQuery(targetId, page, pageSize);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetAuditTrailResponse>>(query, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })
         .WithName("GetAuditTrail")
-        .WithSummary("Get the current user's audit trail. Requires audit.trail.read permission.")
+        .WithSummary("Get an audit trail. Defaults to the caller's own trail; admins may pass actorId to query any user.")
         .Produces<GetAuditTrailResponse>()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status403Forbidden)
-        .RequireAuthorization(AuditPermissions.TrailRead);
+        .RequireAuthorization()
+        .RequireRateLimiting("read");
 }

@@ -3,10 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry;
+using Modulith.Modules.Audit.Authorization;
 using Modulith.Modules.Audit.Features.GetAuditTrail;
 using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
 using Modulith.Modules.Audit.Persistence;
+using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
@@ -31,6 +33,8 @@ public static class AuditModule
 
         services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
         services.AddScoped<IPersonalDataEraser, AuditPersonalDataEraser>();
+
+        services.AddSingleton<IResourcePolicy<AuditTrailResource>, AuditTrailPolicy>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<AuditDbContext>("audit-db", tags: ["ready"]);
