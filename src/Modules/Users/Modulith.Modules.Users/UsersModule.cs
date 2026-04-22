@@ -28,6 +28,8 @@ using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Modules.Users.Seeding;
+using Modulith.Modules.Users.Contracts.Authorization;
+using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
@@ -55,6 +57,7 @@ public static class UsersModule
             .ValidateOnStart();
 
         services.AddHttpContextAccessor();
+        services.AddPermissions(UsersPermissions.All);
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();

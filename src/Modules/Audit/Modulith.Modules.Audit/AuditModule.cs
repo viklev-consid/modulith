@@ -8,6 +8,7 @@ using Modulith.Modules.Audit.Features.GetAuditTrail;
 using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
 using Modulith.Modules.Audit.Persistence;
+using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -22,6 +23,7 @@ public static class AuditModule
         IConfiguration configuration)
     {
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
+        services.AddPermissions(AuditPermissions.All);
 
         services.AddDbContext<AuditDbContext>((sp, opts) =>
         {

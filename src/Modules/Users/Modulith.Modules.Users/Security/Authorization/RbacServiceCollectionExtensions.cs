@@ -9,13 +9,14 @@ public static class RbacServiceCollectionExtensions
     /// <summary>
     /// Registers the RBAC infrastructure:
     /// <list type="bullet">
-    ///   <item><description><see cref="IPermissionCatalog"/> — discovers and maps role→permissions</description></item>
+    ///   <item><description><see cref="IPermissionCatalog"/> — collects permissions from all registered <c>IPermissionSource</c> instances and builds the role→permissions map</description></item>
     ///   <item><description><see cref="PermissionClaimsTransformation"/> — injects permission claims per request</description></item>
     ///   <item><description><see cref="PermissionAuthorizationHandler"/> — evaluates permission requirements</description></item>
     ///   <item><description>One named <see cref="AuthorizationPolicy"/> per declared permission constant</description></item>
     /// </list>
-    /// Must be called <em>after</em> all module <c>AddXxxModule</c> registrations so that
-    /// every <c>*.Contracts</c> assembly is already loaded when the catalog scans them.
+    /// Each module contributes its permissions by calling <c>services.AddPermissions(XxxPermissions.All)</c>
+    /// in its own <c>Add*Module</c> extension. <c>AddRbac</c> can be called at any point after those
+    /// registrations; there is no load-order constraint.
     /// </summary>
     public static IServiceCollection AddRbac(this IServiceCollection services)
     {
