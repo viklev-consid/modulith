@@ -52,6 +52,7 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnPasswordResetHandler>();
         opts.Discovery.IncludeType<OnPasswordChangedHandler>();
         opts.Discovery.IncludeType<OnEmailChangedHandler>();
+        opts.Discovery.IncludeType<OnUserRoleChangedHandler>();
         return opts;
     }
 
