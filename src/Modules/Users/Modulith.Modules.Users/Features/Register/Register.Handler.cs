@@ -61,7 +61,7 @@ public sealed class RegisterHandler(
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
 
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
-        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, refreshToken.Id.Value);
+        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
 
         return new RegisterResponse(
             user.Id.Value,

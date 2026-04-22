@@ -28,6 +28,20 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(u => u.Role)
+            .HasConversion(r => r.Name, v => new Role(v))
+            .HasMaxLength(32)
+            .IsRequired()
+            .HasDefaultValue(Role.User);
+
+        // xmin is a Postgres system column that advances on every row write.
+        // EF Core includes it in UPDATE WHERE clauses; a mismatch throws DbUpdateConcurrencyException.
+        // No migration required — xmin is always present on every Postgres table.
+        // IsRowVersion() sets IsConcurrencyToken() + ValueGeneratedOnAddOrUpdate() together.
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .IsRowVersion();
+
         builder.Property(u => u.CreatedAt).IsRequired();
         builder.Property(u => u.CreatedBy).HasMaxLength(100);
         builder.Property(u => u.UpdatedAt);

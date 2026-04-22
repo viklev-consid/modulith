@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Modulith.Modules.Catalog.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Http;
 using Wolverine;
 
@@ -28,5 +29,5 @@ internal static class CreateProductEndpoint
         .Produces<CreateProductResponse>(StatusCodes.Status201Created)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status409Conflict)
-        .RequireAuthorization("Authenticated");
+        .RequireAuthorization(CatalogPermissions.ProductsWrite);
 }

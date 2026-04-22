@@ -280,6 +280,97 @@ dotnet test --filter "Category!=Smoke"
 
 ---
 
+## Resource-level authorization (ownership checks)
+
+Some slices need to allow different callers different levels of access to the same resource — for example, an admin can read any user's audit trail while a regular user can read only their own. This is **resource-based authorization** and it lives in the **endpoint**, not the handler.
+
+Keeping the check in the endpoint preserves handler purity: if the query is in a `.Contracts` project and can be invoked by other modules or background jobs, placing `ICurrentUser` in the handler would silently break those non-HTTP callers. The endpoint is the HTTP boundary; it is the right place to enforce HTTP-caller-specific authorization.
+
+### The pattern
+
+Two types in `Shared.Infrastructure.Authorization`:
+
+- **`IResourcePolicy<TResource>`** — determines whether the current caller may access a specific resource instance.
+- **`PermissionOrOwnerPolicy<TResource>`** — covers the common case: elevated permission → full access; no permission → ownership check.
+
+### Adding a policy for a new resource
+
+**1. Define a resource type** (or reuse an existing entity). If protecting a list query, a lightweight scope record is enough:
+
+```csharp
+// Orders module — internal record representing the scope being protected
+internal sealed record OrderResource(Guid OwnerId);
+```
+
+**2. Implement the policy** in the module's `Authorization/` folder:
+
+```csharp
+internal sealed class OrderPolicy : PermissionOrOwnerPolicy<OrderResource>
+{
+    protected override string ElevatedPermission => OrdersPermissions.OrdersRead;
+    protected override string? GetOwnerId(OrderResource r) => r.OwnerId.ToString();
+}
+```
+
+For rules that can't be expressed as a single elevated permission + owner ID (multi-tenant membership, delegated access, etc.) implement `IResourcePolicy<TResource>` directly.
+
+**3. Register in the module's DI setup:**
+
+```csharp
+services.AddSingleton<IResourcePolicy<OrderResource>, OrderPolicy>();
+```
+
+**4. Apply in the endpoint:**
+
+```csharp
+app.MapGet(OrdersRoutes.GetOrder,
+    async (
+        ICurrentUser currentUser,
+        IResourcePolicy<OrderResource> policy,
+        IMessageBus bus,
+        CancellationToken ct,
+        Guid orderId) =>
+    {
+        // Ownership check at the HTTP boundary — the handler stays pure and
+        // callable by internal/background callers without an HTTP user context.
+        var resource = new OrderResource(orderId);
+        if (!policy.IsAuthorized(currentUser, resource))
+            return Results.Forbid();
+
+        var query = new GetOrderQuery(orderId);
+        var result = await bus.InvokeAsync<ErrorOr<GetOrderResponse>>(query, ct);
+        return result.ToProblemDetailsOr(Results.Ok);
+    })
+   .RequireAuthorization()
+   .RequireRateLimiting("read");
+```
+
+**5. Keep the handler pure.** The handler receives only what it needs to execute the query — no `ICurrentUser`, no policy:
+
+```csharp
+public sealed class GetOrderHandler(OrdersDbContext db)
+{
+    private async Task<ErrorOr<GetOrderResponse>> HandleCoreAsync(GetOrderQuery query, CancellationToken ct)
+    {
+        var order = await db.Orders.FindAsync([query.OrderId], ct);
+        if (order is null)
+            return OrdersErrors.NotFound;
+
+        // ...
+    }
+}
+```
+
+### When to use `PermissionOrOwnerPolicy` vs. a direct implementation
+
+| Scenario | Use |
+|---|---|
+| Elevated permission = full access; else = owner only | `PermissionOrOwnerPolicy<T>` |
+| Multi-field ownership (e.g. org membership) | Implement `IResourcePolicy<T>` directly |
+| No ownership concept — purely permission-gated | `RequireAuthorization(SomePermissions.Const)` on the endpoint, no policy needed |
+
+---
+
 ## Related
 
 - [`add-a-module.md`](add-a-module.md)

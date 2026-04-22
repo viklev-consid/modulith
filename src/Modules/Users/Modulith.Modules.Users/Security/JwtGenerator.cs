@@ -17,7 +17,7 @@ internal sealed class JwtGenerator(
     private readonly JwtOptions _jwt = jwtOptions.Value;
     private readonly UsersOptions _users = usersOptions.Value;
 
-    public string Generate(UserId userId, string email, string displayName, Guid refreshTokenId)
+    public string Generate(UserId userId, string email, string displayName, string role, Guid refreshTokenId)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -28,6 +28,7 @@ internal sealed class JwtGenerator(
             new Claim(JwtRegisteredClaimNames.Sub, userId.Value.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, email),
             new Claim(ClaimTypes.Name, displayName),
+            new Claim(ClaimTypes.Role, role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("rtid", refreshTokenId.ToString()),
         };

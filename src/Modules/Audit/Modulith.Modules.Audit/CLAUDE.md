@@ -20,7 +20,9 @@ This module records a tamper-evident audit trail of significant domain events ac
 1. `AuditEntry` records are never updated or deleted — the table is append-only by convention.
 2. All new event types must be added to `Integration/Subscribers/`.
 3. `GetAuditTrailQuery` is in `Audit.Contracts` so other modules can invoke the audit trail.
-4. The endpoint returns the calling user's own trail. Admin access across users is a future concern.
+4. `GetAuditTrail` is authenticated; the `AuditTrailPolicy` enforces ownership. Regular users see
+   only their own trail (`actorId` defaults to caller's ID). Admins with `audit.trail.read` may
+   pass an explicit `actorId` to query any user's trail.
 
 ---
 

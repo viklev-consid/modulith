@@ -68,7 +68,7 @@ public sealed class RefreshTokenHandler(
         await db.SaveChangesAsync(ct);
 
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
-        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, newRefreshToken.Id.Value);
+        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, newRefreshToken.Id.Value);
 
         return new RefreshTokenResponse(
             accessToken,

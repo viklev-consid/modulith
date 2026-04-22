@@ -12,7 +12,4 @@ public sealed class JwtOptions
 
     [Required, MinLength(32)]
     public required string SigningKey { get; init; }
-
-    [Range(1, 1440)]
-    public int AccessTokenLifetimeMinutes { get; init; } = 60;
 }

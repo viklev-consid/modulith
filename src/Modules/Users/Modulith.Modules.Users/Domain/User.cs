@@ -8,12 +8,13 @@ namespace Modulith.Modules.Users.Domain;
 
 public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 {
-    private User(UserId id, Email email, PasswordHash passwordHash, string displayName)
+    private User(UserId id, Email email, PasswordHash passwordHash, string displayName, Role role)
         : base(id)
     {
         Email = email;
         PasswordHash = passwordHash;
         DisplayName = displayName;
+        Role = role;
     }
 
     // Required by EF Core for materialization.
@@ -22,13 +23,18 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public Email Email { get; private set; } = null!;
     public PasswordHash PasswordHash { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
+    public Role Role { get; private set; } = Role.User;
 
     public DateTimeOffset CreatedAt { get; private set; }
     public string? CreatedBy { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public string? UpdatedBy { get; private set; }
 
-    public static ErrorOr<User> Create(Email email, PasswordHash passwordHash, string displayName)
+    public static ErrorOr<User> Create(
+        Email email,
+        PasswordHash passwordHash,
+        string displayName,
+        Role? initialRole = null)
     {
         if (string.IsNullOrWhiteSpace(displayName))
         {
@@ -40,9 +46,23 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
             return UsersErrors.DisplayNameTooLong;
         }
 
-        var user = new User(UserId.New(), email, passwordHash, displayName.Trim());
+        var role = initialRole ?? Role.User;
+        var user = new User(UserId.New(), email, passwordHash, displayName.Trim(), role);
         user.RaiseEvent(new UserRegistered(user.Id, email.Value, displayName.Trim()));
         return user;
+    }
+
+    public ErrorOr<Success> ChangeRole(Role newRole, UserId changedBy)
+    {
+        if (Role == newRole)
+        {
+            return UsersErrors.RoleSame;
+        }
+
+        var oldRole = Role;
+        Role = newRole;
+        RaiseEvent(new UserRoleChanged(Id, oldRole.Name, newRole.Name, changedBy));
+        return Result.Success;
     }
 
     public ErrorOr<Success> ChangeEmail(Email newEmail)

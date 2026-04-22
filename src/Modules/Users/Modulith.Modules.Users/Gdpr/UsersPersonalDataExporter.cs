@@ -20,6 +20,7 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
         {
             ["email"] = dbUser.Email.Value,
             ["displayName"] = dbUser.DisplayName,
+            ["role"] = dbUser.Role.Name,
             ["createdAt"] = dbUser.CreatedAt,
             ["updatedAt"] = dbUser.UpdatedAt,
         };

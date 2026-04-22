@@ -2,7 +2,9 @@ using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Audit.Contracts.Dtos;
 using Modulith.Modules.Audit.Contracts.Queries;
+using Modulith.Modules.Audit.Errors;
 using Modulith.Modules.Audit.Persistence;
+using Modulith.Shared.Kernel.Pagination;
 
 namespace Modulith.Modules.Audit.Features.GetAuditTrail;
 
@@ -13,6 +15,14 @@ public sealed class GetAuditTrailHandler(AuditDbContext db)
 
     private async Task<ErrorOr<GetAuditTrailResponse>> HandleCoreAsync(GetAuditTrailQuery query, CancellationToken ct)
     {
+        if (query.Page <= 0 || query.Page > PageRequest.MaxPage)
+            return AuditErrors.PageInvalid;
+
+        if (query.PageSize <= 0 || query.PageSize > PageRequest.MaxPageSize)
+            return AuditErrors.PageSizeInvalid;
+
+        var pagination = PageRequest.Of(query.Page, query.PageSize);
+
         var baseQuery = db.AuditEntries
             .AsNoTracking()
             .Where(e => e.ActorId == query.UserId)
@@ -21,8 +31,8 @@ public sealed class GetAuditTrailHandler(AuditDbContext db)
         var total = await baseQuery.CountAsync(ct);
 
         var entries = await baseQuery
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip(pagination.Offset)
+            .Take(pagination.PageSize)
             .Select(e => new AuditEntryDto(
                 e.Id.Value,
                 e.EventType,
@@ -32,6 +42,6 @@ public sealed class GetAuditTrailHandler(AuditDbContext db)
                 e.OccurredAt))
             .ToListAsync(ct);
 
-        return new GetAuditTrailResponse(entries, total, query.Page, query.PageSize);
+        return new GetAuditTrailResponse(entries, total, pagination.Page, pagination.PageSize);
     }
 }

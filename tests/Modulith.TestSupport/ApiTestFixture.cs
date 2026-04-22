@@ -91,9 +91,9 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     public HttpClient CreateAnonymousClient() => CreateClient();
 
-    public HttpClient CreateAuthenticatedClient(Guid userId, string email, string displayName)
+    public HttpClient CreateAuthenticatedClient(Guid userId, string email, string displayName, string role = "user")
     {
-        var token = GenerateTestToken(userId, email, displayName);
+        var token = GenerateTestToken(userId, email, displayName, role);
         var client = CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -109,7 +109,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         return client;
     }
 
-    public static string GenerateTestToken(Guid userId, string email, string displayName)
+    public static string GenerateTestToken(Guid userId, string email, string displayName, string role = "user")
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -119,6 +119,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, email),
             new Claim(ClaimTypes.Name, displayName),
+            new Claim(ClaimTypes.Role, role),
         };
 
         var token = new JwtSecurityToken(

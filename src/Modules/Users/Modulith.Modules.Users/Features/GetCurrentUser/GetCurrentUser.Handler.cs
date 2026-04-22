@@ -1,10 +1,11 @@
 using ErrorOr;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Modules.Users.Security.Authorization;
 
 namespace Modulith.Modules.Users.Features.GetCurrentUser;
 
-public sealed class GetCurrentUserHandler(UsersDbContext db)
+public sealed class GetCurrentUserHandler(UsersDbContext db, IPermissionCatalog permissionCatalog)
 {
     public async Task<ErrorOr<GetCurrentUserResponse>> Handle(GetCurrentUserQuery query, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(GetCurrentUserHandler), () => HandleCoreAsync(query, ct));
@@ -17,10 +18,16 @@ public sealed class GetCurrentUserHandler(UsersDbContext db)
             return UsersErrors.UserNotFound;
         }
 
+        var roleName = query.TokenRole ?? user.Role.Name;
+        var permissions = permissionCatalog.GetPermissionsForRole(roleName);
+        var permissionsVersion = permissionCatalog.GetPermissionsVersion(roleName);
         return new GetCurrentUserResponse(
             user.Id.Value,
             user.Email.Value,
             user.DisplayName,
-            user.CreatedAt);
+            user.CreatedAt,
+            roleName,
+            permissions,
+            permissionsVersion);
     }
 }

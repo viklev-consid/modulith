@@ -25,7 +25,9 @@ This module owns the product catalog: creation, pricing, and availability. It is
 ## Access control
 
 - `ListProducts` and `GetProductById` are public (no auth required).
-- `CreateProduct` requires the `Authenticated` policy. Future admin-only enforcement should happen here.
+- `CreateProduct` requires `CatalogPermissions.ProductsWrite` (`catalog.products.write`), which is granted to the `admin` role.
+
+Permission constants live in `Modulith.Modules.Catalog.Contracts/Authorization/CatalogPermissions.cs`.
 
 ---
 

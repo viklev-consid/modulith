@@ -13,6 +13,8 @@ using Modulith.Modules.Catalog.Gdpr;
 using Modulith.Modules.Catalog.Integration.Subscribers;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Catalog.Seeding;
+using Modulith.Modules.Catalog.Contracts.Authorization;
+using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Kernel.Interfaces;
@@ -33,6 +35,7 @@ public static class CatalogModule
             .ValidateOnStart();
 
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
+        services.AddPermissions(CatalogPermissions.All);
 
         services.AddDbContext<CatalogDbContext>((sp, opts) =>
         {

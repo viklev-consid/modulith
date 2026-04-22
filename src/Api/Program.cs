@@ -14,6 +14,7 @@ using Modulith.Modules.Audit;
 using Modulith.Modules.Catalog;
 using Modulith.Modules.Notifications;
 using Modulith.Modules.Users;
+using Modulith.Modules.Users.Security.Authorization;
 using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Logging;
@@ -21,6 +22,7 @@ using Modulith.Shared.Infrastructure.Messaging;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
+using Modulith.Api.Infrastructure.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
 
@@ -98,7 +100,11 @@ builder.Services.AddAuthorization(opts =>
 });
 
 // 6. OpenAPI + Scalar
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(opts =>
+{
+    opts.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    opts.AddOperationTransformer<AuthorizationOperationTransformer>();
+});
 
 // 7. Module registration
 builder.Services
@@ -106,6 +112,9 @@ builder.Services
     .AddCatalogModule(builder.Configuration, builder.Environment)
     .AddAuditModule(builder.Configuration)
     .AddNotificationsModule(builder.Configuration);
+
+// 7a. RBAC — must follow module registrations so all *.Contracts assemblies are loaded
+builder.Services.AddRbac();
 
 // 8. API versioning
 builder.Services.AddApiVersioning(opts =>

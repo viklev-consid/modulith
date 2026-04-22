@@ -6,6 +6,8 @@ using OpenTelemetry;
 using Modulith.Modules.Notifications.Gdpr;
 using Modulith.Modules.Notifications.Integration.Subscribers;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Notifications.Contracts.Authorization;
+using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -24,6 +26,7 @@ public static class NotificationsModule
             .ValidateOnStart();
 
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddPermissions(NotificationsPermissions.All);
 
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 

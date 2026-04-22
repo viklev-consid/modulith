@@ -53,7 +53,7 @@ public sealed class LoginHandler(
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
 
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
-        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, refreshToken.Id.Value);
+        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
 
         return new LoginResponse(
             user.Id.Value,
