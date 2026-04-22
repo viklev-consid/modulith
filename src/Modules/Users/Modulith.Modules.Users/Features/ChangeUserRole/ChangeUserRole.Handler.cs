@@ -4,12 +4,17 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Modules.Users.Security.Authorization;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ChangeUserRole;
 
-public sealed class ChangeUserRoleHandler(UsersDbContext db, IClock clock, IMessageBus bus)
+public sealed class ChangeUserRoleHandler(
+    UsersDbContext db,
+    IClock clock,
+    IMessageBus bus,
+    IPermissionCatalog permissionCatalog)
 {
     public async Task<ErrorOr<ChangeUserRoleResponse>> Handle(ChangeUserRoleCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(ChangeUserRoleHandler), () => HandleCoreAsync(cmd, ct));
@@ -25,20 +30,24 @@ public sealed class ChangeUserRoleHandler(UsersDbContext db, IClock clock, IMess
             return UsersErrors.CannotChangeSelfRole;
         }
 
+        // Resolve from the catalog — only roles with explicit permission mappings are allowed.
+        // This rejects syntactically valid but unsupported names (e.g. "moderator") before any
+        // DB work, rather than constructing an arbitrary Role and persisting it.
+        if (!permissionCatalog.KnownRoles.Contains(cmd.NewRole))
+        {
+            return UsersErrors.RoleNotFound;
+        }
+
+        var newRole = new Role(cmd.NewRole);
+
         var user = await db.Users.FindAsync([targetUserId], ct);
         if (user is null)
         {
             return UsersErrors.UserNotFound;
         }
 
-        var roleResult = Role.Create(cmd.NewRole);
-        if (roleResult.IsError)
-        {
-            return UsersErrors.RoleNotFound;
-        }
-
         var oldRoleName = user.Role.Name;
-        var changeResult = user.ChangeRole(roleResult.Value, changedBy);
+        var changeResult = user.ChangeRole(newRole, changedBy);
         if (changeResult.IsError)
         {
             return changeResult.Errors;
@@ -55,10 +64,10 @@ public sealed class ChangeUserRoleHandler(UsersDbContext db, IClock clock, IMess
         await bus.PublishAsync(new UserRoleChangedV1(
             cmd.TargetUserId,
             oldRoleName,
-            roleResult.Value.Name,
+            newRole.Name,
             cmd.ChangedBy));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRoleChangedV1)));
 
-        return new ChangeUserRoleResponse(cmd.TargetUserId, roleResult.Value.Name);
+        return new ChangeUserRoleResponse(cmd.TargetUserId, newRole.Name);
     }
 }

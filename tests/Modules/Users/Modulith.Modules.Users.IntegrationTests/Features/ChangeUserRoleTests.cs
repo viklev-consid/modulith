@@ -87,6 +87,19 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task ChangeUserRole_UnknownRole_Returns404()
+    {
+        var admin = await RegisterAsync("admin@example.com", "Admin");
+        var target = await RegisterAsync("target@example.com", "Target");
+
+        var response = await AdminClient(admin.UserId, "admin@example.com")
+            .PutAsJsonAsync($"/v1/users/{target.UserId}/role",
+                new ChangeUserRoleRequest("moderator"));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ── ListUsers ──────────────────────────────────────────────────────────
 
     [Fact]

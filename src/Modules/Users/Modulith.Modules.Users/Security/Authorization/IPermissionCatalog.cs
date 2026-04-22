@@ -17,4 +17,10 @@ public interface IPermissionCatalog
     /// Cached per role; changes only on process restart / code change.
     /// </summary>
     string GetPermissionsVersion(string roleName);
+
+    /// <summary>
+    /// The set of role names that have explicit permission mappings. Only roles
+    /// in this set may be assigned to users. Role names are case-insensitive.
+    /// </summary>
+    IReadOnlySet<string> KnownRoles { get; }
 }

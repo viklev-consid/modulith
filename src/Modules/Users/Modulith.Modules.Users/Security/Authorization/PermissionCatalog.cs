@@ -18,15 +18,19 @@ internal sealed class PermissionCatalog : IPermissionCatalog
     private readonly IReadOnlyCollection<string> _allPermissions;
     private readonly Dictionary<string, IReadOnlyCollection<string>> _roleMap;
     private readonly Dictionary<string, string> _versionCache;
+    private readonly IReadOnlySet<string> _knownRoles;
 
     public PermissionCatalog()
     {
         _allPermissions = DiscoverAllPermissions();
         _roleMap = BuildRoleMap(_allPermissions);
         _versionCache = BuildVersionCache(_roleMap);
+        _knownRoles = new HashSet<string>(_roleMap.Keys, StringComparer.OrdinalIgnoreCase);
     }
 
     public IReadOnlyCollection<string> AllPermissions => _allPermissions;
+
+    public IReadOnlySet<string> KnownRoles => _knownRoles;
 
     public IReadOnlyCollection<string> GetPermissionsForRole(string roleName) =>
         _roleMap.TryGetValue(roleName, out var perms) ? perms : [];
