@@ -42,6 +42,7 @@ internal static class ChangeUserRoleEndpoint
         .WithSummary("Change the role of a user. Admin only.")
         .Produces<ChangeUserRoleResponse>()
         .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .RequireAuthorization(UsersPermissions.RolesWrite)

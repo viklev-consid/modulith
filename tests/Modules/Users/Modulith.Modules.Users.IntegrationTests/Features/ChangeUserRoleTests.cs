@@ -73,7 +73,7 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
         var response = await client.PutAsJsonAsync($"/v1/users/{admin.UserId}/role",
             new ChangeUserRoleRequest("user"));
 
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]
