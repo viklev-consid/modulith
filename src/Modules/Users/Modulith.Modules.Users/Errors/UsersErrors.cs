@@ -71,4 +71,11 @@ internal static class UsersErrors
 
     public static readonly Error ConcurrencyConflict =
         Error.Conflict("Users.ConcurrencyConflict", "The user record was modified concurrently. Please retry.");
+
+    // Pagination
+    public static readonly Error PageInvalid =
+        Error.Validation("Users.Query.PageInvalid", $"Page number must be between 1 and {Shared.Kernel.Pagination.PageRequest.MaxPage}.");
+
+    public static readonly Error PageSizeInvalid =
+        Error.Validation("Users.Query.PageSizeInvalid", $"Page size must be between 1 and {Shared.Kernel.Pagination.PageRequest.MaxPageSize}.");
 }
