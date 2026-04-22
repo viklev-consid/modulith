@@ -12,19 +12,22 @@ internal static class GetCurrentUserEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapGet(UsersRoutes.Me,
-            async (ICurrentUser currentUser, IMessageBus bus, CancellationToken ct) =>
+            async (ICurrentUser currentUser, IMessageBus bus, HttpContext http, CancellationToken ct) =>
             {
                 if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))
                 {
                     return Results.Unauthorized();
                 }
 
+                // User-specific data; must not be stored in shared caches.
+                http.Response.Headers.CacheControl = "private, no-store";
+
                 var query = new GetCurrentUserQuery(new UserId(userId));
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetCurrentUserResponse>>(query, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })
         .WithName("GetCurrentUser")
-        .WithSummary("Get the authenticated user's profile.")
+        .WithSummary("Get the authenticated user's profile, role, and resolved permissions.")
         .Produces<GetCurrentUserResponse>()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .RequireAuthorization();
