@@ -24,6 +24,8 @@ Modulith is opinionated. It encodes a set of decisions that have been made delib
 - **Blob storage abstraction** with a local-disk reference implementation
 - **Notifications module** with Razor templates and Mailpit for dev
 - **Audit module** consuming domain events for change history
+- **Per-module health checks** registered under the `ready` tag, visible in the Aspire dashboard
+- **Per-module OpenTelemetry activity sources** with full handler instrumentation
 - **GDPR primitives**: data classification attributes, exporter/eraser contracts, consent tracking
 - **Testing**: xUnit v3, Shouldly, Verify, Bogus, Testcontainers, NetArchTest, WireMock.Net
 - **Agent-ready**: `CLAUDE.md` files at multiple levels, comprehensive ADRs, `dotnet new` item templates for slices and modules
@@ -59,10 +61,6 @@ dotnet test
 - [`CONFIG.md`](CONFIG.md) — configuration hierarchy and secrets management
 - [`CLAUDE.md`](CLAUDE.md) — operating manual for AI agents working in this codebase
 
-## Status
-
-Phases 0–10 complete: solution skeleton, shared primitives, API host, architectural tests, Users module (full auth baseline: register, login, password reset, email change, refresh token rotation, logout), Catalog, cross-module event flow, Audit, Notifications, GDPR flows, `dotnet new` templates, and CI pipeline. See [`docs/implementation-roadmap.md`](docs/implementation-roadmap.md) for Phase 12 polish items.
-
 ## License
 
-TBD.
+MIT — see [LICENSE](LICENSE).
