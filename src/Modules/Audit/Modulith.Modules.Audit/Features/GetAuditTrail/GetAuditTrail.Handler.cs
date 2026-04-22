@@ -20,6 +20,12 @@ public sealed class GetAuditTrailHandler(
 
     private async Task<ErrorOr<GetAuditTrailResponse>> HandleCoreAsync(GetAuditTrailQuery query, CancellationToken ct)
     {
+        if (query.Page <= 0)
+            return AuditErrors.PageInvalid;
+
+        if (query.PageSize <= 0 || query.PageSize > 100)
+            return AuditErrors.PageSizeInvalid;
+
         var resource = new AuditTrailResource(query.UserId);
         if (!policy.IsAuthorized(currentUser, resource))
         {
