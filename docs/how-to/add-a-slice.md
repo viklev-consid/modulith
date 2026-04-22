@@ -282,7 +282,9 @@ dotnet test --filter "Category!=Smoke"
 
 ## Resource-level authorization (ownership checks)
 
-Some slices need to allow different callers different levels of access to the same resource — for example, an admin can read any user's audit trail while a regular user can read only their own. This is **resource-based authorization** and it lives in the handler, not the endpoint.
+Some slices need to allow different callers different levels of access to the same resource — for example, an admin can read any user's audit trail while a regular user can read only their own. This is **resource-based authorization** and it lives in the **endpoint**, not the handler.
+
+Keeping the check in the endpoint preserves handler purity: if the query is in a `.Contracts` project and can be invoked by other modules or background jobs, placing `ICurrentUser` in the handler would silently break those non-HTTP callers. The endpoint is the HTTP boundary; it is the right place to enforce HTTP-caller-specific authorization.
 
 ### The pattern
 
@@ -318,13 +320,35 @@ For rules that can't be expressed as a single elevated permission + owner ID (mu
 services.AddSingleton<IResourcePolicy<OrderResource>, OrderPolicy>();
 ```
 
-**4. Apply in the handler:**
+**4. Apply in the endpoint:**
 
 ```csharp
-public sealed class GetOrderHandler(
-    OrdersDbContext db,
-    ICurrentUser currentUser,
-    IResourcePolicy<OrderResource> policy)
+app.MapGet(OrdersRoutes.GetOrder,
+    async (
+        ICurrentUser currentUser,
+        IResourcePolicy<OrderResource> policy,
+        IMessageBus bus,
+        CancellationToken ct,
+        Guid orderId) =>
+    {
+        // Ownership check at the HTTP boundary — the handler stays pure and
+        // callable by internal/background callers without an HTTP user context.
+        var resource = new OrderResource(orderId);
+        if (!policy.IsAuthorized(currentUser, resource))
+            return Results.Forbid();
+
+        var query = new GetOrderQuery(orderId);
+        var result = await bus.InvokeAsync<ErrorOr<GetOrderResponse>>(query, ct);
+        return result.ToProblemDetailsOr(Results.Ok);
+    })
+   .RequireAuthorization()
+   .RequireRateLimiting("read");
+```
+
+**5. Keep the handler pure.** The handler receives only what it needs to execute the query — no `ICurrentUser`, no policy:
+
+```csharp
+public sealed class GetOrderHandler(OrdersDbContext db)
 {
     private async Task<ErrorOr<GetOrderResponse>> HandleCoreAsync(GetOrderQuery query, CancellationToken ct)
     {
@@ -332,21 +356,9 @@ public sealed class GetOrderHandler(
         if (order is null)
             return OrdersErrors.NotFound;
 
-        var resource = new OrderResource(order.OwnerId);
-        if (!policy.IsAuthorized(currentUser, resource))
-            return OrdersErrors.Forbidden;
-
         // ...
     }
 }
-```
-
-**5. Keep the endpoint gate minimal.** The endpoint should require `RequireAuthorization()` (authenticated) only — the handler's policy decides whether the authenticated caller can access this particular resource:
-
-```csharp
-app.MapGet(OrdersRoutes.GetOrder, ...)
-   .RequireAuthorization()   // authenticated only — ownership check is in the handler
-   .RequireRateLimiting("read");
 ```
 
 ### When to use `PermissionOrOwnerPolicy` vs. a direct implementation

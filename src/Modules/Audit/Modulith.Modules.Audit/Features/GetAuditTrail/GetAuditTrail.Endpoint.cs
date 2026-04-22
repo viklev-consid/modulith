@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Modulith.Modules.Audit.Authorization;
 using Modulith.Modules.Audit.Contracts.Queries;
+using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
@@ -14,6 +16,7 @@ internal static class GetAuditTrailEndpoint
         app.MapGet(AuditRoutes.Trail,
             async (
                 ICurrentUser currentUser,
+                IResourcePolicy<AuditTrailResource> policy,
                 IMessageBus bus,
                 CancellationToken ct,
                 Guid? actorId = null,
@@ -27,6 +30,14 @@ internal static class GetAuditTrailEndpoint
 
                 // Default to the caller's own trail; admins may pass an explicit actorId.
                 var targetId = actorId ?? callerId;
+
+                // Ownership check at the HTTP boundary — keeps the handler pure and
+                // callable by internal/background callers without an HTTP user context.
+                var resource = new AuditTrailResource(targetId);
+                if (!policy.IsAuthorized(currentUser, resource))
+                {
+                    return Results.Forbid();
+                }
 
                 var query = new GetAuditTrailQuery(targetId, page, pageSize);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetAuditTrailResponse>>(query, ct);
