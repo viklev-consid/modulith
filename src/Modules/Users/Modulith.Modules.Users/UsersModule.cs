@@ -12,7 +12,10 @@ using Modulith.Modules.Users.Features.ConfirmEmailChange;
 using Modulith.Modules.Users.Features.DeleteAccount;
 using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ForgotPassword;
+using Modulith.Modules.Users.Features.ChangeUserRole;
 using Modulith.Modules.Users.Features.GetCurrentUser;
+using Modulith.Modules.Users.Features.GetUserById;
+using Modulith.Modules.Users.Features.ListUsers;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Logout;
 using Modulith.Modules.Users.Features.LogoutAll;
@@ -105,6 +108,11 @@ public static class UsersModule
         opts.Discovery.IncludeType<LogoutAllHandler>();
         opts.Discovery.IncludeType<SweepExpiredTokensHandler>();
 
+        // RBAC management handlers — Phase 13
+        opts.Discovery.IncludeType<ChangeUserRoleHandler>();
+        opts.Discovery.IncludeType<ListUsersHandler>();
+        opts.Discovery.IncludeType<GetUserByIdHandler>();
+
         return opts;
     }
 
@@ -125,6 +133,11 @@ public static class UsersModule
         RefreshTokenEndpoint.Map(app);
         LogoutEndpoint.Map(app);
         LogoutAllEndpoint.Map(app);
+
+        // RBAC management endpoints — Phase 13
+        ChangeUserRoleEndpoint.Map(app);
+        ListUsersEndpoint.Map(app);
+        GetUserByIdEndpoint.Map(app);
 
         return app;
     }

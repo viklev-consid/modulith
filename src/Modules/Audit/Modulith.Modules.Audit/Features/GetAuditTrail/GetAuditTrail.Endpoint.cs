@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Modules.Audit.Contracts.Queries;
 using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Kernel.Interfaces;
@@ -29,8 +30,9 @@ internal static class GetAuditTrailEndpoint
                 return result.ToProblemDetailsOr(Results.Ok);
             })
         .WithName("GetAuditTrail")
-        .WithSummary("Get the current user's audit trail.")
+        .WithSummary("Get the current user's audit trail. Requires audit.trail.read permission.")
         .Produces<GetAuditTrailResponse>()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
-        .RequireAuthorization();
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .RequireAuthorization(AuditPermissions.TrailRead);
 }
