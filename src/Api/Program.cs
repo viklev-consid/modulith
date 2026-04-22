@@ -22,6 +22,7 @@ using Modulith.Shared.Infrastructure.Messaging;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
+using Modulith.Api.Infrastructure.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
 
@@ -99,7 +100,11 @@ builder.Services.AddAuthorization(opts =>
 });
 
 // 6. OpenAPI + Scalar
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(opts =>
+{
+    opts.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    opts.AddOperationTransformer<AuthorizationOperationTransformer>();
+});
 
 // 7. Module registration
 builder.Services
