@@ -34,7 +34,9 @@ public sealed class GetAuditTrailTests(AuditCrossModuleFixture fixture) : IAsync
             using var scope = fixture.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
             if (await db.AuditEntries.AnyAsync(e => e.ActorId == userId, cts.Token))
+            {
                 break;
+            }
             await Task.Delay(200, cts.Token);
         }
 
