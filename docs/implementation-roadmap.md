@@ -855,6 +855,294 @@ Audit all `Errors.Xxx` classes. Ensure codes are stable and documented.
 
 ---
 
+## Phase 13: RBAC, Bearer in OpenAPI
+
+**Goal:** Promote authorization from "authenticated / not" to role-based with permission-level policy checks, and make the Scalar UI able to send `Authorization: Bearer <token>` against protected endpoints.
+
+Reference docs:
+
+- [`adr/0030-rbac.md`](adr/0030-rbac.md)
+- [`adr/0028-auth-flows-baseline.md`](adr/0028-auth-flows-baseline.md)
+- [`adr/0029-refresh-tokens-and-logout.md`](adr/0029-refresh-tokens-and-logout.md)
+
+Design summary (full reasoning in ADR-0030):
+
+- **One role per user.** Roles cannot be granted or revoked; only *changed*. Simplifies invariants, claim surface, and audit.
+- **Roles → permissions**, permissions are dotted strings declared as constants by each module in its `.Contracts` project and aggregated at startup.
+- **Endpoints authorize on permissions**, not roles. Policies are registered at startup, one per declared permission.
+- **JWT carries only the `role` claim.** Permissions are resolved per request from an in-memory `role → permission[]` map via `IClaimsTransformation`. Keeps tokens small and permissions always current relative to code.
+- **Role change forces re-login** via refresh-token revocation. There is no "stale role in token" window beyond the access-token TTL.
+- **Seeded roles**: `Admin` (all declared permissions) and `User` (no elevated permissions). More roles can be defined later without schema changes.
+
+---
+
+### 13.1 Users module — domain additions
+
+Add to `Modulith.Modules.Users/Domain/`:
+
+**`Role` value object (enum-like):**
+
+- Reference-by-name (case-sensitive, ASCII, `^[a-z][a-z0-9_-]{1,31}$`).
+- Two seeded instances exposed as static members: `Role.Admin`, `Role.User`.
+- Comparable and `IEquatable` by name.
+
+**Addition to `User` aggregate:**
+
+- `Role` property, non-nullable, private setter.
+- Factory `User.Create(...)` now takes an initial `Role` parameter (default `Role.User`) and asserts it is non-null.
+- Method `User.ChangeRole(Role newRole, UserId changedBy) : Result` — no-op and returns failure if `newRole == Role`; otherwise sets and raises `UserRoleChanged`.
+
+**New domain event:**
+
+- `UserRoleChanged` (internal) — `UserId`, `OldRole`, `NewRole`, `ChangedBy`.
+- Maps to `UserRoleChangedV1` (public contract) — same fields, intended for Audit and Notifications subscribers.
+
+### 13.2 Users module — persistence
+
+- Add a `role` column (`text`, non-null) to the `users` table with default `'user'`.
+- Migration `AddUserRole`: backfills existing rows to `'user'`, then adds the `NOT NULL` constraint.
+- No new tables. Role→permission mapping is in code, not the database (see ADR-0030 for the trade-off).
+
+```bash
+dotnet ef migrations add AddUserRole \
+  --project src/Modules/Users/Modulith.Modules.Users \
+  --context UsersDbContext \
+  --output-dir Persistence/Migrations
+```
+
+### 13.3 Permission declarations — per module
+
+Each module declares its permission constants in its `.Contracts` project under `Authorization/`:
+
+```csharp
+// Modulith.Modules.Catalog.Contracts/Authorization/CatalogPermissions.cs
+public static class CatalogPermissions
+{
+    public const string ProductsRead  = "catalog.products.read";
+    public const string ProductsWrite = "catalog.products.write";
+
+    public static IReadOnlyCollection<string> All { get; } =
+        [ProductsRead, ProductsWrite];
+}
+```
+
+Apply to:
+
+- `Modulith.Modules.Users.Contracts` → `UsersPermissions` (role management, user administration).
+- `Modulith.Modules.Catalog.Contracts` → `CatalogPermissions`.
+- `Modulith.Modules.Audit.Contracts` → `AuditPermissions` (read trail).
+- `Modulith.Modules.Notifications.Contracts` → `NotificationsPermissions` (template admin).
+
+Format rule (enforced by architectural test, 13.10): `{module}.{resource}.{action}`, lowercase, dot-separated, ASCII.
+
+### 13.4 Users module — authorization composition
+
+Add `Security/Authorization/`:
+
+- **`IPermissionCatalog`** — resolves `role → IReadOnlyCollection<string>` and exposes the set of all declared permissions. Populated at startup from the contracts.
+- **`RolePermissionMap`** — static map. `Admin` → all declared permissions; `User` → empty (endpoints that only need authentication still use the existing `Authenticated` policy).
+- **`PermissionClaimsTransformation : IClaimsTransformation`** — reads the `role` claim from the incoming principal, looks up the permissions from `IPermissionCatalog`, and adds them as `permission` claims to a cloned `ClaimsIdentity`. Idempotent (skips if already present).
+- **`PermissionRequirement` + `PermissionAuthorizationHandler`** — matches a `permission` claim.
+- **`AuthorizationBuilderExtensions.AddPermissionPolicies(...)`** — registers one named policy per declared permission so endpoints can call `.RequireAuthorization(CatalogPermissions.ProductsWrite)`.
+
+These live in the Users module (it owns identity) and are wired into the API host via a new `AddRbac(...)` extension on `UsersModule`:
+
+```csharp
+services.AddRbac(); // registers catalog, claims transformation, auth handler, policies
+```
+
+The catalog is assembled by discovering `public static IReadOnlyCollection<string> All` on `*Permissions` types across the loaded contracts assemblies.
+
+### 13.5 JWT issuance — role claim
+
+Update `JwtGenerator`:
+
+- Add a `role` claim (`ClaimTypes.Role`) carrying the user's current role name.
+- No permission claims in the token. The claims transformation injects them per request.
+
+### 13.6 `ICurrentUser` extension
+
+Extend the shared kernel interface:
+
+```csharp
+string? Role { get; }
+IReadOnlyCollection<string> Permissions { get; }
+bool HasPermission(string permission);
+```
+
+Update `CurrentUser` default to read `ClaimTypes.Role` and all `permission` claims. This is a breaking change to `Modulith.Shared.Kernel`; all call sites already in-tree update trivially.
+
+### 13.6a `GET /v1/users/me` — include role and permissions
+
+Update `GetCurrentUserResponse` to carry the authorization surface the frontend needs for show/hide gating. The JWT still only carries `role` (per 13.5); `me` is the canonical hydration point for the client after login or refresh.
+
+New fields on the response:
+
+- `role: string` — the user's current role name (e.g. `"admin"`, `"user"`).
+- `permissions: string[]` — the fully resolved permission set for that role, sorted lexicographically. Always present; empty array for roles with no permissions.
+- `permissionsVersion: string` — short, stable hash (e.g. SHA-256 of the sorted permissions joined by `\n`, base64url, first 16 chars) so the frontend can detect changes cheaply.
+
+Source of data: `IPermissionCatalog` from 13.4. The handler does not query the database for permissions — it reads the caller's role from the loaded `User` and resolves the permission set from the in-memory map. `permissionsVersion` is computed at startup per role and cached; the response just reads it.
+
+Contract notes:
+
+- Ordering is part of the contract. Frontends may compare by value, not by set.
+- `permissions` is never `null`.
+- When a role change occurs, refresh tokens are revoked (per 13.7); the frontend's next `me` after re-login returns the new set and a new `permissionsVersion`.
+
+Response caching: add `Cache-Control: private, no-store` on the endpoint. `me` is authenticated and user-specific; shared caches must not store it.
+
+### 13.7 Feature slices — role management
+
+Add under `Modules/Users/Modulith.Modules.Users/Features/`:
+
+- **`ChangeUserRole/`** — `PUT /v1/users/{userId}/role`
+  - Body: `{ "role": "admin" | "user" }`.
+  - Authorization: `UsersPermissions.RolesWrite` (Admin only by default).
+  - Prevents an admin from changing their own role (avoids the last-admin footgun).
+  - On success: updates role, revokes all refresh tokens for the target user, publishes `UserRoleChangedV1`.
+  - Rate limit: `write`.
+- **`ListUsers/`** — `GET /v1/users`
+  - Authorization: `UsersPermissions.UsersRead`.
+  - Paginated; returns id, email, display name, role.
+- **`GetUserById/`** — `GET /v1/users/{userId}`
+  - Authorization: `UsersPermissions.UsersRead`.
+
+All six files per slice (Request/Response/Command/Handler/Validator/Endpoint) per the standard pattern.
+
+Update **existing endpoints** to migrate off the plain `Authenticated` policy where a permission now applies:
+
+- `CatalogPermissions.ProductsWrite` → `CreateProduct` endpoint.
+- `AuditPermissions.TrailRead` → `GetAuditTrail` endpoint (previously authenticated-only; this is a privilege escalation fix).
+- Notifications admin endpoints (if any) → `NotificationsPermissions.*`.
+
+Endpoints tied to `me` (profile, password change, account deletion, personal-data export) stay on `Authenticated` — they don't need permission scoping.
+
+### 13.8 Admin bootstrap
+
+Two mechanisms — development and production — live side-by-side:
+
+- **Dev seeder.** Extend `UsersDevSeeder` to ensure one admin exists. Email + display name from `Modules:Users:Dev:AdminEmail` / `AdminDisplayName` configuration. Idempotent.
+- **Non-dev bootstrap.** New `AdminBootstrapper : IHostedService` registered only when `Modules:Users:AdminBootstrap:Enabled` is `true`. On startup:
+  - If at least one user with role `Admin` exists → no-op, log at Information.
+  - Else: read `Modules:Users:AdminBootstrap:Email`. If missing → fail fast with a clear error (refuse to start without an admin).
+  - If a user with that email exists → promote to `Admin` (same code path as `ChangeUserRole`), emit `UserRoleChangedV1`.
+  - Otherwise → no-op and log a Warning. Creating a user from nothing during bootstrap is out of scope (no password, no email confirmation). Operators register the user via the normal flow, then bootstrap promotes them.
+  - The hosted service runs once per process start. Safe under rolling deployments.
+
+Document both in `docs/how-to/auth/bootstrap-admin.md`.
+
+### 13.9 OpenAPI — Bearer security scheme
+
+Add `src/Api/Infrastructure/OpenApi/`:
+
+- **`BearerSecuritySchemeTransformer : IOpenApiDocumentTransformer`** — registers a `Bearer` security scheme (type `http`, scheme `bearer`, bearer format `JWT`) on the document's components.
+- **`AuthorizationOperationTransformer : IOpenApiOperationTransformer`** — for each operation, inspect the endpoint's metadata for `IAuthorizeData`. If present, attach a `Bearer` security requirement. Anonymous endpoints remain requirement-free.
+
+Wire in `Program.cs`:
+
+```csharp
+builder.Services.AddOpenApi(opts =>
+{
+    opts.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    opts.AddOperationTransformer<AuthorizationOperationTransformer>();
+});
+```
+
+Verify: Scalar UI shows an "Authorize" button; protected operations display a lock; anonymous operations do not.
+
+### 13.10 Architectural tests
+
+Add to `Modulith.Architecture.Tests`:
+
+- **Permission naming.** All `const string` fields on any `*Permissions` type match `^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*){2}$` (three dot-separated segments).
+- **Permission ownership.** The first segment of a permission constant equals the owning module's short name (`catalog.*` lives in `Modulith.Modules.Catalog.Contracts`).
+- **No role literals in endpoints.** Endpoints do not call `RequireAuthorization("admin")` or `RequireRole(...)`; authorization is permission-based. (String literal check over endpoint files.)
+- **No raw role claim reads outside `CurrentUser`.** `ClaimTypes.Role` string is only referenced inside `Modulith.Shared.Infrastructure.Identity.CurrentUser` and `Modulith.Modules.Users.Security.*`.
+- **`User.Role` has a private setter.**
+
+### 13.11 Integration tests
+
+Add to Users integration tests:
+
+- **Role change round-trip.** Admin → PUT role → target's refresh tokens revoked; target's next request with the *old* access token still works (until expiry); target's next refresh with the old refresh token fails; after re-login the new role is reflected in `GET /v1/users/me`.
+- **Self-role-change forbidden.** Admin changing their own role returns 400 with a specific error code.
+- **Permission gating.** Non-admin GET `/v1/users` → 403; admin → 200.
+- **Claims transformation.** Request with role `admin` token results in `permission` claims present on `HttpContext.User` (verified via a test-only diagnostic endpoint, or by behavior: endpoint requiring `catalog.products.write` succeeds for admin, fails for user).
+- **`me` exposes role and permissions.** `GET /v1/users/me` for an admin returns `role: "admin"`, the full permission list sorted lexicographically, and a non-empty `permissionsVersion`. For a `user`-role caller, `permissions` is `[]` and `permissionsVersion` reflects the empty set. `permissionsVersion` is stable across requests for the same role within a process and changes when the role→permission map changes.
+- **Audit subscription.** `UserRoleChangedV1` produces an `AuditEntry` with old/new role and actor.
+
+Add to Catalog integration tests:
+
+- Admin can create a product; user cannot (403).
+
+Add OpenAPI smoke test:
+
+- `GET /openapi/v1.json` includes a `Bearer` security scheme.
+- A protected operation (`POST /v1/catalog/products`) has a `security` requirement on it.
+- A public operation (`POST /v1/users/login`) has no `security` requirement.
+
+### 13.12 Unit tests
+
+- `User.ChangeRole` rejects same role, accepts different role, raises `UserRoleChanged`.
+- `Role` value-object equality and validation.
+- `PermissionClaimsTransformation` is idempotent.
+- `PermissionAuthorizationHandler` succeeds when the permission claim is present and fails otherwise.
+
+### 13.13 GDPR export
+
+Update `UsersPersonalDataExporter` to include the user's current role under a `Role` field. No change to the eraser — role is not sensitive and is deleted naturally with the row.
+
+### 13.14 Notifications integration (optional but recommended)
+
+Subscribe Notifications to `UserRoleChangedV1` and send a transactional "your account role has changed" email (non-opt-out, per ADR-0014). Old role + new role in the body; no tokens. Skip if shipping the minimum.
+
+### 13.15 Audit integration
+
+Add `UserRoleChangedV1` to the Audit module's subscribed-events list. Standard pattern; no new shape needed.
+
+### 13.16 Documentation
+
+- New ADR: **`docs/adr/0030-rbac.md`** — roles, permissions, claim-delivery strategy, bootstrap, trade-offs.
+- New how-to: **`docs/how-to/auth/use-rbac.md`** — declaring a permission, applying it to an endpoint, testing it.
+- New how-to: **`docs/how-to/auth/bootstrap-admin.md`** — dev seeder + non-dev hosted-service bootstrap.
+- Update `docs/how-to/add-a-slice.md` to reference the permission convention.
+- Update `src/Modules/Users/CLAUDE.md` — RBAC is no longer an extension point; document role invariants.
+- Update `src/Modules/Catalog/CLAUDE.md` (and other modules' CLAUDE.md) — reference their own `*Permissions` contract.
+
+### 13.17 Configuration additions
+
+`Modulith.Api/appsettings.json` and dev overrides:
+
+```json
+"Modules": {
+  "Users": {
+    "Dev": {
+      "AdminEmail": "admin@example.test",
+      "AdminDisplayName": "Admin"
+    },
+    "AdminBootstrap": {
+      "Enabled": false,
+      "Email": null
+    }
+  }
+}
+```
+
+`AdminBootstrap` is `Enabled: false` by default. Operators turn it on explicitly in non-dev environments.
+
+### 13.18 Verify
+
+- `dotnet test` all green.
+- `dotnet run --project src/AppHost` — seeded admin can log in, change another user's role, and see the old user's sessions revoked.
+- Scalar at `/scalar/v1` — "Authorize" button accepts a Bearer token; protected endpoints call through; anonymous endpoints remain callable without a token.
+- OpenAPI document contains `securitySchemes.Bearer` and per-operation security requirements only where `[Authorize]`/`RequireAuthorization` is applied.
+- No role literals in endpoint code (architectural test green).
+
+**Commit.** Message: "feat: RBAC with per-module permissions and Bearer in OpenAPI".
+
+---
+
 ## What "done" looks like
 
 At the end of this roadmap:

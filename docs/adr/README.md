@@ -35,6 +35,7 @@ This directory contains ADRs documenting every significant design decision in Mo
 | [0027](0027-agentic-development-support.md) | First-Class Support for Agentic Development | Accepted |
 | [0028](0028-auth-flows-baseline.md) | Baseline Authentication Flows | Accepted |
 | [0029](0029-refresh-tokens-and-logout.md) | Refresh Tokens for Logout and Session Management | Accepted |
+| [0030](0030-rbac.md) | Role-Based Access Control with Permission-Level Policies | Accepted |
 
 ## Reading order
 
