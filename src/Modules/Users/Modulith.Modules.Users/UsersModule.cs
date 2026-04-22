@@ -49,6 +49,11 @@ public static class UsersModule
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<AdminBootstrapOptions>()
+            .Bind(configuration.GetSection("Modules:Users:AdminBootstrap"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddSingleton<IClock, SystemClock>();
@@ -83,7 +88,16 @@ public static class UsersModule
 
         if (environment.IsDevelopment())
         {
+            services.AddOptions<UsersDevOptions>()
+                .Bind(configuration.GetSection("Modules:Users:Dev"))
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
             services.AddScoped<IModuleSeeder, UsersDevSeeder>();
+        }
+        else
+        {
+            services.AddHostedService<AdminBootstrapper>();
         }
 
         return services;
