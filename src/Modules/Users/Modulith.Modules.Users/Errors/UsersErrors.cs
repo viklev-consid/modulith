@@ -51,4 +51,21 @@ internal static class UsersErrors
     // Password errors
     public static readonly Error CurrentPasswordIncorrect =
         Error.Unauthorized("Users.Password.CurrentIncorrect", "The current password is incorrect.");
+
+    // Role errors
+    public static readonly Error RoleNameEmpty =
+        Error.Validation("Users.Role.Empty", "Role name cannot be empty.");
+
+    public static readonly Error RoleNameInvalid =
+        Error.Validation("Users.Role.Invalid",
+            "Role name must match ^[a-z][a-z0-9_-]{1,31}$ (lowercase ASCII, no spaces).");
+
+    public static readonly Error RoleSame =
+        Error.Conflict("Users.Role.Same", "The user already has the specified role.");
+
+    public static readonly Error RoleNotFound =
+        Error.NotFound("Users.Role.NotFound", "The specified role does not exist.");
+
+    public static readonly Error CannotChangeSelfRole =
+        Error.Conflict("Users.Role.CannotChangeSelf", "An admin cannot change their own role.");
 }

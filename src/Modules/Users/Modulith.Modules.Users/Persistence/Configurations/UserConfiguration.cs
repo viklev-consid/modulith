@@ -28,6 +28,12 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(u => u.Role)
+            .HasConversion(r => r.Name, v => new Role(v))
+            .HasMaxLength(32)
+            .IsRequired()
+            .HasDefaultValue(Role.User);
+
         builder.Property(u => u.CreatedAt).IsRequired();
         builder.Property(u => u.CreatedBy).HasMaxLength(100);
         builder.Property(u => u.UpdatedAt);
