@@ -1,10 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ChangeUserRole;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.GetUserById;
 using Modulith.Modules.Users.Features.ListUsers;
 using Modulith.Modules.Users.Features.Register;
+using Modulith.Modules.Users.Persistence;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -244,5 +248,84 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
         // Role and permissions both reflect the token claim, not the DB — consistent.
         Assert.Equal("admin", body.Role);
         Assert.NotEmpty(body.Permissions);
+    }
+
+    // ── Concurrency ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ChangeUserRole_WhenSuccessful_RevokesTargetRefreshTokens()
+    {
+        // Verifies that token revocation (which was moved to run after SaveChanges
+        // in the concurrency fix) still fires correctly on the happy path.
+        var admin = await RegisterAsync("admin@example.com", "Admin");
+        var target = await RegisterAsync("target@example.com", "Target");
+
+        // Log in as target to create an active refresh token.
+        var loginResp = await _anon.PostAsJsonAsync("/v1/users/login",
+            new { Email = "target@example.com", Password = "Password1!" });
+        Assert.Equal(HttpStatusCode.OK, loginResp.StatusCode);
+
+        var activeTokensBefore = await CountActiveRefreshTokensAsync(target.UserId);
+        Assert.True(activeTokensBefore >= 1);
+
+        // Act — admin promotes the target.
+        var roleResp = await AdminClient(admin.UserId, "admin@example.com")
+            .PutAsJsonAsync($"/v1/users/{target.UserId}/role", new ChangeUserRoleRequest("admin"));
+        Assert.Equal(HttpStatusCode.OK, roleResp.StatusCode);
+
+        // Assert — target's refresh tokens must be revoked so re-login is forced
+        // and the new role is reflected in the next access token.
+        var activeTokensAfter = await CountActiveRefreshTokensAsync(target.UserId);
+        Assert.Equal(0, activeTokensAfter);
+    }
+
+    [Fact]
+    public async Task ChangeUserRole_ConcurrentRequests_HandledGracefully()
+    {
+        // Fires two simultaneous role-change requests for the same user.
+        // With optimistic concurrency (xmin), if both reads land before either write
+        // commits, one SaveChanges will encounter a stale row version and the handler
+        // returns UsersErrors.ConcurrencyConflict (409). This test verifies:
+        //   1. Neither request propagates as an unhandled 500.
+        //   2. Every response is a recognised outcome (200 OK or 409 Conflict).
+        //   3. At least one request succeeded — the role was actually changed.
+        var admin = await RegisterAsync("admin@example.com", "Admin");
+        var target = await RegisterAsync("target@example.com", "Target");
+
+        var client1 = AdminClient(admin.UserId, "admin@example.com");
+        var client2 = AdminClient(admin.UserId, "admin@example.com");
+
+        // Act — fire both concurrently.
+        var results = await Task.WhenAll(
+            client1.PutAsJsonAsync($"/v1/users/{target.UserId}/role", new ChangeUserRoleRequest("admin")),
+            client2.PutAsJsonAsync($"/v1/users/{target.UserId}/role", new ChangeUserRoleRequest("admin"))
+        );
+        var r1 = results[0];
+        var r2 = results[1];
+
+        // Assert — no unhandled errors.
+        Assert.NotEqual(HttpStatusCode.InternalServerError, r1.StatusCode);
+        Assert.NotEqual(HttpStatusCode.InternalServerError, r2.StatusCode);
+
+        // Each response is either a success or a gracefully-handled conflict.
+        var acceptable = new[] { HttpStatusCode.OK, HttpStatusCode.Conflict };
+        Assert.Contains(r1.StatusCode, acceptable);
+        Assert.Contains(r2.StatusCode, acceptable);
+
+        // At least one request must have committed the role change.
+        Assert.True(
+            r1.StatusCode == HttpStatusCode.OK || r2.StatusCode == HttpStatusCode.OK,
+            "Expected at least one request to succeed.");
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private async Task<int> CountActiveRefreshTokensAsync(Guid userId)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var typedId = new UserId(userId);
+        return await db.RefreshTokens
+            .CountAsync(t => t.UserId == typedId && t.RevokedAt == null);
     }
 }
