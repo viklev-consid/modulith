@@ -68,4 +68,7 @@ internal static class UsersErrors
 
     public static readonly Error CannotChangeSelfRole =
         Error.Conflict("Users.Role.CannotChangeSelf", "An admin cannot change their own role.");
+
+    public static readonly Error ConcurrencyConflict =
+        Error.Conflict("Users.ConcurrencyConflict", "The user record was modified concurrently. Please retry.");
 }

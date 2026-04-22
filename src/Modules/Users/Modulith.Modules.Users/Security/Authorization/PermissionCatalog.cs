@@ -18,7 +18,7 @@ internal sealed class PermissionCatalog : IPermissionCatalog
     private readonly IReadOnlyCollection<string> _allPermissions;
     private readonly Dictionary<string, IReadOnlyCollection<string>> _roleMap;
     private readonly Dictionary<string, string> _versionCache;
-    private readonly IReadOnlySet<string> _knownRoles;
+    private readonly HashSet<string> _knownRoles;
 
     public PermissionCatalog(IEnumerable<IPermissionSource> sources)
     {
@@ -30,11 +30,16 @@ internal sealed class PermissionCatalog : IPermissionCatalog
         _roleMap = BuildRoleMap(_allPermissions);
         _versionCache = BuildVersionCache(_roleMap);
         _knownRoles = new HashSet<string>(_roleMap.Keys, StringComparer.OrdinalIgnoreCase);
+        // Note: _knownRoles is typed as HashSet<string> so ResolveRole can call TryGetValue,
+        // which returns the stored canonical key rather than just true/false.
     }
 
     public IReadOnlyCollection<string> AllPermissions => _allPermissions;
 
     public IReadOnlySet<string> KnownRoles => _knownRoles;
+
+    public string? ResolveRole(string name) =>
+        _knownRoles.TryGetValue(name, out var canonical) ? canonical : null;
 
     public IReadOnlyCollection<string> GetPermissionsForRole(string roleName) =>
         _roleMap.TryGetValue(roleName, out var perms) ? perms : [];

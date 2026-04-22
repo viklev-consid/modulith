@@ -23,4 +23,12 @@ public interface IPermissionCatalog
     /// in this set may be assigned to users. Role names are case-insensitive.
     /// </summary>
     IReadOnlySet<string> KnownRoles { get; }
+
+    /// <summary>
+    /// Returns the canonical (lowercase) role name if <paramref name="name"/> matches a known
+    /// role (case-insensitive), or <c>null</c> if the role is unknown.
+    /// Use this instead of <see cref="KnownRoles"/>.<c>Contains</c> whenever you need to
+    /// persist or compare the name, to guarantee canonical casing regardless of caller input.
+    /// </summary>
+    string? ResolveRole(string name);
 }

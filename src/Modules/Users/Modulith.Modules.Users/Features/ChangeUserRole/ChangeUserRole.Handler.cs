@@ -30,15 +30,15 @@ public sealed class ChangeUserRoleHandler(
             return UsersErrors.CannotChangeSelfRole;
         }
 
-        // Resolve from the catalog — only roles with explicit permission mappings are allowed.
-        // This rejects syntactically valid but unsupported names (e.g. "moderator") before any
-        // DB work, rather than constructing an arbitrary Role and persisting it.
-        if (!permissionCatalog.KnownRoles.Contains(cmd.NewRole))
+        // Resolve canonical role name from the catalog. Rejects unknown roles (e.g. "moderator")
+        // and normalises casing so callers cannot persist "ADMIN" or "User" variants.
+        var canonicalRole = permissionCatalog.ResolveRole(cmd.NewRole);
+        if (canonicalRole is null)
         {
             return UsersErrors.RoleNotFound;
         }
 
-        var newRole = new Role(cmd.NewRole);
+        var newRole = new Role(canonicalRole);
 
         var user = await db.Users.FindAsync([targetUserId], ct);
         if (user is null)
@@ -59,7 +59,17 @@ public sealed class ChangeUserRoleHandler(
             .Where(t => t.UserId == targetUserId && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request modified this user row between our read and our write.
+            // The domain event was raised in memory but is discarded — Wolverine's outbox
+            // write is part of the same transaction, so it was never committed.
+            return UsersErrors.ConcurrencyConflict;
+        }
 
         await bus.PublishAsync(new UserRoleChangedV1(
             cmd.TargetUserId,
