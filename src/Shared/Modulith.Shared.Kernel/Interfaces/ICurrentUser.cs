@@ -13,4 +13,17 @@ public interface ICurrentUser
     /// Used by ChangePassword to preserve the caller's own session while revoking others.
     /// </summary>
     string? ActiveRefreshTokenId { get; }
+
+    /// <summary>The caller's current role name (e.g. <c>"admin"</c>, <c>"user"</c>).</summary>
+    string? Role { get; }
+
+    /// <summary>
+    /// The fully resolved permission set for the caller's role, injected per-request by
+    /// <c>PermissionClaimsTransformation</c>. Empty for unauthenticated callers or roles
+    /// with no permissions.
+    /// </summary>
+    IReadOnlyCollection<string> Permissions { get; }
+
+    /// <summary>Returns <c>true</c> if the caller holds the specified permission.</summary>
+    bool HasPermission(string permission);
 }

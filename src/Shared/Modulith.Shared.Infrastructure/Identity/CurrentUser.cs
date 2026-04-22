@@ -6,6 +6,8 @@ namespace Modulith.Shared.Infrastructure.Identity;
 
 public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
+    private const string PermissionClaimType = "permission";
+
     public string? Id =>
         httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -17,4 +19,17 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
 
     public string? ActiveRefreshTokenId =>
         httpContextAccessor.HttpContext?.User?.FindFirstValue("rtid");
+
+    public string? Role =>
+        httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.Role);
+
+    public IReadOnlyCollection<string> Permissions =>
+        httpContextAccessor.HttpContext?.User?
+            .FindAll(PermissionClaimType)
+            .Select(c => c.Value)
+            .ToArray() ?? [];
+
+    public bool HasPermission(string permission) =>
+        httpContextAccessor.HttpContext?.User?
+            .HasClaim(PermissionClaimType, permission) ?? false;
 }
