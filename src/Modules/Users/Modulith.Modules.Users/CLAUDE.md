@@ -33,6 +33,20 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - User data export (GDPR)
 - User erasure (GDPR)
 
+**RBAC (shipped — Phase 13):**
+
+- `Role` value object on `User` aggregate (`admin` / `user`)
+- Permission constants in `Users.Contracts/Authorization/UsersPermissions.cs`
+- `PermissionCatalog` discovers all `*Permissions` types from `*.Contracts` assemblies at startup
+- `PermissionClaimsTransformation` adds `"permission"` claims per request from JWT role
+- Per-permission `AuthorizationPolicy` instances registered at startup
+- `PUT /v1/users/{userId}/role` — requires `users.roles.write` (admin only)
+- `GET /v1/users` — requires `users.users.read` (admin only)
+- `GET /v1/users/{userId}` — requires `users.users.read` (admin only)
+- `GET /v1/users/me` — returns `role`, `permissions[]`, `permissionsVersion`
+- `AdminBootstrapper` hosted service for non-dev environments
+- See `docs/how-to/auth/use-rbac.md` and ADR-0030
+
 ---
 
 ## Invariants
@@ -80,6 +94,9 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 | RefreshToken | `POST /v1/users/token/refresh` | refresh-token-authed | `auth` |
 | Logout | `POST /v1/users/logout` | authenticated | `write` |
 | LogoutAll | `POST /v1/users/logout/all` | authenticated | `write` |
+| ChangeUserRole | `PUT /v1/users/{userId}/role` | `users.roles.write` | `write` |
+| ListUsers | `GET /v1/users` | `users.users.read` | `read` |
+| GetUserById | `GET /v1/users/{userId}` | `users.users.read` | `read` |
 
 ---
 
