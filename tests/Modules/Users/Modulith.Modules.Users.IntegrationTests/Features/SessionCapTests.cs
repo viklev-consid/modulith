@@ -37,8 +37,8 @@ public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<Sma
         await _client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
-        LoginResponse login1 = await LoginAsync();
-        LoginResponse login2 = await LoginAsync();
+        _ = await LoginAsync();
+        _ = await LoginAsync();
         LoginResponse login3 = await LoginAsync(); // should push out login1's token
 
         // Act — inspect persisted state directly.
@@ -51,7 +51,7 @@ public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<Sma
 
         // Assert — exactly the cap number of active tokens; the oldest was revoked.
         Assert.Equal(2, active.Count);
-        Assert.Equal(1, revoked.Count);
+        Assert.Single(revoked);
 
         // The revoked token must be older than either active token.
         Assert.True(revoked[0].IssuedAt <= active.Min(t => t.IssuedAt),
