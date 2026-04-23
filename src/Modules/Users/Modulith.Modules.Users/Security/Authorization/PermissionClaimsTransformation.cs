@@ -17,7 +17,7 @@ internal sealed class PermissionClaimsTransformation(IPermissionCatalog catalog)
     public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
         // Idempotent: skip if permission claims already present.
-        if (principal.HasClaim(c => c.Type == PermissionClaimType))
+        if (principal.HasClaim(c => string.Equals(c.Type, PermissionClaimType, StringComparison.Ordinal)))
         {
             return Task.FromResult(principal);
         }

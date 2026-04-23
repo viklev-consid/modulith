@@ -35,7 +35,7 @@ public static class ErrorOrExtensions
             ErrorType.Validation => Results.ValidationProblem(
                 result.Errors
                     .Where(e => e.Type == ErrorType.Validation)
-                    .ToDictionary(e => e.Code, e => new[] { e.Description })),
+                    .ToDictionary(e => e.Code, e => new[] { e.Description }, StringComparer.Ordinal)),
             _ => Results.Problem(
                 title: "Internal Server Error",
                 detail: result.FirstError.Description,

@@ -13,7 +13,7 @@ namespace Modulith.Shared.Infrastructure.Authorization;
 /// record (e.g. <c>AuditTrailResource(Guid ActorId)</c>) when protecting a collection
 /// query rather than a single entity.
 /// </typeparam>
-public interface IResourcePolicy<TResource>
+public interface IResourcePolicy<in TResource>
 {
     /// <summary>
     /// Returns <c>true</c> if <paramref name="caller"/> is authorized to access

@@ -15,7 +15,7 @@ public sealed class AuditPersonalDataExporter(AuditDbContext db) : IPersonalData
             .Select(e => new { e.EventType, e.ResourceType, e.ResourceId, e.OccurredAt })
             .ToListAsync(ct);
 
-        var data = new Dictionary<string, object?>
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["auditEntries"] = entries.Select(e => new
             {

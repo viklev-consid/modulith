@@ -4,7 +4,7 @@ internal static class PasswordResetConfirmationTemplate
 {
     public const string Subject = "Your password has been reset";
 
-    public static string HtmlBody() =>
+    public static readonly string HtmlBody =
         """
         <html>
         <body>
@@ -14,6 +14,6 @@ internal static class PasswordResetConfirmationTemplate
         </html>
         """;
 
-    public static string PlainTextBody() =>
+    public static readonly string PlainTextBody =
         "Your password has been reset. If you did not make this change, contact support immediately.";
 }

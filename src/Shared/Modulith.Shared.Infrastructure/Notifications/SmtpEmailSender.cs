@@ -29,14 +29,14 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
             ? SecureSocketOptions.SslOnConnect
             : SecureSocketOptions.None;
 
-        await client.ConnectAsync(_options.Host, _options.Port, secureSocketOptions, ct);
+        await client.ConnectAsync(_options.Host, _options.Port, secureSocketOptions, ct).ConfigureAwait(false);
 
         if (_options.Username is not null)
         {
-            await client.AuthenticateAsync(_options.Username, _options.Password ?? string.Empty, ct);
+            await client.AuthenticateAsync(_options.Username, _options.Password ?? string.Empty, ct).ConfigureAwait(false);
         }
 
-        await client.SendAsync(mail, ct);
-        await client.DisconnectAsync(quit: true, ct);
+        await client.SendAsync(mail, ct).ConfigureAwait(false);
+        await client.DisconnectAsync(quit: true, ct).ConfigureAwait(false);
     }
 }

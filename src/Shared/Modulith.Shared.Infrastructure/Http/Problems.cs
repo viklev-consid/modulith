@@ -15,8 +15,8 @@ public static class Problems
         {
             var validationErrors = errors
                 .Where(e => e.Type == ErrorType.Validation)
-                .GroupBy(e => e.Code)
-                .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray());
+                .GroupBy(e => e.Code, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray(), StringComparer.Ordinal);
 
             return Results.ValidationProblem(
                 validationErrors,
@@ -58,12 +58,12 @@ public static class Problems
     }
 
     private static Dictionary<string, object?> WithCode(string code) =>
-        new()
+        new(StringComparer.Ordinal)
         {
             ["errorCode"] = code,
             ["traceId"] = Activity.Current?.TraceId.ToString()
         };
 
     private static Dictionary<string, object?> Trace() =>
-        new() { ["traceId"] = Activity.Current?.TraceId.ToString() };
+        new(StringComparer.Ordinal) { ["traceId"] = Activity.Current?.TraceId.ToString() };
 }

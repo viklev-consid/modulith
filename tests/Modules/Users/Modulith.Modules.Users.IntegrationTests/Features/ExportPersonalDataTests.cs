@@ -30,7 +30,7 @@ public sealed class ExportPersonalDataTests(GdprApiFixture fixture) : IAsyncLife
         var body = await response.Content.ReadFromJsonAsync<ExportPersonalDataResponse>();
         Assert.NotNull(body);
         Assert.NotEmpty(body.Exports);
-        var usersExport = body.Exports.FirstOrDefault(e => e.ModuleName == "Users");
+        var usersExport = body.Exports.FirstOrDefault(e => string.Equals(e.ModuleName, "Users", StringComparison.Ordinal));
         Assert.NotNull(usersExport);
         Assert.Equal(registerResp.UserId, usersExport.UserId);
         Assert.True(usersExport.Data.ContainsKey("email"));

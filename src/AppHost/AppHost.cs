@@ -9,11 +9,11 @@ var redis = builder.AddRedis("cache");
 
 var mailpit = builder.AddMailPit("mailpit");
 
-var api = builder.AddProject<Projects.Modulith_Api>("api")
+_ = builder.AddProject<Projects.Modulith_Api>("api")
     .WithReference(postgres)
     .WithReference(redis)
     .WithReference(mailpit)
     .WaitFor(postgres)
     .WaitFor(redis);
 
-builder.Build().Run();
+await builder.Build().RunAsync();

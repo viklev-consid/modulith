@@ -4,7 +4,7 @@ internal static class PasswordChangedTemplate
 {
     public const string Subject = "Your password has been changed";
 
-    public static string HtmlBody() =>
+    public static readonly string HtmlBody =
         """
         <html>
         <body>
@@ -14,6 +14,6 @@ internal static class PasswordChangedTemplate
         </html>
         """;
 
-    public static string PlainTextBody() =>
+    public static readonly string PlainTextBody =
         "Your account password has been changed. If you did not make this change, contact support immediately.";
 }

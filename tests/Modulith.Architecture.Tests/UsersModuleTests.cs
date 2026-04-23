@@ -216,7 +216,7 @@ public sealed class UsersModuleTests
                             {
                                 var resolved = module.ResolveMethod(token);
                                 if (resolved?.DeclaringType == typeof(DateTime) &&
-                                    resolved.Name == "get_UtcNow")
+                                    string.Equals(resolved.Name, "get_UtcNow", StringComparison.Ordinal))
                                 {
                                     return true;
                                 }

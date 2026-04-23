@@ -14,7 +14,7 @@ public sealed class CacheInvalidationMiddleware(HybridCache cache)
 
         foreach (var key in invalidating.CacheKeys)
         {
-            await cache.RemoveAsync(key, cancellationToken);
+            await cache.RemoveAsync(key, cancellationToken).ConfigureAwait(false);
         }
     }
 }

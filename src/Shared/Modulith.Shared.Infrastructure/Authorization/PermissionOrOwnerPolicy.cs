@@ -31,5 +31,5 @@ public abstract class PermissionOrOwnerPolicy<TResource> : IResourcePolicy<TReso
     /// <inheritdoc/>
     public bool IsAuthorized(ICurrentUser caller, TResource resource)
         => caller.HasPermission(ElevatedPermission)
-           || (caller.Id is not null && caller.Id == GetOwnerId(resource));
+           || (caller.Id is not null && string.Equals(caller.Id, GetOwnerId(resource), StringComparison.Ordinal));
 }

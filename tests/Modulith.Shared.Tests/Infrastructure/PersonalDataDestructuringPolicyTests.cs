@@ -49,7 +49,7 @@ public sealed class PersonalDataDestructuringPolicyTests
 
         Assert.True(ok);
         var structure = Assert.IsType<StructureValue>(result);
-        var props = structure.Properties.ToDictionary(p => p.Name, p => p.Value);
+        var props = structure.Properties.ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
 
         Assert.Equal("alice", ((ScalarValue)props["Username"]).Value);
         Assert.Equal("***", ((ScalarValue)props["Email"]).Value);
@@ -82,7 +82,7 @@ public sealed class PersonalDataDestructuringPolicyTests
         _policy.TryDestructure(dto, new FakePropertyValueFactory(), out var result);
 
         var structure = Assert.IsType<StructureValue>(result);
-        var props = structure.Properties.ToDictionary(p => p.Name, p => p.Value);
+        var props = structure.Properties.ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
 
         // "Password" matches the name pattern "password"
         Assert.Equal("***", ((ScalarValue)props["Password"]).Value);

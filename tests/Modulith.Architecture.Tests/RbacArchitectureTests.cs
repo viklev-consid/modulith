@@ -35,7 +35,7 @@ public sealed class RbacArchitectureTests
 
     private static readonly Regex PermissionFormat =
         new(@"^[a-z][a-z0-9_-]*\.[a-z][a-z0-9_-]*\.[a-z][a-z0-9_-]*$",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+            RegexOptions.NonBacktracking | RegexOptions.CultureInvariant);
 
     [Fact]
     public void PermissionConstants_MustFollowNamingConvention()
@@ -116,11 +116,10 @@ public sealed class RbacArchitectureTests
     {
         // ClaimTypes.Role must only be referenced in the CurrentUser implementation.
         // Handlers and endpoints must read role/permissions via ICurrentUser. See ADR-0030.
-        var claimsTypeFullName = typeof(ClaimTypes).FullName;
 
         var violations = AllModuleAssemblies
             .SelectMany(a => a.GetTypes())
-            .Where(t => t.Name != nameof(CurrentUser))
+            .Where(t => !string.Equals(t.Name, nameof(CurrentUser), StringComparison.Ordinal))
             .Where(t => t.GetMethods(
                 BindingFlags.Public | BindingFlags.NonPublic |
                 BindingFlags.Static | BindingFlags.Instance |
@@ -132,7 +131,7 @@ public sealed class RbacArchitectureTests
         // Also check the shared infrastructure assembly (except CurrentUser itself).
         var sharedViolations = typeof(CurrentUser).Assembly
             .GetTypes()
-            .Where(t => t.Name != nameof(CurrentUser))
+            .Where(t => !string.Equals(t.Name, nameof(CurrentUser), StringComparison.Ordinal))
             .Where(t => t.GetMethods(
                 BindingFlags.Public | BindingFlags.NonPublic |
                 BindingFlags.Static | BindingFlags.Instance |
@@ -175,7 +174,7 @@ public sealed class RbacArchitectureTests
                     {
                         var field = mod.ResolveField(token);
                         if (field?.DeclaringType == typeof(ClaimTypes)
-                            && field.Name == nameof(ClaimTypes.Role))
+                            && string.Equals(field.Name, nameof(ClaimTypes.Role), StringComparison.Ordinal))
                         {
                             return true;
                         }

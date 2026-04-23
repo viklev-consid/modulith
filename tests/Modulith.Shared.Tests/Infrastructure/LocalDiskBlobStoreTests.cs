@@ -83,9 +83,9 @@ public sealed class LocalDiskBlobStoreTests : IDisposable
         var url = await _store.GetDownloadUrlAsync(blobRef, TimeSpan.FromMinutes(5), CancellationToken.None);
 
         Assert.False(url.IsAbsoluteUri);
-        Assert.Contains("/blobs/", url.ToString());
-        Assert.Contains("token=", url.ToString());
-        Assert.Contains("exp=", url.ToString());
+        Assert.Contains("/blobs/", url.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("token=", url.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("exp=", url.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
