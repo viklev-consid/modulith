@@ -15,7 +15,7 @@ public sealed class NotificationsPersonalDataExporter(NotificationsDbContext db)
             .Select(l => new { l.NotificationType, l.Subject, l.SentAt })
             .ToListAsync(ct);
 
-        var data = new Dictionary<string, object?>
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["notificationsSent"] = logs.Select(l => new
             {

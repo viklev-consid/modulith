@@ -21,7 +21,7 @@ public sealed class FluentValidationMiddleware(IServiceProvider serviceProvider)
         }
 
         var context = new ValidationContext<object>(message);
-        var result = await validator.ValidateAsync(context, cancellationToken);
+        var result = await validator.ValidateAsync(context, cancellationToken).ConfigureAwait(false);
 
         if (result.IsValid)
         {

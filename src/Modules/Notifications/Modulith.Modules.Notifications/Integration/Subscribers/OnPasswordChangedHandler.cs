@@ -30,8 +30,8 @@ public sealed class OnPasswordChangedHandler(
         var message = new EmailMessage(
             To: @event.Email,
             Subject: PasswordChangedTemplate.Subject,
-            HtmlBody: PasswordChangedTemplate.HtmlBody(),
-            PlainTextBody: PasswordChangedTemplate.PlainTextBody());
+            HtmlBody: PasswordChangedTemplate.HtmlBody,
+            PlainTextBody: PasswordChangedTemplate.PlainTextBody);
 
         await emailSender.SendAsync(message, ct);
 

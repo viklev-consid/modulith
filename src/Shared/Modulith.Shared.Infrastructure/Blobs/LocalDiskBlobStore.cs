@@ -20,11 +20,14 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
         var dir = Path.Combine(_rootPath, container);
         Directory.CreateDirectory(dir);
 
-        await using var fileStream = File.Create(GetFilePath(container, key));
-        await content.CopyToAsync(fileStream, ct);
+        var fileStream = File.Create(GetFilePath(container, key));
+        await using (fileStream.ConfigureAwait(false))
+        {
+            await content.CopyToAsync(fileStream, ct).ConfigureAwait(false);
+        }
 
         var metaJson = JsonSerializer.Serialize(metadata);
-        await File.WriteAllTextAsync(GetMetaPath(container, key), metaJson, ct);
+        await File.WriteAllTextAsync(GetMetaPath(container, key), metaJson, ct).ConfigureAwait(false);
 
         return new BlobRef(container, key);
     }
@@ -39,7 +42,7 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
             throw new FileNotFoundException($"Blob not found: {reference.Container}/{reference.Key}");
         }
 
-        var metaJson = await File.ReadAllTextAsync(metaPath, ct);
+        var metaJson = await File.ReadAllTextAsync(metaPath, ct).ConfigureAwait(false);
         var metadata = JsonSerializer.Deserialize<BlobMetadata>(metaJson)
             ?? throw new InvalidOperationException("Corrupted blob metadata.");
 

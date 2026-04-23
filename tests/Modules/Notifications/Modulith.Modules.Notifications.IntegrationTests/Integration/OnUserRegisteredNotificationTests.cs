@@ -52,10 +52,10 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
 
         // Assert the fake sender captured the email
         var sentEmail = fixture.EmailSender.SentMessages
-            .SingleOrDefault(m => m.To == "notifications-test@example.com");
+            .SingleOrDefault(m => string.Equals(m.To, "notifications-test@example.com", StringComparison.Ordinal));
         Assert.NotNull(sentEmail);
-        Assert.Contains("Welcome", sentEmail.Subject);
-        Assert.Contains("Notified User", sentEmail.HtmlBody);
+        Assert.Contains("Welcome", sentEmail.Subject, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Notified User", sentEmail.HtmlBody, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
         }
 
         var emailsToUser = fixture.EmailSender.SentMessages
-            .Count(m => m.To == "idempotency-test@example.com");
+            .Count(m => string.Equals(m.To, "idempotency-test@example.com", StringComparison.Ordinal));
         Assert.Equal(1, emailsToUser);
     }
 }

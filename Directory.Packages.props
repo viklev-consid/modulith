@@ -77,6 +77,13 @@
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.3.1" />
   </ItemGroup>
 
+  <!-- Analyzers -->
+  <ItemGroup>
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.52" />
+    <PackageVersion Include="Roslynator.Analyzers" Version="4.13.1" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.24.0.138807" />
+  </ItemGroup>
+
   <!-- Testing -->
   <ItemGroup>
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />

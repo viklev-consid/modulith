@@ -14,10 +14,10 @@ public sealed class CatalogPersonalDataExporter(CatalogDbContext db) : IPersonal
 
         if (customer is null)
         {
-            return new PersonalDataExport(user.UserId, "Catalog", new Dictionary<string, object?>());
+            return new PersonalDataExport(user.UserId, "Catalog", new Dictionary<string, object?>(StringComparer.Ordinal));
         }
 
-        var data = new Dictionary<string, object?>
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["email"] = customer.Email,
             ["displayName"] = customer.DisplayName,

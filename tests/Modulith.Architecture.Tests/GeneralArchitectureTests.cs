@@ -62,7 +62,7 @@ public sealed class GeneralArchitectureTests
     public void IntegrationEvents_MustBeSealedRecords()
     {
         // Integration events in *.Contracts.Events.* must be declared as 'sealed record'.
-        // 'sealed' prevents serialization surprises from subclassing;
+        // 'sealed' prevents serialization surprises from subclassing
         // 'record' provides value equality and immutability suitable for message envelopes.
         var violations = AllContractsAssemblies
             .SelectMany(a => a.GetExportedTypes())
@@ -104,7 +104,7 @@ public sealed class GeneralArchitectureTests
 
             var hasNoPersonalDataOptOut = assembly
                 .GetCustomAttributes()
-                .Any(a => a.GetType().Name == "NoPersonalDataAttribute");
+                .Any(a => string.Equals(a.GetType().Name, "NoPersonalDataAttribute", StringComparison.Ordinal));
 
             if (!hasEraser && !hasNoPersonalDataOptOut)
             {

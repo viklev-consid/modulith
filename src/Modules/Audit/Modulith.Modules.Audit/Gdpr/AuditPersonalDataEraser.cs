@@ -16,7 +16,7 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
 
         foreach (var entry in entries)
         {
-            var redacted = RedactEmailFromPayload(entry.Payload, user.DisplayName);
+            var redacted = RedactEmailFromPayload(entry.Payload);
             entry.AnonymizeActor(redacted);
         }
 
@@ -26,7 +26,7 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
             "Actor anonymized; payload email references redacted.");
     }
 
-    private static string RedactEmailFromPayload(string payload, string? displayName)
+    private static string RedactEmailFromPayload(string payload)
     {
         if (string.IsNullOrEmpty(payload))
         {
@@ -37,7 +37,7 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
         {
             using var doc = JsonDocument.Parse(payload);
             var obj = doc.RootElement.EnumerateObject()
-                .ToDictionary(p => p.Name, p => (object?)p.Value.ToString());
+                .ToDictionary(p => p.Name, p => (object?)p.Value.ToString(), StringComparer.Ordinal);
 
             foreach (var key in obj.Keys.Where(
                 k => k.Contains("email", StringComparison.OrdinalIgnoreCase) ||

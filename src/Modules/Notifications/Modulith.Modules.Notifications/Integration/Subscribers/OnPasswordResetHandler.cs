@@ -30,8 +30,8 @@ public sealed class OnPasswordResetHandler(
         var message = new EmailMessage(
             To: @event.Email,
             Subject: PasswordResetConfirmationTemplate.Subject,
-            HtmlBody: PasswordResetConfirmationTemplate.HtmlBody(),
-            PlainTextBody: PasswordResetConfirmationTemplate.PlainTextBody());
+            HtmlBody: PasswordResetConfirmationTemplate.HtmlBody,
+            PlainTextBody: PasswordResetConfirmationTemplate.PlainTextBody);
 
         await emailSender.SendAsync(message, ct);
 

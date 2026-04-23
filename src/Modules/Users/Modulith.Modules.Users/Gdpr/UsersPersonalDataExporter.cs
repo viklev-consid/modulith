@@ -13,10 +13,10 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
         var dbUser = await db.Users.FindAsync([new UserId(user.UserId)], ct);
         if (dbUser is null)
         {
-            return new PersonalDataExport(user.UserId, "Users", new Dictionary<string, object?>());
+            return new PersonalDataExport(user.UserId, "Users", new Dictionary<string, object?>(StringComparer.Ordinal));
         }
 
-        var data = new Dictionary<string, object?>
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["email"] = dbUser.Email.Value,
             ["displayName"] = dbUser.DisplayName,

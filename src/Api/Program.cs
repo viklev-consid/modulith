@@ -264,7 +264,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
     }
 }
 
-app.Run();
+await app.RunAsync();
 
 static RateLimitPartition<string> PerUserPartition(string policy, HttpContext ctx, int limit) =>
     RateLimitPartition.GetFixedWindowLimiter(

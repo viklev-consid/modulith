@@ -23,8 +23,10 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
     public string? Role =>
         httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.Role);
 
+    private IReadOnlyCollection<string>? _permissions;
+
     public IReadOnlyCollection<string> Permissions =>
-        httpContextAccessor.HttpContext?.User?
+        _permissions ??= httpContextAccessor.HttpContext?.User?
             .FindAll(PermissionClaimType)
             .Select(c => c.Value)
             .ToArray() ?? [];
