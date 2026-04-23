@@ -6,6 +6,7 @@ using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
+using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ConfirmEmailChange;
@@ -67,7 +68,16 @@ public sealed class ConfirmEmailChangeHandler(
             .Where(t => t.UserId == user.Id && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // Between the pre-check in RequestEmailChange and this confirmation committing, someone else
+            // claimed the target email. Return the same opaque error — the token is effectively spent.
+            return UsersErrors.InvalidOrExpiredToken;
+        }
 
         await bus.PublishAsync(new EmailChangedV1(user.Id.Value, oldEmail, user.Email.Value, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangedV1)));

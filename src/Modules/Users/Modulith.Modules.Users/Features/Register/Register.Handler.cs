@@ -8,6 +8,7 @@ using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
+using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.Register;
@@ -55,7 +56,15 @@ public sealed class RegisterHandler(
         // Issue refresh token alongside initial access token.
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // A concurrent registration claimed the same email between our pre-check and commit.
+            return UsersErrors.EmailAlreadyRegistered;
+        }
 
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
