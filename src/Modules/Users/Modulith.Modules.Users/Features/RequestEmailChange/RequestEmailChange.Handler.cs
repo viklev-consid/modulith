@@ -62,7 +62,7 @@ public sealed class RequestEmailChangeHandler(
 
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new EmailChangeRequestedV1(user.Id.Value, newEmail.Value, rawToken));
+        await bus.PublishAsync(new EmailChangeRequestedV1(user.Id.Value, newEmail.Value, rawToken, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangeRequestedV1)));
 
         return new RequestEmailChangeResponse();

@@ -30,7 +30,11 @@ internal sealed class NotificationLogConfiguration : IEntityTypeConfiguration<No
         builder.Property(n => n.SentAt)
             .IsRequired();
 
+        builder.Property(n => n.IdempotencyKey)
+            .IsRequired();
+
         builder.HasIndex(n => n.UserId);
-        builder.HasIndex(n => new { n.UserId, n.NotificationType });
+        builder.HasIndex(n => n.IdempotencyKey)
+            .IsUnique();
     }
 }

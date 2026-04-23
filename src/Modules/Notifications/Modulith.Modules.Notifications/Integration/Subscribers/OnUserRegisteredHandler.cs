@@ -5,6 +5,7 @@ using Modulith.Modules.Notifications.Templates;
 using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Infrastructure.Notifications;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
@@ -25,12 +26,19 @@ public sealed class OnUserRegisteredHandler(
             return;
         }
 
-        // Idempotency guard — safe to re-run on Wolverine retries.
-        var alreadySent = await db.NotificationLogs.AnyAsync(
-            l => l.UserId == @event.UserId && l.NotificationType == NotificationType.WelcomeEmail,
-            ct);
+        db.NotificationLogs.Add(NotificationLog.Create(
+            @event.UserId,
+            @event.Email,
+            NotificationType.WelcomeEmail,
+            WelcomeEmailTemplate.Subject,
+            clock.UtcNow,
+            @event.EventId));
 
-        if (alreadySent)
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             return;
         }
@@ -42,15 +50,5 @@ public sealed class OnUserRegisteredHandler(
             PlainTextBody: WelcomeEmailTemplate.PlainTextBody(@event.DisplayName));
 
         await emailSender.SendAsync(message, ct);
-
-        var log = NotificationLog.Create(
-            @event.UserId,
-            @event.Email,
-            NotificationType.WelcomeEmail,
-            WelcomeEmailTemplate.Subject,
-            clock.UtcNow);
-
-        db.NotificationLogs.Add(log);
-        await db.SaveChangesAsync(ct);
     }
 }

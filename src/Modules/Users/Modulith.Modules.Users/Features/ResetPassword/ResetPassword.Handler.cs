@@ -50,7 +50,7 @@ public sealed class ResetPasswordHandler(
 
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new PasswordResetV1(user.Id.Value, user.Email.Value));
+        await bus.PublishAsync(new PasswordResetV1(user.Id.Value, user.Email.Value, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetV1)));
 
         return new ResetPasswordResponse();

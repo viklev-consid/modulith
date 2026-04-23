@@ -69,7 +69,7 @@ public sealed class ConfirmEmailChangeHandler(
 
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new EmailChangedV1(user.Id.Value, oldEmail, user.Email.Value));
+        await bus.PublishAsync(new EmailChangedV1(user.Id.Value, oldEmail, user.Email.Value, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangedV1)));
 
         return new ConfirmEmailChangeResponse();

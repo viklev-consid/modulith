@@ -4,6 +4,7 @@ using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Templates;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Infrastructure.Notifications;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
@@ -22,16 +23,20 @@ public sealed class OnEmailChangedHandler(
         using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnEmailChangedHandler));
         NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangedV1)));
 
-        var alreadySent = await db.NotificationLogs.AnyAsync(
-            l => l.UserId == @event.UserId && l.NotificationType == NotificationType.EmailChanged,
-            ct);
+        // Send to the OLD email — that is the address that needs the alert.
+        db.NotificationLogs.Add(NotificationLog.Create(
+            @event.UserId, @event.OldEmail, NotificationType.EmailChanged,
+            EmailChangedTemplate.Subject, clock.UtcNow, @event.EventId));
 
-        if (alreadySent)
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             return;
         }
 
-        // Send to the OLD email — that is the address that needs the alert.
         var message = new EmailMessage(
             To: @event.OldEmail,
             Subject: EmailChangedTemplate.Subject,
@@ -39,11 +44,5 @@ public sealed class OnEmailChangedHandler(
             PlainTextBody: EmailChangedTemplate.PlainTextBody(@event.NewEmail));
 
         await emailSender.SendAsync(message, ct);
-
-        db.NotificationLogs.Add(NotificationLog.Create(
-            @event.UserId, @event.OldEmail, NotificationType.EmailChanged,
-            EmailChangedTemplate.Subject, clock.UtcNow));
-
-        await db.SaveChangesAsync(ct);
     }
 }

@@ -42,7 +42,8 @@ public sealed class ForgotPasswordHandler(
             await bus.PublishAsync(new PasswordResetRequestedV1(
                 user.Id.Value,
                 user.Email.Value,
-                rawToken));
+                rawToken,
+                Guid.NewGuid()));
             UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetRequestedV1)));
         }
 
