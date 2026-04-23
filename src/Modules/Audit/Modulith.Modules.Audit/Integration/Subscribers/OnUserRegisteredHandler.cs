@@ -13,7 +13,7 @@ public sealed class OnUserRegisteredHandler(AuditDbContext db, IClock clock)
         using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnUserRegisteredHandler));
         AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
 
-        var payload = JsonSerializer.Serialize(@event);
+        var payload = JsonSerializer.Serialize(new { @event.UserId });
         var entry = AuditEntry.Create(
             eventType: "user.registered",
             actorId: @event.UserId,

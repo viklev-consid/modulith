@@ -46,9 +46,10 @@ public sealed class AuditEntry : Entity<AuditEntryId>
             payload,
             occurredAt);
 
-    public void AnonymizeActor(string anonymizedPayload)
+    public void Anonymize(Guid userId, string redactedPayload)
     {
-        ActorId = null;
-        Payload = anonymizedPayload;
+        if (ActorId == userId) { ActorId = null; }
+        if (ResourceId == userId) { ResourceId = null; }
+        Payload = redactedPayload;
     }
 }
