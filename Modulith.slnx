@@ -6,7 +6,7 @@
   <Folder Name="/src/AppHost/">
     <Project Path="src/AppHost/Modulith.AppHost.csproj" />
   </Folder>
-  <Folder Name="/src/Modules/">
+  <Folder Name="/src/Modules/" />
     <Folder Name="/src/Modules/Audit/">
       <Project Path="src/Modules/Audit/Modulith.Modules.Audit/Modulith.Modules.Audit.csproj" />
       <Project Path="src/Modules/Audit/Modulith.Modules.Audit.Contracts/Modulith.Modules.Audit.Contracts.csproj" />
@@ -23,7 +23,7 @@
       <Project Path="src/Modules/Users/Modulith.Modules.Users/Modulith.Modules.Users.csproj" />
       <Project Path="src/Modules/Users/Modulith.Modules.Users.Contracts/Modulith.Modules.Users.Contracts.csproj" />
     </Folder>
-  </Folder>
+
   <Folder Name="/src/ServiceDefaults/">
     <Project Path="src/ServiceDefaults/Modulith.ServiceDefaults.csproj" />
   </Folder>
