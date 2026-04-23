@@ -10,15 +10,18 @@ using Modulith.Modules.Users.Persistence;
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
 /// <summary>
-/// Fixture that lowers MaxActiveRefreshTokensPerUser to 2 so cap enforcement
-/// can be tested without issuing N+1 tokens for the default of 10.
+/// Fixture that lowers MaxActiveRefreshTokensPerUser to 3 so cap enforcement
+/// can be tested without issuing many tokens. The cap is set to 3 rather than 2
+/// because Register also issues a refresh token, giving a baseline count of 1
+/// before any Login call. With cap=3: Login × 2 fills the cap; Login × 3 triggers
+/// revocation of the oldest, leaving exactly 1 revoked token.
 /// </summary>
 public sealed class SmallCapFixture : UsersApiFixture
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
-        builder.UseSetting("Modules:Users:MaxActiveRefreshTokensPerUser", "2");
+        builder.UseSetting("Modules:Users:MaxActiveRefreshTokensPerUser", "3");
     }
 }
 
@@ -50,7 +53,7 @@ public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<Sma
         var revoked = all.Where(t => t.RevokedAt != null).ToList();
 
         // Assert — exactly the cap number of active tokens; the oldest was revoked.
-        Assert.Equal(2, active.Count);
+        Assert.Equal(3, active.Count);
         Assert.Single(revoked);
 
         // The revoked token must be older than either active token.
