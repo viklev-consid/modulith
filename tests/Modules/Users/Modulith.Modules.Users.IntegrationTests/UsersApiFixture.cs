@@ -8,7 +8,7 @@ namespace Modulith.Modules.Users.IntegrationTests;
 [CollectionDefinition("UsersModule")]
 public sealed class UsersModuleCollection : ICollectionFixture<UsersApiFixture> { }
 
-public sealed class UsersApiFixture : ApiTestFixture
+public class UsersApiFixture : ApiTestFixture
 {
     protected override async Task MigrateAsync(IServiceProvider services)
     {
