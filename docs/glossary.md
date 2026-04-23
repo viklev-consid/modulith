@@ -10,13 +10,15 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **API Versioning.** Exposing different versions of endpoints (`/v1/`, `/v2/`) to allow backward-compatible evolution. Implemented via `Asp.Versioning.Http`.
 
-**Architectural Test.** A test that verifies structural rules of the codebase (who depends on whom, where types live, naming conventions). Implemented with `NetArchTest`. Runs as part of the fast test tier.
+**Architectural Test.** A test that verifies structural rules of the codebase (who depends on whom, where types live, naming conventions). Implemented with `NetArchTest`. Runs as part of the fast test suite.
 
 **Audit Module.** A dedicated module that consumes domain events from other modules and persists a change history. Separate from row-level audit fields (which are per-entity).
 
 **Auditable Entity.** An entity implementing `IAuditableEntity`, which carries `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy`. Populated automatically by a `SaveChangesInterceptor`.
 
 **AuthN / AuthZ.** Authentication (who are you) and Authorization (what you may do). We use JWT bearer authentication with a lightweight `User` aggregate — not ASP.NET Identity.
+
+**At-least-once Delivery.** A message-delivery guarantee where the sender ensures a message is published at least once, even if retries mean a consumer may see the same message more than once. Wolverine's outbox provides at-least-once producer delivery, so subscribers must be idempotent.
 
 **Blob.** Binary content (file, image, PDF, etc.) stored outside the relational database. Accessed via `IBlobStore`. Each blob has an opaque `BlobRef` used for retrieval.
 
@@ -26,7 +28,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Capability Boundary.** An explicit statement (usually in `CLAUDE.md`) of what an agent should not modify without asking. See the agent operating manual.
 
-**Command.** A request to change state. Named imperatively (`PlaceOrder`, `CancelOrder`). Handled by exactly one handler. Returns `Result<T>`. Records, not classes.
+**Command.** A request to change state. Named imperatively (`PlaceOrder`, `CancelOrder`). Handled by exactly one feature handler; in this codebase those handlers return `ErrorOr<T>`. Records, not classes.
 
 **Composition Root.** The single place where dependency injection registrations are wired up. In this codebase, `Api/Program.cs` plus each module's `AddXxxModule` extension.
 
@@ -38,33 +40,37 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Destructuring Policy.** A Serilog configuration that controls how objects are serialized into log events. Used to mask sensitive properties.
 
-**Domain Event.** An event raised from within an aggregate when something business-meaningful happens (`OrderPlaced`, `UserDeactivated`). Internal to the module. Distinct from *integration events*, which are the public version published to other modules via the outbox.
+**Domain Event.** An event raised from within an aggregate when something business-meaningful happens (`OrderPlaced`, `UserDeactivated`). Internal to the module and not wire-stable. Distinct from *integration events*, which are the public version published to other modules via the outbox.
 
 **DTO.** Data Transfer Object. A type whose purpose is to carry data across a boundary — HTTP (Request/Response), cross-module (Contracts). Has no behavior.
 
-**Endpoint.** An HTTP route handler. In this codebase, a minimal API delegate that maps a `Request` to a `Command`, dispatches via `IMessageBus`, and maps the `Result<T>` to an HTTP response. Lives in the slice folder.
+**Endpoint.** An HTTP route handler. In this codebase, a minimal API delegate that maps a `Request` to a `Command`, dispatches via `IMessageBus`, and maps `ErrorOr<T>` to an HTTP response. Lives in the slice folder.
 
 **Enricher.** A Serilog component that adds properties to every log event (machine name, environment, span ID). Configured in `Program.cs`.
+
+**ErrorOr.** The result-type library used to implement the Result Pattern in this codebase. Handlers and many domain factory methods return `ErrorOr<T>` for expected failures, and shared HTTP extensions map those failures to `ProblemDetails` responses.
+
+**Eventually Consistent.** A state where changes become visible across module boundaries asynchronously rather than in the publisher's transaction. Integration events, cache invalidation, audit trails, and GDPR erasure workflows are eventually consistent by design.
 
 **Feature Flag.** A named boolean (or richer value) that controls whether a code path is active. Two lifetimes: *startup* (module toggles, read from config via `IOptions`) and *runtime* (`IFeatureManager`).
 
 **Feature Slice.** See Slice.
 
-**Global Exception Handler.** An implementation of `IExceptionHandler` that catches unhandled exceptions at the pipeline boundary and converts them to `ProblemDetails` responses. For expected failures, use `Result` instead.
+**Global Exception Handler.** An implementation of `IExceptionHandler` that catches unhandled exceptions at the pipeline boundary and converts them to `ProblemDetails` responses. For expected failures, return an `ErrorOr` failure instead.
 
 **GDPR Primitives.** The set of types and contracts baked into the template to support GDPR compliance: classification attributes, exporter/eraser contracts, consent tracking, retention hooks.
 
-**Handler.** A class that processes a command, query, or event. Discovered by Wolverine, invoked via `IMessageBus`. Handlers orchestrate — they load aggregates, invoke domain methods, commit via the UoW, and return results.
+**Handler.** A public class that processes a command, query, or event. Discovered by Wolverine, invoked via `IMessageBus`. Feature handlers orchestrate — they load aggregates, invoke domain methods, commit via the UoW, and return `ErrorOr<T>`. Integration-event subscribers usually return `Task` and apply side effects within their own module.
 
 **HybridCache.** .NET 10's built-in two-tier cache (in-memory L1 + distributed L2). Replaces the `IMemoryCache` + `IDistributedCache` combination. Used with Redis via Aspire.
 
 **Idempotent.** An operation that can be executed multiple times with the same effect as executing it once. Critical for message handlers in an at-least-once delivery system.
 
-**Integration Event.** A public event published to other modules via the outbox. Defined in a module's `.Contracts` project. Distinct from internal *domain events*.
+**Integration Event.** A public, wire-stable event published to other modules via the outbox. Defined in a module's `.Contracts` project and usually versioned (`UserRegisteredV1`). Distinct from internal *domain events*.
 
 **Integration Test.** A test that exercises a full slice end-to-end (HTTP → handler → DB) using a real database via Testcontainers. Per-module, lives in `tests/Modules/<Module>/*.IntegrationTests/`.
 
-**Invariant.** A rule that must always be true for the domain to be in a valid state. Enforced by aggregate methods. Violations produce `Result.Fail`, not exceptions.
+**Invariant.** A rule that must always be true for the domain to be in a valid state. Enforced by aggregate methods. Violations return an `ErrorOr` failure, not exceptions.
 
 **Kernel.** See Shared Kernel.
 
@@ -80,15 +86,17 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Notification.** A message sent to a user via email, SMS, or push. Orchestrated by the Notifications module, which owns templates, user preferences, and a delivery log.
 
+**Object Mother.** A test helper that creates valid, domain-specific objects with realistic defaults (`UserMother.Active()`, `OrderMother.PlacedWithItems(3)`). Lives in `TestSupport.TestDataBuilders/` and is preferred over manually seeding raw entities in tests.
+
 **Observability.** Logs, metrics, and traces that let you understand what the system is doing. Powered by OpenTelemetry, surfaced in the Aspire dashboard locally.
 
 **Outbox.** A pattern where messages to publish are written to the database in the same transaction as the state change, then a background process publishes them. Guarantees at-least-once delivery with transactional consistency. Provided by Wolverine.
 
-**Personal Data.** User data subject to GDPR. Marked with the `[PersonalData]` attribute. Affects logging (masked), export (included in personal data export), and erasure.
+**Personal Data.** User data subject to GDPR. Usually marked with `[PersonalData]` or `[SensitivePersonalData]`; modules that reference a user without storing personal data can opt out with `[NoPersonalData]`. Classification affects logging (masked), export (included in personal data export), and erasure.
 
 **ProblemDetails.** The RFC 7807 standard response format for HTTP errors. All error responses in this API use ProblemDetails.
 
-**Query.** A request to read state without changing anything. Named descriptively (`GetOrderById`). Handled by exactly one handler. Returns `Result<T>` where T is a Response DTO. Records, not classes.
+**Query.** A request to read state without changing anything. Named descriptively (`GetOrderById`). Handled by exactly one feature handler. Feature handlers return `ErrorOr<T>` where `T` is usually a Response DTO. Records, not classes.
 
 **Rate Limiting.** Restricting the number of requests a client may make in a time window. Applied per-endpoint via policies (auth, write, read, expensive). ASP.NET Core built-in.
 
@@ -96,13 +104,19 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Request.** The HTTP request DTO for an endpoint. Public contract with external clients. Lives in the slice folder as `{Slice}.Request.cs`.
 
+**Respawn.** A library used in integration tests to wipe database state between tests without recreating the schema. The module fixtures create the database once per test class; Respawn resets it between test cases.
+
 **Response.** The HTTP response DTO for an endpoint. Public contract with external clients. Lives in the slice folder as `{Slice}.Response.cs`.
 
-**Result Pattern.** Returning `Result<T>` from operations that can fail for expected reasons, rather than throwing exceptions. Makes failure paths explicit in the type system.
+**Result Pattern.** Returning a result type rather than throwing exceptions for expected failures. In this codebase the concrete type is `ErrorOr<T>`, which makes validation, not-found, conflict, and business-rule failures explicit in method signatures.
 
 **Scalar.** An OpenAPI documentation UI. Replacement for Swagger UI. Pairs cleanly with .NET 10's built-in OpenAPI generation.
 
+**Scheduled Job.** A time-based Wolverine message handler scheduled for future execution. Used for delayed or recurring work such as cleanup sweeps, retries, and token-expiry processing.
+
 **Seeder.** An implementation of `IModuleSeeder` that populates a module's database with deterministic local-dev data on first run. Not used in production.
+
+**SensitivePersonalData.** A stricter GDPR classification attribute than `[PersonalData]`, used for fields that need tighter handling or masking. It participates in the same export and erasure flows while signaling stronger protection requirements.
 
 **Serilog.** The structured logging library used throughout. Configured via `appsettings.json` with a bootstrap fallback in `Program.cs`. Writes to OpenTelemetry so logs correlate with traces.
 
@@ -110,7 +124,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Shared Infrastructure.** The project `Shared.Infrastructure` — cross-cutting infrastructure with no domain meaning: `IBlobStore`, `IEmailSender`, `ICurrentUser`, shared interceptors, shared Wolverine middleware.
 
-**Shared Kernel.** The project `Shared.Kernel` — domain-adjacent primitives: `Result<T>`, `DomainEvent`, strongly-typed IDs, classification attributes. Has no runtime dependencies beyond the BCL.
+**Shared Kernel.** The project `Shared.Kernel` — domain-adjacent primitives such as `DomainEvent`, strongly-typed IDs, pagination types, GDPR classification attributes, and shared abstractions like `IClock`, `ICurrentUser`, `IPersonalDataExporter`, and `IPersonalDataEraser`. Has no runtime dependencies beyond the BCL.
 
 **Slice.** A feature folder inside a module. Contains all files for a single feature: `Request`, `Response`, `Command`/`Query`, `Handler`, `Validator`, `Endpoint`. Co-located to reduce the cost of change.
 
@@ -118,7 +132,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Testcontainers.** A library for spinning up ephemeral Docker containers during tests. Used for real Postgres (and Redis, if needed) in integration tests. No in-memory EF, no SQLite stand-in.
 
-**TestSupport.** A test project containing shared fixtures, builders, authenticated client helpers, and object mothers. Referenced by all module test projects.
+**TestSupport.** A test project containing shared fixtures and helpers such as `ApiTestFixture`, `AuthenticatedClientBuilder`, object mothers, Verify settings, test clocks, and HTTP stubs. Referenced by all module test projects.
 
 **Transport.** The layer that physically delivers a notification: `IEmailSender`, `ISmsSender`. Lives in `Shared.Infrastructure`. Distinct from orchestration (templates, preferences), which is the Notifications module's job.
 
@@ -129,5 +143,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 **Validator.** A `FluentValidation` validator for a Request or Command. Runs via Wolverine middleware before the handler executes. Lives in the slice folder as `{Slice}.Validator.cs`.
 
 **Vertical Slice.** See Slice. The architecture term for organizing code by feature rather than by layer.
+
+**Wire-stable.** Safe to serialize across module or HTTP boundaries without depending on internal types or semantics that may change freely. Integration events and public contracts must be wire-stable; domain events are not.
 
 **Wolverine.** The in-process message bus + durable outbox + background job scheduler used throughout. Replaces the combination of MediatR, Hangfire, and MassTransit.

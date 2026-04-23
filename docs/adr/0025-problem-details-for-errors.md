@@ -18,7 +18,7 @@ ProblemDetails is the right default:
 - Has specialized subtypes (`ValidationProblemDetails`) for validation scenarios.
 - Integrates with ASP.NET Core's `IExceptionHandler` and `AddProblemDetails()`.
 
-The `Result<T>` pattern (ADR-0004) pairs naturally: a `Result.Fail(Error.Validation(...))` maps to a `ValidationProblemDetails` 422; `Error.NotFound(...)` maps to a `ProblemDetails` 404; and so on.
+The ErrorOr-based Result Pattern (ADR-0004) pairs naturally: an `Error.Validation(...)` failure maps to a `ValidationProblemDetails` 422; `Error.NotFound(...)` maps to a `ProblemDetails` 404; and so on.
 
 ## Decision
 
@@ -37,7 +37,7 @@ Including:
 
 `builder.Services.AddProblemDetails()` registers the infrastructure. A custom `IExceptionHandler` (global exception handler) catches unhandled exceptions and returns a sanitized 500 `ProblemDetails` with a correlation ID.
 
-### Mapping from Result to ProblemDetails
+### Mapping from ErrorOr to ProblemDetails
 
 A central extension converts an `ErrorOr<T>` failure to an `IResult`:
 

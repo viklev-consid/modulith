@@ -22,7 +22,7 @@ Result types make failure explicit in the type system, compose well, and are che
 
 ## Decision
 
-Operations that can fail for **expected reasons** return `Result<T>` (or `Result` for operations with no payload). Expected reasons include:
+Operations that can fail for **expected reasons** return `ErrorOr<T>` (or `ErrorOr<Success>` for operations with no payload). Expected reasons include:
 
 - Validation failures
 - Business rule violations
@@ -36,7 +36,7 @@ Exceptions are reserved for **truly exceptional cases**:
 - Infrastructure faults (DB connection dead, disk full)
 - Framework-level errors the app cannot sensibly recover from
 
-Handlers return `Result<T>`. Endpoints map `Result<T>` to HTTP responses — success to 200/201 with the Response DTO, failure to a `ProblemDetails` response (ADR-0025).
+Handlers return `ErrorOr<T>`. Endpoints map `ErrorOr<T>` to HTTP responses — success to 200/201 with the Response DTO, failure to a `ProblemDetails` response (ADR-0025).
 
 ### Library choice
 
@@ -62,10 +62,10 @@ We evaluated `FluentResults` and `ErrorOr`. The template uses **ErrorOr** becaus
 
 - Non-idiomatic in .NET, costs onboarding time. New contributors will try to throw; the arch tests and code review catch this.
 - Slightly more code at call sites than unchecked exceptions. Worth it for the explicitness.
-- Discipline required about exception vs. Result boundary. When a DB call throws a `DbUpdateConcurrencyException`, the handler catches it and returns `Result.Fail(Conflict(...))`. Guidelines documented in `CLAUDE.md` and `how-to/handle-failures.md`.
+- Discipline required about exception vs. `ErrorOr` boundary. When a DB call throws a `DbUpdateConcurrencyException`, the handler catches it and returns a conflict `ErrorOr` failure. Guidelines documented in `CLAUDE.md` and `how-to/handle-failures.md`.
 - Generic infrastructure code (middleware, global exception handler) still handles exceptions — they're not abolished, just de-emphasized.
 
 ## Related
 
-- ADR-0009 (Rich Domain Model): aggregates return `Result<T>` from factory methods and state-changing operations.
-- ADR-0025 (ProblemDetails): the mapping from Result failures to HTTP responses.
+- ADR-0009 (Rich Domain Model): aggregates return `ErrorOr<T>`/`ErrorOr<Success>` from factory methods and state-changing operations.
+- ADR-0025 (ProblemDetails): the mapping from `ErrorOr` failures to HTTP responses.

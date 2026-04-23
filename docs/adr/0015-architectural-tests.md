@@ -68,7 +68,7 @@ A dedicated test project `Modulith.Architecture.Tests` runs a comprehensive set 
 
 **Shared kernel rules:**
 
-- `Modulith.Shared.Kernel` must depend only on the BCL — no other project references, no third-party packages except the Result library.
+- `Modulith.Shared.Kernel` must depend only on the BCL — no other project references, no third-party packages except ErrorOr.
 
 **Notification rules:**
 

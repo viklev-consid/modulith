@@ -273,7 +273,7 @@ dotnet test --filter "Category!=Smoke"
 
 - **Forgetting to register the endpoint.** The file exists, the code compiles, but there's no route. Integration test fails with 404.
 - **Injecting `IConfiguration` in the handler.** Use `IOptions<T>` with validation. Arch test will catch it.
-- **Throwing instead of returning `Result`.** The endpoint won't map exceptions to ProblemDetails — they become 500s. Return `ErrorOr` failures for expected paths.
+- **Throwing instead of returning an `ErrorOr` failure.** The endpoint won't map exceptions to ProblemDetails — they become 500s. Return `ErrorOr` failures for expected paths.
 - **Validator on the Command instead of the Request.** Validator runs on HTTP input, before the Command is constructed. Put it on the Request.
 - **Cross-module data in the handler.** If the handler needs data from another module, send a query via `IMessageBus`. Don't reach into another DbContext.
 - **Skipping the integration test.** The fast tier doesn't exercise this slice. Integration tests are where contract regressions are caught.

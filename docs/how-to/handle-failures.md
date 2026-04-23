@@ -10,14 +10,14 @@ For the reasoning, see [`../adr/0004-result-pattern.md`](../adr/0004-result-patt
 
 | Failure kind | Mechanism | Why |
 |---|---|---|
-| Validation failure | `Result.Fail(Error.Validation(...))` | Expected; client input may be wrong |
-| Entity not found | `Result.Fail(Error.NotFound(...))` | Expected; user may request missing resource |
-| Business rule violation | `Result.Fail(Error.Conflict(...))` | Expected; state may be incompatible with operation |
-| Authorization failure | `Result.Fail(Error.Forbidden(...))` | Expected; user may lack permission |
-| Concurrency conflict | `Result.Fail(Error.Conflict(...))` (after catching `DbUpdateConcurrencyException`) | Expected; two writers raced |
+| Validation failure | `Error.Validation(...)` | Expected; client input may be wrong |
+| Entity not found | `Error.NotFound(...)` | Expected; user may request missing resource |
+| Business rule violation | `Error.Conflict(...)` | Expected; state may be incompatible with operation |
+| Authorization failure | `Error.Forbidden(...)` | Expected; user may lack permission |
+| Concurrency conflict | `Error.Conflict(...)` (after catching `DbUpdateConcurrencyException`) | Expected; two writers raced |
 | Bug (null, out-of-range, unexpected state) | Throw | Exceptional; should not happen |
 | Infrastructure fault (DB dead, network) | Throw | Exceptional; often transient, sometimes fatal |
-| External API error | Depends. If expected (provider returned 4xx with a documented code): Result. If unexpected (5xx, timeout): Throw. | See below |
+| External API error | Depends. If expected (provider returned 4xx with a documented code): return an `ErrorOr` failure. If unexpected (5xx, timeout): Throw. | See below |
 
 ---
 
@@ -93,7 +93,7 @@ Stable error codes are the programmatic contract. Clients pattern-match on them.
 
 ---
 
-## Mapping Result to HTTP
+## Mapping ErrorOr to HTTP
 
 The endpoint maps `ErrorOr<T>` to an HTTP response via a shared extension:
 
@@ -165,30 +165,30 @@ Critical: **never include the exception message or stack trace in the response b
 
 ---
 
-## Domain invariants as Results
+## Domain invariants as ErrorOr failures
 
-Aggregate methods return `Result`:
+Aggregate methods return `ErrorOr<Success>`:
 
 ```csharp
-public Result Cancel(string reason)
+public ErrorOr<Success> Cancel(string reason)
 {
     if (Status == OrderStatus.Shipped)
-        return Result.Fail("Cannot cancel a shipped order.");
+        return OrdersErrors.CannotCancelShipped;
 
     Status = OrderStatus.Cancelled;
     CancelledAt = DateTimeOffset.UtcNow;
     RaiseEvent(new OrderCancelled(Id, reason));
-    return Result.Ok();
+    return Result.Success;
 }
 ```
 
-Factory methods return `Result<TSelf>`:
+Factory methods return `ErrorOr<TSelf>`:
 
 ```csharp
-public static Result<Order> Create(CustomerId customerId)
+public static ErrorOr<Order> Create(CustomerId customerId)
 {
     if (customerId is null)
-        return Result.Fail<Order>("Customer is required.");
+        return Error.Validation("Orders.CustomerRequired", "Customer is required.");
     return new Order(OrderId.New(), customerId);
 }
 ```
@@ -197,11 +197,11 @@ In the handler:
 
 ```csharp
 var cancel = order.Cancel(cmd.Reason);
-if (cancel.IsFailed)
-    return Error.Conflict("orders.cannot_cancel", cancel.Errors[0].Message);
+if (cancel.IsError)
+    return cancel.Errors;
 ```
 
-(Or a helper that does this conversion in one step.)
+The aggregate returns the module's domain error directly, so the handler can propagate it without translation.
 
 ---
 
@@ -211,7 +211,7 @@ Three patterns:
 
 ### Expected, documented provider errors
 
-The provider returns a 4xx with a documented error code. Treat as Result:
+The provider returns a 4xx with a documented error code. Treat as an `ErrorOr` failure:
 
 ```csharp
 var result = await _paymentProvider.ChargeAsync(...);
@@ -256,10 +256,10 @@ Runs before the handler. Failures return 422 `ValidationProblemDetails`.
 **Domain-level** (aggregate methods):
 
 ```csharp
-public Result AddLine(Sku sku, int quantity)
+public ErrorOr<Success> AddLine(Sku sku, int quantity)
 {
     if (Status != OrderStatus.Draft)
-        return Result.Fail("Cannot modify a non-draft order.");
+        return Error.Conflict("Orders.NotDraft", "Cannot modify a non-draft order.");
     // ...
 }
 ```
@@ -271,10 +271,10 @@ Request validation catches shape/format errors. Domain validation catches state/
 ## Common mistakes
 
 - **Throwing for validation failures.** The endpoint won't map it to 422 — it becomes a 500 via the global handler. Return an `Error.Validation`.
-- **Swallowing exceptions silently.** If you catch and continue without logging or converting to a Result, bugs hide indefinitely.
+- **Swallowing exceptions silently.** If you catch and continue without logging or converting to an `ErrorOr` failure, bugs hide indefinitely.
 - **Broad `catch (Exception)`.** Masks bugs. Catch specific types.
 - **Leaking exception messages to clients.** Always go through the global exception handler for unexpected errors.
-- **Mixing Result and throw in the same method.** Pick one style per operation.
+- **Mixing `ErrorOr` failures and throw in the same method.** Pick one style per operation.
 - **Error codes that aren't stable.** If a code changes, clients break. Treat the error catalog like a public API.
 
 ---

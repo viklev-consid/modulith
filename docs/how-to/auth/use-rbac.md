@@ -65,7 +65,7 @@ Inject `ICurrentUser`:
 ```csharp
 public sealed class MyHandler(ICurrentUser currentUser)
 {
-    public Task<Result> Handle(MyCommand cmd, CancellationToken ct)
+    public Task<ErrorOr<Success>> Handle(MyCommand cmd, CancellationToken ct)
     {
         var role = currentUser.Role;                   // "admin" or "user"
         var canWrite = currentUser.HasPermission(OrdersPermissions.OrdersWrite);

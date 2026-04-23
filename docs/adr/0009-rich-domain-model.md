@@ -22,8 +22,8 @@ Vertical slicing (ADR-0002) has a known risk: the handler sits next to the entit
 Aggregates and entities follow these rules:
 
 1. **No public setters.** Properties are either `get; private set;` or (preferably) init-only with explicit state transitions via methods.
-2. **Constructors are private or internal.** Object creation goes through factory methods, usually `public static Result<T> Create(...)`.
-3. **State transitions are methods, not property assignments.** `order.Cancel(reason)`, `user.ChangeEmail(newEmail)`. These return `Result` and enforce invariants.
+2. **Constructors are private or internal.** Object creation goes through factory methods, usually `public static ErrorOr<T> Create(...)`.
+3. **State transitions are methods, not property assignments.** `order.Cancel(reason)`, `user.ChangeEmail(newEmail)`. These return `ErrorOr<Success>` and enforce invariants.
 4. **Domain events are raised from within the aggregate.** Aggregates inherit from an `AggregateRoot` base that tracks uncommitted events. Wolverine middleware picks them up post-save and dispatches internal handlers.
 5. **Strongly-typed IDs.** `UserId`, `OrderId`, etc. — not raw `Guid`. Prevents accidentally passing a `UserId` where an `OrderId` was expected.
 6. **Value objects for non-trivial primitives.** `Email`, `Money`, `DateRange` — types that own their validation and comparison.
@@ -47,19 +47,20 @@ public sealed class Order : AggregateRoot<OrderId>
         Total = Money.Zero;
     }
 
-    public static Result<Order> Create(CustomerId customerId)
+    public static ErrorOr<Order> Create(CustomerId customerId)
     {
-        if (customerId is null) return Result.Fail<Order>("Customer is required.");
+        if (customerId is null)
+            return Error.Validation("Orders.CustomerRequired", "Customer is required.");
         return new Order(OrderId.New(), customerId);
     }
 
-    public Result Cancel(string reason)
+    public ErrorOr<Success> Cancel(string reason)
     {
         if (Status == OrderStatus.Shipped)
-            return Result.Fail("Cannot cancel a shipped order.");
+            return Error.Conflict("Orders.CannotCancelShipped", "Cannot cancel a shipped order.");
         Status = OrderStatus.Cancelled;
         RaiseEvent(new OrderCancelled(Id, reason));
-        return Result.Ok();
+        return Result.Success;
     }
 }
 ```
@@ -83,6 +84,6 @@ public sealed class Order : AggregateRoot<OrderId>
 ## Related
 
 - ADR-0002 (Vertical Slices): rich domain is the discipline that prevents slice drift into anemia.
-- ADR-0004 (Result Pattern): factory methods and state transitions return `Result`.
+- ADR-0004 (Result Pattern): factory methods and state transitions return `ErrorOr<T>` or `ErrorOr<Success>`.
 - ADR-0015 (Architectural Tests): enforces no-public-setters rule.
 - ADR-0023 (DbContext Per Module): each module's DbContext configures its own aggregates.

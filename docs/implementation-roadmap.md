@@ -113,7 +113,7 @@ Note: use xUnit v3 when the template supports it (or upgrade the generated proje
 
 Implement:
 
-- `Result`, `Result<T>`, `Error` (via ErrorOr — reference the ErrorOr package, re-export types from the kernel for convenience, or adopt ErrorOr's types directly)
+- `ErrorOr<T>`, `ErrorOr<Success>`, `Error` (via ErrorOr)
 - `TypedId<T>` base for strongly-typed IDs
 - `AggregateRoot<TId>` and `Entity<TId>` base classes with domain event tracking
 - `DomainEvent` base record
@@ -146,7 +146,7 @@ Implement:
 
 Write tests for:
 
-- `Result` / `Error` behavior
+- `ErrorOr` / `Error` behavior
 - `TypedId<T>` equality
 - `AggregateRoot` event tracking
 - Destructuring policy masks classified properties
@@ -259,9 +259,9 @@ dotnet sln add src/Modules/Users/Modulith.Modules.Users src/Modules/Users/Moduli
 - `Email` value object (validation in factory method)
 - `PasswordHash` value object (BCrypt)
 - `User : AggregateRoot<UserId>` with `Email`, `PasswordHash`, `CreatedAt`, `DisplayName`
-  - `public static Result<User> Create(...)` factory
-  - `public Result ChangeEmail(Email newEmail)` — raises `UserEmailChanged` internal event
-  - `public Result ChangePassword(string current, string new)` — hashes, raises event
+  - `public static ErrorOr<User> Create(...)` factory
+  - `public ErrorOr<Success> ChangeEmail(Email newEmail)` — raises `UserEmailChanged` internal event
+  - `public ErrorOr<Success> SetPassword(PasswordHash newPasswordHash)` — raises event
 - Domain events: `UserRegistered`, `UserEmailChanged`, `UserPasswordChanged`
 
 ### 4.3 Persistence
@@ -556,8 +556,8 @@ Add to `Modulith.Modules.Users/Domain/`:
 **Additions to `User` aggregate:**
 
 - `VerifyPassword(string) : bool` (constant-time via BCrypt)
-- `SetPassword(string) : Result` (applies password policy, hashes, raises `PasswordChanged` internal event)
-- Existing `ChangeEmail(Email) : Result` stays as-is
+- `SetPassword(PasswordHash) : ErrorOr<Success>` (raises `UserPasswordChanged` internal event)
+- Existing `ChangeEmail(Email) : ErrorOr<Success>` stays as-is
 
 **`PendingEmailChange` entity:**
 
@@ -890,7 +890,7 @@ Add to `Modulith.Modules.Users/Domain/`:
 
 - `Role` property, non-nullable, private setter.
 - Factory `User.Create(...)` now takes an initial `Role` parameter (default `Role.User`) and asserts it is non-null.
-- Method `User.ChangeRole(Role newRole, UserId changedBy) : Result` — no-op and returns failure if `newRole == Role`; otherwise sets and raises `UserRoleChanged`.
+- Method `User.ChangeRole(Role newRole, UserId changedBy) : ErrorOr<Success>` — returns failure if `newRole == Role`; otherwise sets and raises `UserRoleChanged`.
 
 **New domain event:**
 

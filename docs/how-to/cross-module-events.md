@@ -32,14 +32,14 @@ Internal events use internal types (strongly-typed IDs, value objects). They are
 
 ```csharp
 // Inside User aggregate
-public Result ChangeEmail(Email newEmail)
+public ErrorOr<Success> ChangeEmail(Email newEmail)
 {
-    if (_email == newEmail) return Result.Ok();
+    if (Email == newEmail) return UsersErrors.EmailSame;
 
-    var oldEmail = _email;
-    _email = newEmail;
+    var oldEmail = Email;
+    Email = newEmail;
     RaiseEvent(new UserEmailChanged(Id, oldEmail, newEmail));
-    return Result.Ok();
+    return Result.Success;
 }
 ```
 

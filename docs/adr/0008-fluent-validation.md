@@ -18,7 +18,7 @@ For a template aimed at general-purpose API development, attribute-based validat
 
 Use **FluentValidation** for request-level validation. Each slice has a `{Feature}.Validator.cs` that validates the `Request` DTO (or the `Command` if they differ meaningfully).
 
-Validators run as Wolverine middleware before the handler. Validation failures short-circuit with a `Result.Fail(Error.Validation(...))`, which the endpoint translates to an RFC 7807 `ValidationProblemDetails` response (400 Bad Request with per-field errors).
+Validators run as Wolverine middleware before the handler. Validation failures short-circuit with an `Error.Validation(...)` failure, which the endpoint translates to an RFC 7807 `ValidationProblemDetails` response (400 Bad Request with per-field errors).
 
 **Scope of request-level validation:**
 
@@ -54,6 +54,6 @@ Validators run as Wolverine middleware before the handler. Validation failures s
 ## Related
 
 - ADR-0002 (Vertical Slices): validator lives in the slice folder.
-- ADR-0004 (Result Pattern): validation failures are Results, not exceptions.
+- ADR-0004 (Result Pattern): validation failures are `ErrorOr` failures, not exceptions.
 - ADR-0009 (Rich Domain Model): domain invariants are NOT a FluentValidation concern.
 - ADR-0025 (ProblemDetails): validation failures map to `ValidationProblemDetails`.

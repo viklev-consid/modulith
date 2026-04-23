@@ -341,7 +341,7 @@ Every other endpoint is protected by the fallback policy — authenticated + has
 
 For retrieving the current app user inside handlers, extend `ICurrentUser` to expose the `app_user_id` claim as a `UserId`, plus an `IsAdmin` convenience backed by the `roles` claim.
 
-> **Domain-level authorization goes elsewhere.** Checks like "is this user the manager of that employee" or "does this user belong to HR" are not app-role checks. They belong in a domain service in the relevant module (Organization, HR, etc.), called explicitly from handlers and returning `Result.Forbidden()`. Keep the `roles` claim for Admin/User only — don't stuff domain concepts into it.
+> **Domain-level authorization goes elsewhere.** Checks like "is this user the manager of that employee" or "does this user belong to HR" are not app-role checks. They belong in a domain service in the relevant module (Organization, HR, etc.), called explicitly from handlers and returning an `Error.Forbidden(...)` failure. Keep the `roles` claim for Admin/User only — don't stuff domain concepts into it.
 
 ### 8. Refresh profile endpoint
 

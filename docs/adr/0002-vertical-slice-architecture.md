@@ -36,7 +36,7 @@ Domain concerns (aggregates, value objects, domain events) live in the module's 
 - Delete-safe. Deleting a feature means deleting a folder. No orphaned services, no dead DTOs.
 - Onboarding friendly. A new developer can read one slice and understand a feature completely.
 - Low ceremony. Six files, no abstractions that exist only for symmetry.
-- Natural pairing with mediation (Wolverine). Request → Command → Handler → Result is already a good vertical structure.
+- Natural pairing with mediation (Wolverine). Request → Command → Handler → `ErrorOr<T>` response is already a good vertical structure.
 
 **Negative:**
 

@@ -57,7 +57,7 @@ Modulith.sln
 │   ├── Api/
 │   │   └── Modulith.Api.csproj                        # Host + composition root
 │   ├── Shared/
-│   │   ├── Modulith.Shared.Kernel/                    # Result, DomainEvent, base types
+│   │   ├── Modulith.Shared.Kernel/                    # DomainEvent, typed IDs, GDPR/shared primitives
 │   │   ├── Modulith.Shared.Contracts/                 # Cross-module primitives
 │   │   └── Modulith.Shared.Infrastructure/            # IBlobStore, IEmailSender, etc.
 │   └── Modules/
@@ -150,13 +150,13 @@ Typical `POST /orders` request:
 3. **Authentication middleware** validates the JWT bearer token.
 4. **Endpoint handler** (minimal API) receives the `Request` DTO and `IMessageBus`.
 5. Endpoint maps `Request` → `Command`.
-6. Endpoint calls `bus.InvokeAsync<Result<Response>>(command)`.
+6. Endpoint calls `bus.InvokeAsync<ErrorOr<Response>>(command)`.
 7. **Wolverine middleware pipeline** runs: validation (`FluentValidation`), transaction start, logging.
-8. **Handler** executes: loads aggregates, invokes domain methods, returns `Result<T>`.
+8. **Handler** executes: loads aggregates, invokes domain methods, returns `ErrorOr<T>`.
 9. Transaction commits if the handler succeeded. Domain events are captured.
 10. **Outbox middleware** persists outgoing integration events in the same transaction.
-11. Wolverine returns the `Result<T>` to the endpoint.
-12. Endpoint maps `Result<T>` → HTTP response (200/201 with body, or `ProblemDetails` on failure).
+11. Wolverine returns the `ErrorOr<T>` to the endpoint.
+12. Endpoint maps `ErrorOr<T>` → HTTP response (200/201 with body, or `ProblemDetails` on failure).
 13. **Global exception handler** catches anything that escaped (bugs/infra) and returns a 500 `ProblemDetails`.
 
 Post-commit, the outbox publishes integration events in the background. Subscribers in other modules handle them idempotently.
@@ -195,7 +195,7 @@ See [`adr/0005-module-communication-patterns.md`](adr/0005-module-communication-
 
 `Shared.Kernel` contains primitives used across modules:
 
-- `Result<T>`, `Result`, and error types (via FluentResults or ErrorOr — decision deferred to ADR-0004)
+- `ErrorOr<T>`/`ErrorOr<Success>` and `Error` (via the ErrorOr package)
 - `DomainEvent` base type
 - Strongly-typed ID base types (`TypedId<T>`)
 - `IAuditableEntity` marker

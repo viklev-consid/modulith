@@ -15,7 +15,7 @@ Modulith uses four test layers. Each has a distinct purpose, scope, and speed pr
 **Speed:** Milliseconds.
 
 **What belongs here:**
-- Invariant enforcement — constructing an aggregate with invalid state produces `Result.Fail`.
+- Invariant enforcement — constructing an aggregate with invalid state returns an `ErrorOr` failure.
 - State transitions — calling methods on aggregates produces the expected state and domain events.
 - Value object equality and validation.
 
@@ -191,7 +191,7 @@ Rules of thumb:
 
 **Test names describe the scenario and the expected outcome.** `PlacingOrderWithEmptyCart_ReturnsValidationFailure` is correct. `TestPlaceOrder` is not.
 
-**Failure messages are debugging aids.** Shouldly's defaults are good; when they aren't enough, add a message: `result.IsSuccess.ShouldBeTrue("expected to succeed but got: " + result.Errors)`.
+**Failure messages are debugging aids.** Shouldly's defaults are good; when they aren't enough, add a message: `result.IsError.ShouldBeFalse("expected to succeed but got: " + string.Join(", ", result.Errors.Select(e => e.Description)))`.
 
 ---
 

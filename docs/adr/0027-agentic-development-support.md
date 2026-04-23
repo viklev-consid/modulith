@@ -16,7 +16,7 @@ Making it explicit changes several decisions:
 - Error message quality (architectural test failures written to be actionable)
 - Self-scaffolding (`dotnet new` item templates)
 - Capability boundaries (explicit lists of what agents shouldn't touch)
-- Feedback loop speed (warnings-as-errors, `ValidateOnStart`, fast test tier)
+- Feedback loop speed (warnings-as-errors, `ValidateOnStart`, fast test suite)
 
 ## Decision
 
