@@ -10,7 +10,7 @@ public sealed class CreateProductTests(CatalogApiFixture fixture) : IAsyncLifeti
 {
     private readonly HttpClient _anonClient = fixture.CreateAnonymousClient();
     private readonly HttpClient _authedClient = fixture.CreateAuthenticatedClient(
-        Guid.NewGuid(), "admin@example.com", "Admin");
+        Guid.NewGuid(), "admin@example.com", "Admin", "admin");
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
