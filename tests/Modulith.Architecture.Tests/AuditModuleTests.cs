@@ -107,7 +107,7 @@ public sealed class AuditModuleTests
         Assert.True(publicSetters.Count == 0,
             $"FAIL: AuditEntry must not have public setters. " +
             $"Found public setters on: {string.Join(", ", publicSetters)}. " +
-            $"State transitions belong on aggregate methods (e.g. AnonymizeActor).");
+            $"State transitions belong on aggregate methods (e.g. Anonymize).");
     }
 
     [Fact]

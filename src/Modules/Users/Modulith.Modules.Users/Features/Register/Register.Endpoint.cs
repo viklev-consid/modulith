@@ -28,5 +28,6 @@ internal static class RegisterEndpoint
         .Produces<RegisterResponse>(StatusCodes.Status201Created)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status409Conflict)
-        .AllowAnonymous();
+        .AllowAnonymous()
+        .RequireRateLimiting("auth");
 }

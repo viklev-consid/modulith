@@ -12,13 +12,15 @@ public sealed class NotificationLog : Entity<NotificationLogId>
         string recipientEmail,
         NotificationType notificationType,
         string subject,
-        DateTimeOffset sentAt) : base(id)
+        DateTimeOffset sentAt,
+        Guid idempotencyKey) : base(id)
     {
         UserId = userId;
         RecipientEmail = recipientEmail;
         NotificationType = notificationType;
         Subject = subject;
         SentAt = sentAt;
+        IdempotencyKey = idempotencyKey;
     }
 
     public Guid UserId { get; private set; }
@@ -26,18 +28,21 @@ public sealed class NotificationLog : Entity<NotificationLogId>
     public NotificationType NotificationType { get; private set; }
     public string Subject { get; private set; } = string.Empty;
     public DateTimeOffset SentAt { get; private set; }
+    public Guid IdempotencyKey { get; private set; }
 
     public static NotificationLog Create(
         Guid userId,
         string recipientEmail,
         NotificationType notificationType,
         string subject,
-        DateTimeOffset sentAt)
+        DateTimeOffset sentAt,
+        Guid idempotencyKey)
         => new(
             new NotificationLogId(Guid.NewGuid()),
             userId,
             recipientEmail,
             notificationType,
             subject,
-            sentAt);
+            sentAt,
+            idempotencyKey);
 }

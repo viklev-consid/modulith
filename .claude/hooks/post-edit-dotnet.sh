@@ -16,7 +16,7 @@ if [[ -z "$file" || "$file" != *.cs ]]; then
 fi
 
 rel="${file#"$CLAUDE_PROJECT_DIR/"}"
-if [[ "$rel" != src/* ]]; then
+if [[ "$rel" != src/* && "$rel" != tests/* ]]; then
   exit 0
 fi
 

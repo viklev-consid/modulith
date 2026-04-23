@@ -23,6 +23,12 @@ public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock, I
             .Where(t => t.ExpiresAt < cutoff)
             .ExecuteDeleteAsync(ct);
 
+        // Pending email changes have no expiry of their own; they become stale once the
+        // associated SingleUseToken has been swept. Delete any that no longer have a token.
+        await db.PendingEmailChanges
+            .Where(p => !db.SingleUseTokens.Any(t => t.Id == p.TokenId))
+            .ExecuteDeleteAsync(ct);
+
         // Re-schedule for next day.
         await bus.PublishAsync(new SweepExpiredTokens(), new DeliveryOptions { ScheduledTime = clock.UtcNow.AddDays(1) });
     }

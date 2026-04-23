@@ -12,7 +12,21 @@ public sealed class UsersPersonalDataEraser(UsersDbContext db) : IPersonalDataEr
     {
         var affected = 0;
 
-        var dbUser = await db.Users.FindAsync([new UserId(user.UserId)], ct);
+        var userId = new UserId(user.UserId);
+
+        affected += await db.RefreshTokens
+            .Where(t => t.UserId == userId)
+            .ExecuteDeleteAsync(ct);
+
+        affected += await db.SingleUseTokens
+            .Where(t => t.UserId == userId)
+            .ExecuteDeleteAsync(ct);
+
+        affected += await db.PendingEmailChanges
+            .Where(p => p.UserId == userId)
+            .ExecuteDeleteAsync(ct);
+
+        var dbUser = await db.Users.FindAsync([userId], ct);
         if (dbUser is not null)
         {
             db.Users.Remove(dbUser);

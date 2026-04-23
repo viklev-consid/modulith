@@ -34,5 +34,6 @@ internal static class LoginEndpoint
         .Produces<LoginResponse>()
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
-        .AllowAnonymous();
+        .AllowAnonymous()
+        .RequireRateLimiting("auth");
 }

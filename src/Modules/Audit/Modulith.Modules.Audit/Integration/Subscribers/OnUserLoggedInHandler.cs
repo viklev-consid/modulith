@@ -13,7 +13,7 @@ public sealed class OnUserLoggedInHandler(AuditDbContext db, IClock clock)
         using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnUserLoggedInHandler));
         AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
 
-        var payload = JsonSerializer.Serialize(new { @event.UserId, @event.Email, @event.IpAddress });
+        var payload = JsonSerializer.Serialize(new { @event.UserId });
         var entry = AuditEntry.Create(
             eventType: "user.logged_in",
             actorId: @event.UserId,

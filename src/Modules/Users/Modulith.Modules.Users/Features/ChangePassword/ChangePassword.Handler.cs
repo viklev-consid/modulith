@@ -47,7 +47,7 @@ public sealed class ChangePasswordHandler(
 
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new PasswordChangedV1(user.Id.Value, user.Email.Value));
+        await bus.PublishAsync(new PasswordChangedV1(user.Id.Value, user.Email.Value, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordChangedV1)));
 
         return new ChangePasswordResponse();

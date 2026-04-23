@@ -4,6 +4,7 @@ using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Templates;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Infrastructure.Notifications;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
@@ -18,11 +19,15 @@ public sealed class OnPasswordResetRequestedHandler(
         using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnPasswordResetRequestedHandler));
         NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetRequestedV1)));
 
-        var alreadySent = await db.NotificationLogs.AnyAsync(
-            l => l.UserId == @event.UserId && l.NotificationType == NotificationType.PasswordResetRequest,
-            ct);
+        db.NotificationLogs.Add(NotificationLog.Create(
+            @event.UserId, @event.Email, NotificationType.PasswordResetRequest,
+            PasswordResetRequestTemplate.Subject, clock.UtcNow, @event.EventId));
 
-        if (alreadySent)
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             return;
         }
@@ -36,11 +41,5 @@ public sealed class OnPasswordResetRequestedHandler(
             PlainTextBody: PasswordResetRequestTemplate.PlainTextBody(@event.RawToken));
 
         await emailSender.SendAsync(message, ct);
-
-        db.NotificationLogs.Add(NotificationLog.Create(
-            @event.UserId, @event.Email, NotificationType.PasswordResetRequest,
-            PasswordResetRequestTemplate.Subject, clock.UtcNow));
-
-        await db.SaveChangesAsync(ct);
     }
 }

@@ -14,7 +14,7 @@ public sealed class OnEmailChangedHandler(AuditDbContext db, IClock clock)
         using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnEmailChangedHandler));
         AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangedV1)));
 
-        var payload = JsonSerializer.Serialize(new { @event.UserId, @event.OldEmail, @event.NewEmail });
+        var payload = JsonSerializer.Serialize(new { @event.UserId });
         var entry = AuditEntry.Create(
             eventType: "user.email_changed",
             actorId: @event.UserId,

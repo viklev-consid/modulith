@@ -5,6 +5,7 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
+using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.RequestEmailChange;
@@ -60,9 +61,18 @@ public sealed class RequestEmailChangeHandler(
 
         db.PendingEmailChanges.Add(PendingEmailChange.Create(user.Id, newEmail, token.Id));
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // A concurrent request from the same user hit the unique index on pending_email_changes.user_id.
+            // The first request succeeded; silently return the same success shape.
+            return new RequestEmailChangeResponse();
+        }
 
-        await bus.PublishAsync(new EmailChangeRequestedV1(user.Id.Value, newEmail.Value, rawToken));
+        await bus.PublishAsync(new EmailChangeRequestedV1(user.Id.Value, newEmail.Value, rawToken, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangeRequestedV1)));
 
         return new RequestEmailChangeResponse();

@@ -11,22 +11,22 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
     public async Task<ErasureResult> EraseAsync(UserRef user, ErasureStrategy strategy, CancellationToken ct)
     {
         var entries = await db.AuditEntries
-            .Where(e => e.ActorId == user.UserId)
+            .Where(e => e.ActorId == user.UserId || e.ResourceId == user.UserId)
             .ToListAsync(ct);
 
         foreach (var entry in entries)
         {
-            var redacted = RedactEmailFromPayload(entry.Payload);
-            entry.AnonymizeActor(redacted);
+            var redacted = RedactPersonalDataFromPayload(entry.Payload);
+            entry.Anonymize(user.UserId, redacted);
         }
 
         await db.SaveChangesAsync(ct);
 
         return new ErasureResult(user.UserId, ErasureStrategy.Anonymize, entries.Count,
-            "Actor anonymized; payload email references redacted.");
+            "Actor and resource references anonymized; payload personal data redacted.");
     }
 
-    private static string RedactEmailFromPayload(string payload)
+    private static string RedactPersonalDataFromPayload(string payload)
     {
         if (string.IsNullOrEmpty(payload))
         {
@@ -41,7 +41,9 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
 
             foreach (var key in obj.Keys.Where(
                 k => k.Contains("email", StringComparison.OrdinalIgnoreCase) ||
-                     k.Contains("mail", StringComparison.OrdinalIgnoreCase)).ToList())
+                     k.Contains("mail", StringComparison.OrdinalIgnoreCase) ||
+                     k.Contains("ipAddress", StringComparison.OrdinalIgnoreCase) ||
+                     k.Contains("displayName", StringComparison.OrdinalIgnoreCase)).ToList())
             {
                 obj[key] = "[REDACTED]";
             }
