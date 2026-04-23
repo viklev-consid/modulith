@@ -28,6 +28,11 @@ internal sealed class PendingEmailChangeConfiguration : IEntityTypeConfiguration
             .HasConversion(id => id.Value, v => new SingleUseTokenId(v))
             .IsRequired();
 
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // One pending change per user maximum (enforced at application level; unique index ensures it)
         builder.HasIndex(p => p.UserId).IsUnique();
     }

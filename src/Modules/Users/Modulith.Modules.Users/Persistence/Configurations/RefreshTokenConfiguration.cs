@@ -32,6 +32,11 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
         builder.Property(t => t.DeviceFingerprint).HasMaxLength(64);
         builder.Property(t => t.CreatedFromIp).HasMaxLength(45); // max IPv6 length
 
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Lookup by token hash (primary query path on refresh)
         builder.HasIndex(t => t.TokenHash).IsUnique();
 

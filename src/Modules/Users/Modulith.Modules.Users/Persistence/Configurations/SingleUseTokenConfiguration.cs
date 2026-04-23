@@ -27,6 +27,11 @@ internal sealed class SingleUseTokenConfiguration : IEntityTypeConfiguration<Sin
         builder.Property(t => t.ExpiresAt).IsRequired();
         builder.Property(t => t.ConsumedAt);
 
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Lookup by hash + purpose (prevents cross-purpose token reuse)
         builder.HasIndex(t => new { t.TokenHash, t.Purpose }).IsUnique();
 
