@@ -29,7 +29,7 @@ Modulith is opinionated. It encodes a set of decisions that have been made delib
 - **Per-module OpenTelemetry activity sources** with full handler instrumentation
 - **GDPR primitives**: data classification attributes, exporter/eraser contracts, consent tracking
 - **Testing**: xUnit v3, Shouldly, Verify, Bogus, Testcontainers, NetArchTest, WireMock.Net
-- **Agent-ready**: `CLAUDE.md` files at multiple levels, comprehensive ADRs, `dotnet new` item templates for slices and modules
+- **Agent-ready**: layered `CLAUDE.md` files, comprehensive ADRs, `dotnet new` item templates, Claude Code hooks/commands/sub-agents, and repo-local skills under `.claude/skills/`
 
 ## Quick start
 
@@ -65,7 +65,7 @@ Agent context is organized hierarchically so the right instructions are always c
 
 ### The `.claude/` harness
 
-The `.claude/` directory ships an active harness that Claude Code picks up automatically.
+The `.claude/` directory ships an active harness that Claude Code picks up automatically, plus repo-local skills for recurring implementation workflows.
 
 **Hooks** enforce rules at the moment they would be violated, not at PR review time:
 
@@ -84,6 +84,19 @@ The `.claude/` directory ships an active harness that Claude Code picks up autom
 - `/new-slice <Module> <Feature>` — scaffolds a vertical slice via `dotnet new modulith-slice`
 - `/new-module <Name>` — scaffolds a new module with an explicit confirmation step
 - `/new-adr <title>` — drafts an ADR in chat; never writes the file
+
+**Skills** provide reusable, task-specific guidance that complements the hooks and commands. They live under `.claude/skills/` and cover the repo's most common implementation surfaces:
+
+- `vertical-slice` — canonical walkthrough for adding or modifying a slice end-to-end
+- `module-boundary` — cross-module communication rules and event/query/command decisions
+- `rich-domain-model` — aggregates, value objects, typed IDs, and internal domain events
+- `testing-strategy` — choosing the correct test layer and using the shared test harness well
+- `ef-migration` — per-module migration workflow and destructive-change safety
+- `wolverine-messaging` — `IMessageBus`, outbox semantics, subscribers, and scheduled jobs
+- `gdpr-primitives` — personal-data classification, export/erasure hooks, consent, and retention
+- `access-control` — endpoint-level authorization, `ICurrentUser`, and resource policies
+- `authorization-model` — the system RBAC model: roles, permissions, registration, and claim expansion
+- `auth-flows` — Users-module authentication flows and token-security invariants
 
 **Sub-agents** handle focused tasks with tightly scoped tool access:
 
