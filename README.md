@@ -49,6 +49,64 @@ dotnet run --project src/AppHost
 dotnet test
 ```
 
+## Working with AI agents
+
+Modulith treats AI coding agents as first-class collaborators alongside human developers. The structural choices that make the codebase navigable for humans — vertical slices, explicit module boundaries, ADRs, exhaustive architectural tests — are the same choices that make it safe for agents to operate in autonomously. Neither audience is an afterthought.
+
+### Layered guidance
+
+Agent context is organized hierarchically so the right instructions are always close to the work:
+
+- **`/CLAUDE.md`** — repo-wide operating manual: invariants, workflow, common commands, footguns
+- **`/src/Modules/CLAUDE.md`** — module shape conventions and cross-module rules
+- **`/src/Modules/<Module>/CLAUDE.md`** — per-module domain vocabulary and business rules
+- **`/tests/CLAUDE.md`** — test patterns and what belongs in each layer
+- **`/docs/adr/CLAUDE.md`** — ADR format guidance
+
+### The `.claude/` harness
+
+The `.claude/` directory ships an active harness that Claude Code picks up automatically.
+
+**Hooks** enforce rules at the moment they would be violated, not at PR review time:
+
+| Hook | Fires | Does |
+|---|---|---|
+| `session-context.sh` | Session start | Injects project overview, git state, and module list |
+| `guard-paths.sh` | Before every edit | Blocks ADR writes, production config edits, domain infrastructure imports, and cross-module references that bypass Contracts |
+| `post-edit-dotnet.sh` | After every `.cs` edit | Runs format check, build, and arch tests on the touched project; failures surface in the conversation immediately |
+| `slice-completeness.sh` | After every `.cs` edit | Reports missing slice files when a feature folder is incomplete |
+| `stop-format.sh` | On session stop | Auto-fixes formatting on changed projects |
+| `stop-gate.sh` | On session stop | Blocks the session ending if architecture tests are failing |
+
+**Slash commands** provide scoped, tool-constrained workflows:
+
+- `/check` — format, build, arch tests, and unit tests on projects changed in this session
+- `/new-slice <Module> <Feature>` — scaffolds a vertical slice via `dotnet new modulith-slice`
+- `/new-module <Name>` — scaffolds a new module with an explicit confirmation step
+- `/new-adr <title>` — drafts an ADR in chat; never writes the file
+
+**Sub-agents** handle focused tasks with tightly scoped tool access:
+
+- `domain-modeler` — works exclusively in `Domain/` folders; writes unit tests alongside models
+- `integration-tester` — writes integration tests with Testcontainers, Wolverine TrackActivity, and WireMock.Net
+- `migration-writer` — adds EF Core migrations and summarizes the generated SQL
+- `adr-drafter` — turns design conversations into ADR drafts for human review and commit
+
+### Why both humans and agents benefit
+
+The structural choices reinforce each other:
+
+| Mechanism | Human benefit | Agent benefit |
+|---|---|---|
+| Vertical slices + co-location | Navigate by feature, not by layer | Unambiguous file placement |
+| Arch tests with readable failure messages | Catches regressions in CI | Self-correcting feedback mid-session |
+| ADRs for every decision | Onboarding and institutional memory | Answers "why?" without guessing |
+| `dotnet new` templates | Fast, consistent scaffolding | Correct namespaces without inference |
+| Hooks + path guards | Backstop for code review | Enforced before code is written |
+| Result pattern + no exceptions | Readable call sites | Predictable handler contracts |
+
+> See [`docs/agentic-development.md`](docs/agentic-development.md) for the full breakdown of agent mechanisms, capability boundaries, and the recommended reading order for humans and agents new to the codebase.
+
 ## Documentation layout
 
 - [`docs/architecture.md`](docs/architecture.md) — the big picture and request flow
