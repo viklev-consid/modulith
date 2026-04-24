@@ -21,8 +21,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(u => u.Email).IsUnique();
 
         builder.Property(u => u.PasswordHash)
-            .HasConversion(h => h.Value, v => new PasswordHash(v))
-            .IsRequired();
+            .HasConversion(
+                h => h != null ? h.Value : null,
+                v => v != null ? new PasswordHash(v) : null)
+            .IsRequired(false);
 
         builder.Property(u => u.DisplayName)
             .HasMaxLength(100)

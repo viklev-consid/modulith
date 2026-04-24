@@ -27,7 +27,7 @@ public sealed class ChangePasswordHandler(
             return UsersErrors.UserNotFound;
         }
 
-        if (!passwordHasher.Verify(cmd.CurrentPassword, user.PasswordHash.Value))
+        if (user.PasswordHash is null || !passwordHasher.Verify(cmd.CurrentPassword, user.PasswordHash.Value))
         {
             return UsersErrors.CurrentPasswordIncorrect;
         }

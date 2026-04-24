@@ -35,7 +35,7 @@ public sealed class RequestEmailChangeHandler(
             return new RequestEmailChangeResponse();
         }
 
-        if (!passwordHasher.Verify(cmd.CurrentPassword, user.PasswordHash.Value))
+        if (user.PasswordHash is null || !passwordHasher.Verify(cmd.CurrentPassword, user.PasswordHash.Value))
         {
             return new RequestEmailChangeResponse();
         }

@@ -41,7 +41,7 @@ public sealed class RegisterHandler(
         }
 
         var passwordHash = new PasswordHash(passwordHasher.Hash(cmd.Password));
-        var userResult = User.Create(email, passwordHash, cmd.DisplayName);
+        var userResult = User.CreateWithPassword(email, passwordHash, cmd.DisplayName);
         if (userResult.IsError)
         {
             return userResult.Errors;
