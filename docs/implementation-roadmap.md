@@ -1143,6 +1143,418 @@ Add `UserRoleChangedV1` to the Audit module's subscribed-events list. Standard p
 
 ---
 
+## Phase 14: Third-party authentication (Google)
+
+**Goal:** Users can sign in with Google, and existing users can link/unlink Google to their account. The flow is uniform against account-existence enumeration — no API response reveals whether an email is known. Account provisioning happens only after the user clicks a confirmation email.
+
+Phase 14 introduces federation alongside the existing password-based flows. It deliberately preserves the custom `User` aggregate (ADR-0007) rather than adopting ASP.NET Identity. Google is the only provider shipped here; the slices serve as the template for future providers (Apple, Microsoft, GitHub).
+
+Reference docs:
+
+- [`adr/0031-third-party-authentication.md`](adr/0031-third-party-authentication.md) (to be drafted)
+- [`adr/0007-custom-user-aggregate.md`](adr/0007-custom-user-aggregate.md) — federation path companion
+- [`adr/0028-auth-flows-baseline.md`](adr/0028-auth-flows-baseline.md)
+- [`adr/0029-refresh-tokens-and-logout.md`](adr/0029-refresh-tokens-and-logout.md)
+- [`how-to/auth/add-external-provider.md`](how-to/auth/add-external-provider.md) (to be drafted)
+- [`src/Modules/Users/CLAUDE.md`](../src/Modules/Users/CLAUDE.md)
+
+Design summary (full reasoning in ADR-0031):
+
+- **Client-driven flow.** Frontends use Google Identity Services (web SDK, native iOS/Android SDKs) and POST a verified `id_token` to the API. No OAuth redirect endpoints, no state cookies, no platform-specific callback URLs on our side. Security boundary is backend JWKS verification.
+- **Uniform email-loop.** The only path that issues tokens on initial submission is an already-linked `(provider, subject)`. Every other case — collision with an existing user, or an unknown email — creates a `PendingExternalLogin`, sends an email, and returns an identical "check your email" response. This closes the enumeration vector that "auto-provision on unknown, email-loop on known" would leave open.
+- **Provisioning on confirm.** No `User` row is created until the user clicks the emailed link. This defers the write and keeps the initial endpoint's behavior uniform.
+- **Onboarding gate.** Auto-provisioned users land with `HasCompletedOnboarding = false`; the frontend steers them through post-signup UI, which calls `CompleteOnboarding` to flip the flag. Password-registered users start with `HasCompletedOnboarding = true` (no change in their flow).
+- **Account linking.** An authenticated user can attach Google to their existing account without the email loop — the active session already proves identity. Unlink enforces a credential-retention guardrail: a user must always retain at least one credential (password or another external login).
+- **Display name.** Seeded from Google's `name` claim at provision time. User-facing editing is out of scope for this phase and deferred to a future `UpdateProfile` slice.
+- **Password-optional users.** `User.PasswordHash` becomes nullable. External-only users can opt in to a password later via `SetInitialPassword`.
+- **Provisioning provenance.** External provisioning fires a dedicated `UserProvisionedFromExternalV1` event (distinct from `UserRegisteredV1`, which is narrowed to password registration). Audit and operational queries can answer "how was this user created?" without inferring from event sequences.
+- **Unlink revokes sessions.** Unlinking an external login revokes all of the user's refresh tokens. A user unlinking because their provider account was compromised should not leave attacker-issued refresh tokens live for the remainder of their 30-day window.
+- **Data minimization.** Pending records are swept on expiry (no grace period), carry only the fields needed to resume the flow, and are also deleted by the Users eraser when the matching email is erased.
+- **Distinct legal artefacts.** Terms-of-Service acceptance (contract agreement under GDPR Art. 6(1)(b)) and GDPR opt-in consent (Art. 6(1)(a), e.g. marketing) are modeled separately. ToS goes to a new `TermsAcceptance` table; marketing opt-in goes to the existing `Consents` registry (ADR-0012). The onboarding slice records ToS acceptance and optionally a marketing-email consent based on the user's explicit choice. Both artefacts capture IP and User-Agent at the moment of the affirmative act so we can demonstrate how and when they were given.
+
+---
+
+### 14.1 Domain additions
+
+Add to `Modulith.Modules.Users/Domain/`:
+
+**`ExternalLoginProvider` enum:**
+
+- `Google` (only value in this phase; future providers append here).
+
+**`ExternalLogin` entity** (aggregate-internal, owned by `User`):
+
+- `UserId`
+- `Provider` (`ExternalLoginProvider`)
+- `Subject` (string — provider-issued stable identifier)
+- `LinkedAt`
+- Private constructor; instantiation flows through `User.LinkExternalLogin`.
+
+**`PendingExternalLogin` entity** (mirrors `PendingEmailChange` from 9.5):
+
+- `TokenHash` (byte[], SHA-256)
+- `Provider`
+- `Subject`
+- `Email`
+- `DisplayName`
+- `IsExistingUser` (bool — captured at pending-record creation so the email template choice is deterministic and doesn't leak through a post-hoc lookup)
+- `CreatedFromIp` (string?) — submitting client IP, mirroring `RefreshToken.CreatedFromIp`
+- `UserAgent` (string?, max 512) — submitting client User-Agent, truncated safely
+- `IssuedAt`, `ExpiresAt`, `ConsumedAt?`
+- Factory: `Create(provider, subject, email, displayName, isExistingUser, ip, userAgent, lifetime, IClock) → (PendingExternalLogin, string rawValue)`
+- Method: `Consume(IClock) : ErrorOr<Success>`
+- Method: `IsValid(IClock) : bool`
+
+**Additions to `User` aggregate:**
+
+- `PasswordHash` → nullable.
+- `HasCompletedOnboarding` (bool, non-null).
+- Factory split:
+  - `User.CreateWithPassword(Email, PasswordHash, displayName, Role)` — existing behavior; `HasCompletedOnboarding = true`.
+  - `User.CreateExternal(Email, displayName, Role)` — for auto-provisioning from external login; `HasCompletedOnboarding = false`; raises `UserRegistered`.
+- `User.SetInitialPassword(PasswordHash) : ErrorOr<Success>` — for external-only users setting their first password. Fails if `PasswordHash` is already set (use `SetPassword` / `ChangePassword` instead). Raises `UserPasswordChanged`.
+- `User.LinkExternalLogin(ExternalLoginProvider, string subject) : ErrorOr<Success>` — fails if the same `(provider, subject)` is already linked to this user. Raises `ExternalLoginLinked`.
+- `User.UnlinkExternalLogin(ExternalLoginProvider) : ErrorOr<Success>` — credential-retention guardrail: fails if this would leave the user with no `PasswordHash` and no other `ExternalLogin`. Raises `ExternalLoginUnlinked`.
+- `User.CompleteOnboarding() : ErrorOr<Success>` — idempotent no-op if already complete; otherwise flips flag and raises `UserOnboardingCompleted`.
+
+**`TermsAcceptance` entity** (aggregate-internal, owned by `User`):
+
+- `UserId`
+- `Version` (string — matches `UsersOptions.TermsOfServiceVersion` at acceptance time)
+- `AcceptedAt`
+- `AcceptedFromIp` (string?)
+- `UserAgent` (string?, max 512)
+- Factory: `Record(UserId, string version, DateTimeOffset acceptedAt, string? ip, string? userAgent) → TermsAcceptance`
+- Uniqueness enforced on `(UserId, Version)` so a user cannot have two acceptances of the same version.
+- ToS acceptance is a *contract-agreement* artefact, distinct from GDPR consent. It lives in its own table rather than in the `Consents` registry (ADR-0012, which is strictly Art. 6(1)(a) opt-in consent: `marketing-emails`, `analytics`).
+
+**New domain events:**
+
+- `ExternalLoginLinked` (internal) → `ExternalLoginLinkedV1` (public — `UserId`, `Provider`, `Subject`, `LinkedAt`).
+- `ExternalLoginUnlinked` (internal) → `ExternalLoginUnlinkedV1`.
+- `UserOnboardingCompleted` (internal) → `UserOnboardingCompletedV1`.
+- `ExternalLoginPending` (internal, delivered via outbox to Notifications only) — carries `Provider`, `Email`, `DisplayName`, `IsExistingUser`, and the raw confirmation token. Publicly exposed as `ExternalLoginPendingV1`; Notifications is the sole subscriber. Follows the same "raw-token-for-Notifications-only" pattern as `PasswordResetRequestedV1` (ADR-0028).
+- `UserProvisionedFromExternal` (internal) → `UserProvisionedFromExternalV1` (public — `UserId`, `Provider`, `Subject`, `Email`, `DisplayName`, `ProvisionedAt`). Fired by `User.CreateExternal`.
+
+**Narrowing of existing event semantics.** `UserRegistered` / `UserRegisteredV1` are narrowed to password registration only (fired from `User.CreateWithPassword`). External provisioning fires `UserProvisionedFromExternalV1` instead, so subscribers that care about how a user entered the system (Audit, Notifications' welcome-email branching) can discriminate without inferring from event ordering. Notifications' existing `UserRegisteredV1` subscriber is updated accordingly — the "welcome email" for external users is the `ExternalLoginPendingV1` confirmation email; no second welcome is sent after `UserProvisionedFromExternalV1`.
+
+### 14.2 Persistence
+
+Add entity configurations and a migration:
+
+```bash
+dotnet ef migrations add AddThirdPartyAuth \
+  --project src/Modules/Users/Modulith.Modules.Users \
+  --context UsersDbContext \
+  --output-dir Persistence/Migrations
+```
+
+Schema changes in the `users` schema:
+
+- `users.password_hash` → nullable.
+- `users.has_completed_onboarding` → `boolean NOT NULL`, default `true`, backfill existing rows to `true` (password-registered users are assumed complete).
+- New table `external_logins` (`user_id` FK with cascade, `provider`, `subject`, `linked_at`).
+- New table `pending_external_logins` (`token_hash`, `provider`, `subject`, `email`, `display_name`, `is_existing_user`, `created_from_ip`, `user_agent`, `issued_at`, `expires_at`, `consumed_at`).
+- New table `terms_acceptances` (`user_id` FK with cascade, `version`, `accepted_at`, `accepted_from_ip`, `user_agent`).
+- Extend existing `consents` table with `granted_from_ip` (nullable) and `granted_user_agent` (nullable, max 512) columns so future consent grants carry demonstrability artefacts. Existing rows backfill to `NULL`. Schema owner is the Users module — this migration is module-local despite touching an existing table.
+
+Indexes:
+
+- `external_logins(provider, subject)` — unique.
+- `external_logins(user_id)` — for cascade and linked-providers queries on `me`.
+- `pending_external_logins(token_hash)` — unique.
+- `pending_external_logins(provider, subject) WHERE consumed_at IS NULL` — partial, supports coalescing (see 14.5).
+- `pending_external_logins(expires_at)` — for the sweep job (14.6).
+- `terms_acceptances(user_id, version)` — unique; supports "has this user accepted version X?" lookup.
+
+### 14.3 Options additions
+
+Extend `UsersOptions`:
+
+```csharp
+public TimeSpan PendingExternalLoginLifetime { get; init; } = TimeSpan.FromMinutes(30);
+```
+
+New `GoogleAuthOptions` bound from `Modules:Users:GoogleAuth`, validated on start:
+
+```csharp
+[Required, MinLength(1)]
+public string ClientId { get; init; } = default!;
+
+public IReadOnlyCollection<string> AllowedAudiences { get; init; } = [];
+// Usually just [ClientId]; additional audiences allowed for multi-platform setups
+// (web + mobile clients with distinct Google OAuth client IDs).
+```
+
+### 14.4 Google id_token verification
+
+Add `Security/ExternalLogin/Google/`:
+
+- **`IGoogleIdTokenVerifier`** — verifies an id_token and returns `ErrorOr<GoogleIdentity>` containing `Subject`, `Email`, `EmailVerified`, `DisplayName`.
+- **`GoogleIdTokenVerifier`** — implementation:
+  - Fetches JWKS from Google's discovery document (`https://accounts.google.com/.well-known/openid-configuration`). Caches keys; refreshes on `kid` miss.
+  - Validates RS256 signature, issuer (`https://accounts.google.com` or `accounts.google.com`), audience against `GoogleAuthOptions.AllowedAudiences`, expiry, and not-before.
+  - Rejects tokens where `email_verified != true`.
+  - Uses a typed `HttpClient` registered via `AddHttpClient<IGoogleIdTokenVerifier, GoogleIdTokenVerifier>()` so it inherits Aspire resilience defaults.
+- **`GoogleIdentity`** record — the verified claims.
+
+**Resilience and fail-closed semantics.** JWKS fetch goes through the typed `HttpClient` with Aspire's standard retry + circuit-breaker policies. Cached keys are served while a refresh is in flight; refresh is triggered on `kid` miss and on cache TTL expiry (1 hour). If JWKS is unreachable *and* no cached key matches the token's `kid`, the verifier returns an error — **never treat an unknown key as valid, never fall back to an unverified path.** `Login` and `Link` surface this as a retryable failure (HTTP 503 with `Retry-After`), not a silent success. Architectural test 14.11 asserts there is no code path that issues tokens when verification fails.
+
+This is the only Google-specific code in the phase. Adding Apple/Microsoft/GitHub later means adding a sibling verifier and widening `ExternalLoginProvider`.
+
+### 14.5 Feature slices
+
+Add under `Modules/Users/Modulith.Modules.Users/Features/ExternalLogin/Google/`:
+
+- **`Login/`** — `POST /v1/auth/external/google/login`
+  - Public; rate-limit `auth`.
+  - Body: `{ "idToken": "..." }`.
+  - Verify id_token.
+  - Normalize the Google-supplied email through `Email.Create(...)` (lowercase, trim) **before** the collision lookup, so `Alice@example.com` from Google matches an existing `alice@example.com` and is not mistakenly treated as a new user.
+  - If `(google, subject)` is already linked → issue access + refresh tokens (same path as the existing `Login` slice, subject to `MaxActiveRefreshTokensPerUser`) and return the existing `LoginResponse` DTO shape — frontends use one token-response path regardless of auth method.
+  - Else, coalesce: if an active, unconsumed `PendingExternalLogin` for `(google, subject)` exists, reuse it — do not issue a new pending record or a new email.
+  - Else: determine `IsExistingUser` by looking up the normalized email in the `users` table, capture the submitting IP (from `HttpContext.Connection.RemoteIpAddress`) and User-Agent header (truncated to 512 chars) into the new `PendingExternalLogin`, publish `ExternalLoginPendingV1` (Notifications sends the email via outbox).
+  - Response in all non-linked cases: `202 Accepted` with `{ "status": "pending_confirmation" }`. Byte-identical for "existing user" and "unknown email" cases.
+- **`Confirm/`** — `POST /v1/auth/external/google/confirm`
+  - Public; rate-limit `auth`.
+  - Body: `{ "token": "..." }` (raw value from the email link).
+  - Hash the raw token and open a transaction; `SELECT ... FOR UPDATE` the matching `PendingExternalLogin` row to serialize concurrent confirms. Re-check `IsValid` inside the lock; reject if invalid, expired, or already consumed.
+  - If `IsExistingUser` → `User.LinkExternalLogin(google, subject)` on the existing user (re-look-up by the normalized email at consumption time; fail with a specific error code if the email no longer resolves or now belongs to a different user — covers the rare case of email change or erasure between submission and confirm).
+  - Else → `User.CreateExternal(email, displayName, Role.User)`, then `LinkExternalLogin(google, subject)`. This path fires `UserProvisionedFromExternalV1` (not `UserRegisteredV1`).
+  - `Consume()` the pending record (inside the same transaction), issue access + refresh tokens, return the existing `LoginResponse` DTO — same shape as password login.
+- **`Link/`** — `POST /v1/users/me/external-logins/google`
+  - Authenticated; rate-limit `auth`.
+  - Body: `{ "idToken": "..." }`.
+  - Verify id_token. If `(google, subject)` is already linked to a *different* user → `409 Conflict`.
+  - `User.LinkExternalLogin(google, subject)` on the current user. No email loop — session proves identity.
+- **`Unlink/`** — `DELETE /v1/users/me/external-logins/google`
+  - Authenticated; rate-limit `write`.
+  - `User.UnlinkExternalLogin(google)`. Fails via the credential-retention guardrail if the user has no password and no other external login.
+  - On success: revoke all of the user's refresh tokens (per ADR-0028 sensitive-event revocation — unlinking covers the "provider account compromised" case where an attacker could have issued themselves a session before the unlink happened).
+- **`SetInitialPassword/`** — `POST /v1/users/me/password/initial`
+  - Authenticated; rate-limit `auth`.
+  - Body: `{ "newPassword": "..." }`, subject to `MinPasswordLength`.
+  - Fails if the user already has a password hash (directs clients to `ChangePassword`).
+  - Sets password, revokes all refresh tokens except current (same pattern as `ChangePassword` per ADR-0029).
+- **`CompleteOnboarding/`** — `POST /v1/users/me/onboarding/complete`
+  - Authenticated; rate-limit `write`.
+  - Body:
+    ```json
+    {
+      "acceptTerms": true,
+      "acceptMarketingEmails": false
+    }
+    ```
+    - `acceptTerms` is required and must be `true`. The endpoint rejects with 400 if absent or `false` — completion without ToS acceptance is not a valid state.
+    - `acceptMarketingEmails` is optional (default `false`). Its value is a first-class GDPR consent act; the user must tick it actively.
+  - Idempotent for the `HasCompletedOnboarding` flag on `User`.
+  - **ToS acceptance recording.** Records a `TermsAcceptance` row with the current `UsersOptions.TermsOfServiceVersion`, the request's IP and User-Agent. If a row already exists for `(UserId, Version)`, the existing row is kept (re-run protection). This is the contract-agreement artefact — it lives in `terms_acceptances`, not `consents`.
+  - **Marketing-consent recording.** If `acceptMarketingEmails = true`, grants a consent via `IConsentRegistry` with purpose `marketing-emails`, policy version matching `UsersOptions.PrivacyPolicyVersion`, capturing IP + User-Agent. If `false`, no row is written (absence is the default state — "no consent given yet"). If the user later wants to opt in, a dedicated preferences endpoint (out of scope for this phase) handles it.
+  - **Idempotency caveat.** Re-running `CompleteOnboarding` with `acceptMarketingEmails = true` after a prior `false` *does* grant the consent on the second call. Re-running with `false` after a prior `true` does *not* revoke (revocation is a different action, via a dedicated endpoint out of scope here). Document this in the slice.
+
+Update the existing **`GetCurrentUser/`** response (additive, on top of 13.6a):
+
+- `linkedProviders: string[]` — provider names sorted lexicographically. Empty array if none.
+- `hasCompletedOnboarding: bool`.
+- `hasPassword: bool` — so the frontend knows whether to offer `SetInitialPassword` vs `ChangePassword`.
+
+Rate-limit table:
+
+| Slice | Policy |
+|---|---|
+| `Login`, `Confirm` | `auth` |
+| `Link` | `auth` |
+| `Unlink` | `write` |
+| `SetInitialPassword` | `auth` |
+| `CompleteOnboarding` | `write` |
+
+### 14.6 Scheduled sweep
+
+Extend the existing `SweepExpiredTokens` Wolverine recurring message (9.5.5) to also sweep `pending_external_logins`. Unlike refresh tokens and password-reset tokens, pending records have no audit value past expiry — they represent attempts that never materialized into an account. Sweep aggressively to minimize retention of email + display name data per GDPR data-minimization:
+
+- Delete rows where `expires_at < now` (no grace period).
+- Delete rows where `consumed_at IS NOT NULL` (consumed-record cleanup; the `Confirm` slice could do this inline but the sweep catches any that slipped through transaction boundaries).
+
+### 14.7 Abuse mitigation
+
+Every first-time Google submission triggers an outbound email; without limits, an attacker with disposable Google accounts can pump mail through our system. Mitigations:
+
+- **Coalescing** (already in 14.5): one active pending record per `(provider, subject)`; re-submission within the window reuses it without re-emailing.
+- **Per-IP rate limits** on `Login` and `Confirm` via the existing `auth` policy from ADR-0018.
+- **Per-email cap** on concurrent pending records (enforced in the handler): reject if more than N active unconsumed pending records exist for the same email. Default `N = 3`, configurable as `UsersOptions.MaxPendingExternalLoginsPerEmail`.
+
+### 14.8 Notifications module integration
+
+Notifications subscribes to:
+
+- `ExternalLoginPendingV1` — template branches on `IsExistingUser`:
+  - `true` → "Someone is linking Google to your account — confirm here" template, sent to the existing user's email.
+  - `false` → "Welcome — finish creating your account with Google" template, sent to the Google-supplied email.
+  The event carries the raw confirmation token, consistent with the `PasswordResetRequestedV1` pattern. Notifications is the sole subscriber.
+- `ExternalLoginLinkedV1` → transactional alert to the user's email: "Google was linked to your account."
+- `ExternalLoginUnlinkedV1` → transactional alert: "Google was unlinked from your account."
+
+All transactional (non-opt-out) per ADR-0014.
+
+### 14.9 Audit module integration
+
+Audit subscribes to:
+
+- `ExternalLoginLinkedV1` — actor = current user, entity = user, action = "ExternalLoginLinked", details include `Provider` (not `Subject`, which is provider-internal).
+- `ExternalLoginUnlinkedV1` — likewise.
+- `UserOnboardingCompletedV1` — actor = user, action = "OnboardingCompleted".
+- `UserProvisionedFromExternalV1` — actor = user (self), action = "UserProvisionedFromExternal", details include `Provider`. This is the data-provenance record: any future question of "how was user X created?" is answered by the presence (or absence) of this entry alongside `UserRegisteredV1`.
+
+Standard pattern; no shape changes in the Audit module.
+
+### 14.10 GDPR export and erasure
+
+Update `UsersPersonalDataExporter` to include:
+
+- `LinkedProviders: [{ Provider, Subject, LinkedAt }]` — the provider-issued subject is a stable identifier and is personal data under GDPR.
+- `HasCompletedOnboarding` — status flag, included for completeness.
+- `TermsAcceptances: [{ Version, AcceptedAt, AcceptedFromIp, UserAgent }]` — the user's history of ToS acceptances, including context of each. Users have a right to see this; it is their personal data.
+- `Consents` — already exported per Phase 8. Confirm that the IP/UA columns added in 14.2 are included in the export payload.
+
+Pending external logins are excluded from export by design:
+
+- They represent transient, pre-account attempts (the data subject has no `User` row yet when they're created).
+- Including them by email would turn export into a partial email-enumeration tool against the pending table.
+- Retention is short (≤30 min via `PendingExternalLoginLifetime`) and sweep is aggressive (on expiry, no grace), so the window of any potential inclusion is small.
+
+Document this exclusion explicitly in the ADR so future reviewers don't re-litigate it.
+
+Update `UsersPersonalDataEraser` to additionally delete pending records matching the erased user's email:
+
+```csharp
+// Inside the erasure transaction, after removing the user's rows:
+await dbContext.PendingExternalLogins
+    .Where(p => p.Email == user.Email.Value)
+    .ExecuteDeleteAsync(cancellationToken);
+```
+
+This covers two cases the FK cascade misses:
+
+- The user's own abandoned or in-flight attempts, which have no `UserId` FK.
+- Hostile submissions that used the subject's email — which hold their email + display name in plaintext until the sweep catches them.
+
+`external_logins` rows cascade on user delete via FK — no extra eraser code. `terms_acceptances` likewise cascade. `consents` rows are handled by the existing Users eraser (Phase 8).
+
+### 14.11 Architectural tests
+
+Add to `Modulith.Architecture.Tests`:
+
+- `ExternalLogin`, `PendingExternalLogin`, and `TermsAcceptance` have no public setters.
+- Nothing outside `Users.Features.CompleteOnboarding` writes to `TermsAcceptance` — it is an append-only artefact of the onboarding act.
+- `IConsentRegistry` is not called with `Purpose = "terms-of-service"` anywhere — ToS is a `TermsAcceptance`, not a consent. Enforce via string-literal check on handler files.
+- `GoogleIdTokenVerifier` is the only type that references the Google discovery endpoint URL (single-source-of-truth heuristic).
+- No type in the Users module persists a raw id_token or raw external-provider access/refresh token — no column named `id_token`, `access_token`, or `refresh_token` on external-login tables (heuristic via EF model inspection).
+- Slices under `Features/ExternalLogin/Google/` depend on `IGoogleIdTokenVerifier`, not on `GoogleIdTokenVerifier` directly (keeps tests substitutable).
+
+### 14.12 Integration tests
+
+Add under `tests/Modules/Users/Modulith.Modules.Users.IntegrationTests/Features/ExternalLogin/Google/`. Register a test-double `IGoogleIdTokenVerifier` in `UsersApiFixture` to avoid depending on real Google JWKS.
+
+- **Already-linked sub** → `Login` issues tokens immediately; no email sent (assert Mailpit is empty for this test). Response DTO matches the existing password-`Login` response shape.
+- **First-time login, unknown email** → uniform 202 response; Mailpit has a "welcome" email; `Confirm` provisions a user with `HasCompletedOnboarding = false`; tokens issued; `UserProvisionedFromExternalV1` published; `UserRegisteredV1` **not** published.
+- **First-time login, known email (collision)** → uniform 202 response; Mailpit has a "link Google" email; `Confirm` links without creating a new user; tokens issued.
+- **Response uniformity** — explicit assertion that status code, headers, and body are byte-identical between the two non-linked cases.
+- **Case-insensitive email collision** — Google supplies `Alice@Example.Com`; an existing user with `alice@example.com` is detected as a collision and goes through the link-email flow rather than being provisioned as a new user.
+- **Coalescing** — two `Login` submissions with the same id_token within the window produce exactly one email and reuse the pending record. Captured `CreatedFromIp` and `UserAgent` remain the values from the first submission.
+- **Expired pending record** → `Confirm` rejects with the same error as an invalid token.
+- **Replay** — consuming a confirmation token twice fails the second time with the same error as a bad token.
+- **Concurrent `Confirm` race** — two simultaneous `Confirm` requests with the same token: one succeeds with tokens, the other fails with the already-consumed error. No duplicate `User` rows, no duplicate `ExternalLogin` rows, no double-issued refresh tokens.
+- **Link (authenticated)** — succeeds; attempting to link the same `(google, subject)` to a second user returns 409.
+- **Unlink guardrail** — external-only user cannot unlink Google (would leave them credential-less).
+- **Unlink revokes sessions** — user with a password plus a Google link; unlink Google → all their active refresh tokens are revoked (verified by attempting `RefreshToken` on a previously-valid token and receiving the reuse-detection response).
+- **`SetInitialPassword`** — external-only user can set; a user who already has a password cannot (400 directs to `ChangePassword`).
+- **Session cap applies** — logging in via Google beyond `MaxActiveRefreshTokensPerUser` revokes the oldest token (same enforcement as password login).
+- **`email_verified = false` id_token is rejected** by `Login` and `Link`.
+- **JWKS unreachable fails closed** — with `IGoogleIdTokenVerifier` configured against an unreachable JWKS endpoint and no cached keys, `Login` returns 503 (or the configured failure status) and issues no tokens; no `PendingExternalLogin` is written.
+- **`me` surface** — after Google-only signup, `GET /v1/users/me` returns `linkedProviders: ["google"]`, `hasPassword: false`, `hasCompletedOnboarding: false`; after `CompleteOnboarding` it returns `true`; after `SetInitialPassword` `hasPassword` is `true`.
+- **Onboarding records ToS acceptance** — `CompleteOnboarding` with `acceptTerms: true` inserts a `TermsAcceptance` row with the configured version and the request's IP + User-Agent; running it a second time with the same version does not duplicate the row.
+- **Onboarding requires ToS acceptance** — `CompleteOnboarding` with `acceptTerms: false` or omitted returns 400 and does not flip `HasCompletedOnboarding`.
+- **Marketing consent opt-in** — `CompleteOnboarding` with `acceptMarketingEmails: true` inserts a `Consents` row with purpose `marketing-emails` and captures IP + User-Agent; with `false` or omitted, no row is written.
+- **Marketing consent not auto-revoked by re-run** — a user who onboards with `acceptMarketingEmails: true` and later re-runs (if the flow allowed) with `false` does not lose their consent record; revocation is a separate explicit action (out of scope).
+- **Erasure sweeps pending records** — a pending record exists for email `alice@example.com` and a user with that email requests erasure; after erasure the pending record is gone.
+- **Audit entries** — `ExternalLoginLinkedV1` and `UserProvisionedFromExternalV1` each produce audit rows with the correct actor and provider.
+
+### 14.13 Unit tests
+
+- `User.CreateExternal` initializes `HasCompletedOnboarding = false`, `PasswordHash = null`, raises `UserProvisionedFromExternal` (not `UserRegistered`).
+- `User.CreateWithPassword` initializes `HasCompletedOnboarding = true`, raises `UserRegistered`.
+- `User.LinkExternalLogin` prevents linking the same `(provider, subject)` twice on the same user.
+- `User.UnlinkExternalLogin` returns failure when it would leave the user credential-less; succeeds when a password or another external login remains.
+- `User.SetInitialPassword` fails when a password already exists.
+- `User.CompleteOnboarding` is idempotent.
+- `TermsAcceptance.Record` stores the configured IP and UA, truncates UA at 512 chars.
+- `TermsAcceptance` uniqueness on `(UserId, Version)` is enforced at the entity level (factory refuses duplicate construction in the same aggregate load).
+- `PendingExternalLogin.Create` hashes the raw value, stores the captured `CreatedFromIp` and `UserAgent`, and truncates User-Agent at 512 chars.
+- `PendingExternalLogin.Consume` is single-use and respects `ExpiresAt`.
+- `GoogleIdTokenVerifier` rejects: bad signature, wrong issuer, wrong audience, expired, missing `email_verified`, `email_verified = false`, unresolvable `kid` with an unreachable JWKS endpoint.
+
+### 14.14 Documentation
+
+- New ADR: **`docs/adr/0031-third-party-authentication.md`** — client-driven flow choice, uniform email-loop rationale (enumeration resistance), provisioning deferred to confirm, onboarding gate with ToS-acceptance and optional marketing-consent side-effects (distinct artefacts), mail-amplification mitigations, boundary with ADR-0007 (still no ASP.NET Identity), pending-record-over-id_token storage (decoupling from Google token lifetime), provisioning-channel event split, unlink-revokes-sessions rule, aggressive sweep + erasure-by-email rationale, JWKS fail-closed requirement, pending-records-not-exported rationale, and a "lawful basis" subsection enumerating the Article 6 basis for each processing activity.
+- Update **`docs/adr/0028-auth-flows-baseline.md`** — append to the sensitive-event revocation table: "External login unlinked → revoke all refresh tokens." (Cross-referenced from Phase 14.5 `Unlink`.)
+- New how-to: **`docs/how-to/auth/add-external-provider.md`** — the provider-addition playbook, using Google as the worked example. Covers verifier interface with JWKS resilience requirements, options shape, migration touch points, notification templates, tests, and the fail-closed invariant.
+- Update **`src/Modules/Users/CLAUDE.md`** — external IdPs is no longer an extension point. Document the provider model, the pending-record lifecycle (including aggressive sweep), the credential-retention guardrail, unlink-revokes-sessions, the uniform-response invariant, and the `UserRegisteredV1` vs `UserProvisionedFromExternalV1` split.
+- Update **`docs/how-to/implement-auth-flows.md`** to reference the Google slices.
+- Update the "Extension points" list in ADR-0028 / module CLAUDE.md to strike "external identity providers (OIDC federation)".
+
+### 14.15 Configuration additions
+
+`Modulith.Api/appsettings.json` and dev overrides:
+
+```json
+"Modules": {
+  "Users": {
+    "GoogleAuth": {
+      "ClientId": "",
+      "AllowedAudiences": []
+    },
+    "PendingExternalLoginLifetime": "00:30:00",
+    "MaxPendingExternalLoginsPerEmail": 3,
+    "TermsOfServiceVersion": "2026-04-24",
+    "PrivacyPolicyVersion": "2026-04-24"
+  }
+}
+```
+
+In dev, `ClientId` comes from user-secrets (`dotnet user-secrets set "Modules:Users:GoogleAuth:ClientId" "..."`). `TermsOfServiceVersion` is the string recorded on the `TermsAcceptance` row when `CompleteOnboarding` runs; bump it whenever the terms change so the next onboarding produces a fresh acceptance record. `PrivacyPolicyVersion` is the string recorded in the `PolicyVersion` column of `consents` rows when marketing consent is granted, per ADR-0012. Document per-environment setup in `docs/how-to/auth/add-external-provider.md`.
+
+### 14.16 Verify
+
+- All tests green (unit, architectural, integration).
+- `dotnet run --project src/AppHost` — end-to-end walk-through:
+  1. Submit Google login for a new email → "welcome" email in Mailpit → click confirm link → user provisioned with `HasCompletedOnboarding = false` → tokens issued; `UserProvisionedFromExternalV1` appears in the Audit log; `UserRegisteredV1` does not.
+  2. `POST /v1/users/me/onboarding/complete` with `acceptTerms: true, acceptMarketingEmails: true` flips the flag, inserts a `TermsAcceptance` row with the configured version + request IP/UA, and grants a `marketing-emails` consent row with the configured policy version + IP/UA; `GET /v1/users/me` reflects the flag.
+  3. Existing password-registered user submits Google login → "link Google" email in Mailpit → confirm → next Google login with the same account issues tokens immediately (no email).
+  4. External-only user (added a password via `SetInitialPassword`) unlinks Google → all their active refresh tokens are revoked; password login still works.
+  5. External-only user without a password attempts to unlink Google → blocked by credential-retention guardrail.
+  6. Request erasure for a user while a pending record for their email exists → after erasure, the pending record is gone.
+- Manual check: raw HTTP response to the two non-linked `Login` cases is byte-identical (same status, same headers sans request-specific ones, same body).
+- Manual check: with the `GoogleAuthOptions` pointed at a deliberately-broken JWKS URL and no cached keys, `Login` returns 503; no `PendingExternalLogin` row is written.
+- Scalar at `/scalar/v1` — all new endpoints listed; `/v1/auth/external/google/*` are public; `/v1/users/me/*` require Bearer.
+- No raw id_tokens, pending-record plaintext tokens, or refresh-token plaintexts appear in logs.
+
+**Commit.** Message: "feat(users): third-party authentication via Google with uniform email-loop".
+
+---
+
+## What this phase does NOT include
+
+Deliberately out of scope for Phase 14:
+
+- Additional providers (Apple, Microsoft, GitHub). Phase-level follow-ups; the Google slices are the template.
+- Backend-driven OAuth redirect flow (`/challenge` + `/callback`). Client-driven was chosen for SPA/mobile ergonomics; see ADR-0031.
+- Offline access tokens / refresh tokens from Google. We verify id_tokens only; we do not exchange authorization codes for long-lived Google credentials, and we do not make Google API calls on behalf of the user.
+- Two-factor step-up when linking a provider. Could be layered on top later.
+- Automatic merging of duplicate accounts that share an email (e.g. a password user and a Google user who later turns out to be the same person).
+- A standalone `ChangeDisplayName` or `UpdateProfile` slice. Display name is seeded from Google at provision time; user-facing editing is a separate feature.
+
+---
+
 ## What "done" looks like
 
 At the end of this roadmap:
