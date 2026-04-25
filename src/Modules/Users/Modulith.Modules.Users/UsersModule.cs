@@ -56,6 +56,11 @@ public static class UsersModule
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<GoogleAuthOptions>()
+            .Bind(configuration.GetSection("Modules:Users:Google"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
         services.AddPermissions(UsersPermissions.All);
         services.AddScoped<ICurrentUser, CurrentUser>();
