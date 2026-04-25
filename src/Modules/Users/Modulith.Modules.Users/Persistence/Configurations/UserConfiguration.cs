@@ -30,6 +30,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(u => u.HasCompletedOnboarding)
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(u => u.Role)
             .HasConversion(r => r.Name, v => new Role(v))
             .HasMaxLength(32)
@@ -43,6 +47,15 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property<uint>("xmin")
             .HasColumnType("xid")
             .IsRowVersion();
+
+        // ExternalLogins is backed by a private field; UsePropertyAccessMode(Field) lets EF
+        // populate it via _externalLogins.Add() without a public setter.
+        builder.HasMany(u => u.ExternalLogins)
+            .WithOne()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(u => u.ExternalLogins)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Property(u => u.CreatedAt).IsRequired();
         builder.Property(u => u.CreatedBy).HasMaxLength(100);

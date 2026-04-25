@@ -71,7 +71,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void ChangeRole_ToNewRole_Succeeds()
     {
-        var user = User.Create(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
         var changerId = user.Id;
 
         var result = user.ChangeRole(Role.Admin, changerId);
@@ -83,7 +83,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void ChangeRole_ToNewRole_RaisesUserRoleChangedEvent()
     {
-        var user = User.Create(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
         user.ClearDomainEvents();
         var changerId = user.Id;
 
@@ -98,7 +98,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void ChangeRole_ToSameRole_ReturnsConflict()
     {
-        var user = User.Create(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
         var changerId = user.Id;
 
         var result = user.ChangeRole(Role.User, changerId);
@@ -110,7 +110,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void Create_DefaultRole_IsUser()
     {
-        var user = User.Create(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
 
         Assert.Equal(Role.User, user.Role);
     }
@@ -118,7 +118,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void Create_WithAdminRole_HasAdminRole()
     {
-        var user = User.Create(ValidEmail, ValidHash, "Alice", Role.Admin).Value;
+        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice", Role.Admin).Value;
 
         Assert.Equal(Role.Admin, user.Role);
     }

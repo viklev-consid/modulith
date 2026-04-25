@@ -17,6 +17,8 @@ internal sealed class ConsentConfiguration : IEntityTypeConfiguration<Consent>
         builder.Property(c => c.ConsentKey).HasMaxLength(100).IsRequired();
         builder.Property(c => c.Granted).IsRequired();
         builder.Property(c => c.RecordedAt).IsRequired();
+        builder.Property(c => c.GrantedFromIp).HasMaxLength(45);
+        builder.Property(c => c.GrantedUserAgent).HasMaxLength(512);
 
         builder.HasIndex(c => new { c.UserId, c.ConsentKey });
     }
