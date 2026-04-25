@@ -40,6 +40,9 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Jwt:Audience", TestJwtAudience);
         builder.UseSetting("Jwt:SigningKey", TestJwtKey);
 
+        // Satisfies GoogleAuthOptions [Required] validation so all tests can start.
+        builder.UseSetting("Modules:Users:Google:ClientId", "test-google-client-id");
+
         builder.ConfigureServices(services => ConfigureTestServices(services));
     }
 

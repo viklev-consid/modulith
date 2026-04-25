@@ -43,8 +43,20 @@ public sealed class CompleteOnboardingHandler(
 
         var now = clock.UtcNow;
 
-        db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, $"tos:{cmd.TermsVersion}", now, cmd.IpAddress, cmd.UserAgent));
-        db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, $"pp:{cmd.PrivacyPolicyVersion}", now, cmd.IpAddress, cmd.UserAgent));
+        var existingVersions = await db.TermsAcceptances
+            .Where(t => t.UserId == user.Id)
+            .Select(t => t.Version)
+            .ToHashSetAsync(ct);
+
+        if (!existingVersions.Contains($"tos:{cmd.TermsVersion}"))
+        {
+            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, $"tos:{cmd.TermsVersion}", now, cmd.IpAddress, cmd.UserAgent));
+        }
+
+        if (!existingVersions.Contains($"pp:{cmd.PrivacyPolicyVersion}"))
+        {
+            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, $"pp:{cmd.PrivacyPolicyVersion}", now, cmd.IpAddress, cmd.UserAgent));
+        }
 
         var onboardingResult = user.CompleteOnboarding();
         if (onboardingResult.IsError)
