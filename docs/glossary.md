@@ -34,7 +34,9 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Contract.** A type in a module's `.Contracts` project — a public command, query, event, or DTO that other modules may depend on. Contracts are the module's API surface. Changing a contract is a breaking change.
 
-**Consent.** A record of a user granting or revoking permission for a specific purpose (marketing emails, data processing). Stored in the Users module. Separate from notification preferences, though wired together.
+**Consent.** A record of a user granting or revoking permission for a specific purpose (marketing emails, data processing). Stored in the Users module. Separate from notification preferences, though wired together. Distinct from *Terms Acceptance* — consent gates optional behaviour (e.g. marketing), whereas terms acceptance records legal agreement to a document version.
+
+**Credential Retention Guardrail.** A domain invariant enforced by `User.UnlinkExternalLogin`: a user must always retain at least one login credential (a password or another external login). Unlinking the last credential returns a `Conflict` error, preventing account lock-out.
 
 **Cross-cutting Concern.** A concern that affects multiple modules — logging, caching, authentication, rate limiting. Lives in `Shared.Infrastructure`, `Api`, or as a dedicated module if it has its own data.
 
@@ -44,11 +46,15 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **DTO.** Data Transfer Object. A type whose purpose is to carry data across a boundary — HTTP (Request/Response), cross-module (Contracts). Has no behavior.
 
+**Email Loop.** The flow triggered when a Google ID token cannot be fast-pathed (i.e. the `(provider, subject)` pair is not yet linked to a user). The server creates a `PendingExternalLogin`, sends an email containing the raw confirmation token, and returns 202. The client has no way to distinguish "email unknown" from "email known but not linked" — both return identical 202 responses, preventing account enumeration. The loop completes when the user clicks the link and calls the confirm endpoint.
+
 **Endpoint.** An HTTP route handler. In this codebase, a minimal API delegate that maps a `Request` to a `Command`, dispatches via `IMessageBus`, and maps `ErrorOr<T>` to an HTTP response. Lives in the slice folder.
 
 **Enricher.** A Serilog component that adds properties to every log event (machine name, environment, span ID). Configured in `Program.cs`.
 
 **ErrorOr.** The result-type library used to implement the Result Pattern in this codebase. Handlers and many domain factory methods return `ErrorOr<T>` for expected failures, and shared HTTP extensions map those failures to `ProblemDetails` responses.
+
+**External Login.** An entity linking an OAuth provider identity `(Provider, Subject)` to a local `User`. Stored as a child collection on the `User` aggregate. The `(Provider, Subject)` pair is globally unique — one Google account can only be linked to one local user. Distinct from a password credential; a user may hold both simultaneously.
 
 **Eventually Consistent.** A state where changes become visible across module boundaries asynchronously rather than in the publisher's transaction. Integration events, cache invalidation, audit trails, and GDPR erasure workflows are eventually consistent by design.
 
@@ -59,6 +65,8 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 **Global Exception Handler.** An implementation of `IExceptionHandler` that catches unhandled exceptions at the pipeline boundary and converts them to `ProblemDetails` responses. For expected failures, return an `ErrorOr` failure instead.
 
 **GDPR Primitives.** The set of types and contracts baked into the template to support GDPR compliance: classification attributes, exporter/eraser contracts, consent tracking, retention hooks.
+
+**JWKS (JSON Web Key Set).** A JSON document published by an identity provider (e.g. `https://www.googleapis.com/oauth2/v3/certs`) that contains the public signing keys used to verify ID tokens. Fetched by `GoogleIdTokenVerifier` and cached in `IMemoryCache`. Verification is fail-closed: if the JWKS endpoint is unreachable, the verifier returns `ExternalAuthUnavailable` rather than treating the token as valid.
 
 **Handler.** A public class that processes a command, query, or event. Discovered by Wolverine, invoked via `IMessageBus`. Feature handlers orchestrate — they load aggregates, invoke domain methods, commit via the UoW, and return `ErrorOr<T>`. Integration-event subscribers usually return `Task` and apply side effects within their own module.
 
@@ -91,6 +99,8 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 **Observability.** Logs, metrics, and traces that let you understand what the system is doing. Powered by OpenTelemetry, surfaced in the Aspire dashboard locally.
 
 **Outbox.** A pattern where messages to publish are written to the database in the same transaction as the state change, then a background process publishes them. Guarantees at-least-once delivery with transactional consistency. Provided by Wolverine.
+
+**Pending External Login.** A transient, pre-account record created during the *Email Loop*. Not linked to a `User` (the user may not exist yet). Holds the `(Provider, Subject, Email)` tuple, a SHA-256 hash of the raw confirmation token, and an `IsExistingUser` flag that was captured at creation time for deterministic email template selection. Single-use via `Consume(IClock)`; considered invalid once consumed or expired. Swept from the database after expiry by `SweepExpiredTokensHandler`.
 
 **Personal Data.** User data subject to GDPR. Usually marked with `[PersonalData]` or `[SensitivePersonalData]`; modules that reference a user without storing personal data can opt out with `[NoPersonalData]`. Classification affects logging (masked), export (included in personal data export), and erasure.
 
@@ -133,6 +143,8 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 **Testcontainers.** A library for spinning up ephemeral Docker containers during tests. Used for real Postgres (and Redis, if needed) in integration tests. No in-memory EF, no SQLite stand-in.
 
 **TestSupport.** A test project containing shared fixtures and helpers such as `ApiTestFixture`, `AuthenticatedClientBuilder`, object mothers, Verify settings, test clocks, and HTTP stubs. Referenced by all module test projects.
+
+**Terms Acceptance.** An immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`, `"pp:1.0"`). Created by the `CompleteOnboarding` slice. Keyed by `(UserId, Version)` with a unique constraint — calling `CompleteOnboarding` a second time with the same versions is a no-op. Distinct from *Consent*, which gates optional processing; terms acceptance is required for account activation.
 
 **Transport.** The layer that physically delivers a notification: `IEmailSender`, `ISmsSender`. Lives in `Shared.Infrastructure`. Distinct from orchestration (templates, preferences), which is the Notifications module's job.
 
