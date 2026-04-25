@@ -59,6 +59,11 @@ public static class NotificationsModule
         opts.Discovery.IncludeType<OnPasswordChangedHandler>();
         opts.Discovery.IncludeType<OnEmailChangeRequestedHandler>();
         opts.Discovery.IncludeType<OnEmailChangedHandler>();
+
+        // External login notifications — Phase 14
+        opts.Discovery.IncludeType<OnExternalLoginPendingHandler>();
+        opts.Discovery.IncludeType<OnExternalLoginLinkedHandler>();
+        opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
         return opts;
     }
 

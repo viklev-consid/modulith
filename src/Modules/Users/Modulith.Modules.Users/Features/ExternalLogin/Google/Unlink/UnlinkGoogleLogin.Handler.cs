@@ -32,7 +32,7 @@ public sealed class UnlinkGoogleLoginHandler(UsersDbContext db, IMessageBus bus)
 
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new ExternalLoginUnlinkedV1(user.Id.Value, "Google", Guid.NewGuid()));
+        await bus.PublishAsync(new ExternalLoginUnlinkedV1(user.Id.Value, user.Email.Value, "Google", Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginUnlinkedV1)));
 
         return Result.Success;

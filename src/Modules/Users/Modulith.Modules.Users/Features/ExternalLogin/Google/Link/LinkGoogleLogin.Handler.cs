@@ -55,7 +55,7 @@ public sealed class LinkGoogleLoginHandler(
 
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, "Google", identity.Subject, now, Guid.NewGuid()));
+        await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, user.Email.Value, "Google", identity.Subject, now, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginLinkedV1)));
 
         return Result.Success;

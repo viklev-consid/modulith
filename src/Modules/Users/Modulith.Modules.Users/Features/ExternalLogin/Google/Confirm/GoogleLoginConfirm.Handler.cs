@@ -83,7 +83,7 @@ public sealed class GoogleLoginConfirmHandler(
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, pending.Provider.ToString(), pending.Subject, now, Guid.NewGuid()));
+        await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, user.Email.Value, pending.Provider.ToString(), pending.Subject, now, Guid.NewGuid()));
         await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
         UsersTelemetry.EventsPublished.Add(2, new KeyValuePair<string, object?>("event", "ExternalLoginLinkedV1+UserLoggedInV1"));
 
