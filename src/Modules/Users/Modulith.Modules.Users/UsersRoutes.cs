@@ -21,4 +21,12 @@ internal static class UsersRoutes
     public const string RefreshToken = $"{Prefix}/token/refresh";
     public const string Logout = $"{Prefix}/logout";
     public const string LogoutAll = $"{Prefix}/logout/all";
+
+    // External login — Phase 14
+    public const string GoogleLogin = $"{Prefix}/auth/google/login";
+    public const string GoogleLoginConfirm = $"{Prefix}/auth/google/confirm";
+    public const string LinkGoogleLogin = $"{Me}/auth/google/link";
+    public const string UnlinkGoogleLogin = $"{Me}/auth/google/unlink";
+    public const string SetInitialPassword = $"{Me}/password/initial";
+    public const string CompleteOnboarding = $"{Me}/onboarding";
 }

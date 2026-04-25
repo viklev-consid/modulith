@@ -7,4 +7,7 @@ public sealed record GetCurrentUserResponse(
     DateTimeOffset CreatedAt,
     string Role,
     IReadOnlyCollection<string> Permissions,
-    string PermissionsVersion);
+    string PermissionsVersion,
+    bool HasPassword,
+    bool HasCompletedOnboarding,
+    IReadOnlyCollection<string> LinkedProviders);
