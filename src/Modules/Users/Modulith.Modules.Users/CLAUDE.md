@@ -16,6 +16,10 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - **RefreshToken** — entity for session management. Stored hashed, rotated on each use.
 - **PendingEmailChange** — holds the requested-but-unconfirmed new email alongside a `SingleUseToken` hash until confirmation completes.
 - **Consent** — entity tracking user agreement to processing purposes (GDPR).
+- **ExternalLogin** — entity linking a `(Provider, Subject)` pair to a `User`. Owned by the `User` aggregate via `_externalLogins`. Unique constraint on `(provider, subject)` across all users.
+- **ExternalLoginProvider** — enum (`Google`).
+- **PendingExternalLogin** — pre-account record created during the email-loop for unlinked Google accounts. Identified by a random 256-bit token, stored as SHA-256 hash. Not linked to a `User` (may precede account creation). Single-use via `Consume(IClock)`; expires after `PendingExternalLoginLifetime`.
+- **TermsAcceptance** — immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`, `"pp:1.0"`). Keyed by `(UserId, Version)`, unique constraint.
 
 ---
 
@@ -32,6 +36,17 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - Consent tracking
 - User data export (GDPR)
 - User erasure (GDPR)
+
+**Third-party authentication — Google (shipped — Phase 14):**
+
+- Uniform email-loop: `POST /v1/users/auth/google/login` verifies the Google ID token via `IGoogleIdTokenVerifier`. If `(Google, subject)` is already linked → fast path, tokens issued immediately (200). Otherwise → create `PendingExternalLogin`, publish `ExternalLoginPendingV1`, return 202. This applies to both new and existing email addresses — the caller cannot distinguish the two cases.
+- `POST /v1/users/auth/google/confirm` consumes the raw token from the email, provisions or links the account, issues tokens.
+- `POST /v1/users/me/auth/google/link` — links Google to an existing authenticated user.
+- `DELETE /v1/users/me/auth/google/unlink` — unlinks Google; enforces credential-retention guardrail.
+- `POST /v1/users/me/password/initial` — sets the first password for external-only users.
+- `POST /v1/users/me/onboarding` — accepts ToS + Privacy Policy versions, marks `HasCompletedOnboarding = true`.
+- `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` — verifies Google ID tokens via JWKS (cached in `IMemoryCache`). Fail-closed: returns `ExternalAuthUnavailable` if JWKS cannot be fetched.
+- `GoogleAuthOptions` — bound from `Modules:Users:Google:`. `ClientId` is `[Required]`.
 
 **RBAC (shipped — Phase 13):**
 
@@ -54,7 +69,13 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 1. Email addresses are unique across the `users` schema. Stored lowercased.
 2. Passwords are BCrypt-hashed before the aggregate ever sees them. Plaintext passwords never enter the domain.
 3. `PasswordHash.ToString()` returns `[REDACTED]` — the raw hash is never rendered in logs or debugger output.
-4. `User.Create(...)` raises `UserRegistered` domain event. A publisher handler maps it to `UserRegisteredV1` integration event, which goes out via the Wolverine outbox after the DB write.
+4. `User.CreateWithPassword(...)` raises `UserRegistered` domain event; `User.CreateExternal(...)` raises `UserProvisionedFromExternal`. Publisher handlers map these to integration events via the Wolverine outbox.
+13. External-only users (`CreateExternal`) have `PasswordHash = null` and `HasCompletedOnboarding = false`. Both are filled in via dedicated slices.
+14. `ExternalLogin` is unique per `(Provider, Subject)` globally — one Google account can only be linked to one user.
+15. Credential-retention guardrail: `UnlinkExternalLogin` fails if the user has no other credential (password or other external login).
+16. Uniform email-loop: `GoogleLogin` never reveals whether an email is registered. Both new and existing emails get 202.
+17. `PendingExternalLogin` tokens are stored as SHA-256 hashes. Raw value exists only in the email body. `IsValid` returns false if expired OR already consumed.
+18. `TermsAcceptance` inserts are idempotent in the handler — re-submitting `CompleteOnboarding` with the same versions is a no-op on the DB level.
 5. `SingleUseToken` values are stored as SHA-256 hashes. Raw tokens exist only in HTTP responses (to Notifications) and in email bodies. Never logged, never persisted in plaintext.
 6. `RefreshToken` values are stored as SHA-256 hashes with the same discipline.
 7. Password comparison uses constant-time equality (BCrypt's default).
@@ -97,6 +118,12 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 | ChangeUserRole | `PUT /v1/users/{userId}/role` | `users.roles.write` | `write` |
 | ListUsers | `GET /v1/users` | `users.users.read` | `read` |
 | GetUserById | `GET /v1/users/{userId}` | `users.users.read` | `read` |
+| GoogleLogin | `POST /v1/users/auth/google/login` | public | `auth` |
+| GoogleLoginConfirm | `POST /v1/users/auth/google/confirm` | public | `auth` |
+| LinkGoogleLogin | `POST /v1/users/me/auth/google/link` | authenticated | `write` |
+| UnlinkGoogleLogin | `DELETE /v1/users/me/auth/google/unlink` | authenticated | `write` |
+| SetInitialPassword | `POST /v1/users/me/password/initial` | authenticated | `auth` |
+| CompleteOnboarding | `POST /v1/users/me/onboarding` | authenticated | `write` |
 
 ---
 
@@ -106,12 +133,15 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `IJwtGenerator` / `JwtGenerator` — issues access tokens. Depends on shared `JwtOptions` from `Shared.Infrastructure.Auth`. Same options drive token validation in the API pipeline, so tokens issued here are accepted there by construction.
 - `IRefreshTokenIssuer` — issues and rotates `RefreshToken` entities. Handles device fingerprinting (UA + IP, opaque) for session context.
 - `ISingleUseTokenService` — creates and verifies `SingleUseToken` instances for password reset and email change.
+- `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` — verifies Google ID tokens against Google's JWKS endpoint. JWKS is cached in `IMemoryCache` (`GoogleAuthOptions.JwksCacheDuration`, default 60 min). Returns `ExternalAuthUnavailable` if JWKS fetch fails (fail-closed). **Must be `public` interface** — Wolverine handler discovery requires all injected types to be public.
 
 ---
 
 ## Configuration
 
 JWT concerns → shared `JwtOptions` (in `Shared.Infrastructure.Auth`), bound from `Jwt:` config section.
+
+Google options → `GoogleAuthOptions`, bound from `Modules:Users:Google:`. `ClientId` is `[Required]` — must be set in all environments including tests (tests use `"test-google-client-id"` via `ApiTestFixture`).
 
 Users-specific options → `UsersOptions`, bound from `Modules:Users:`:
 
@@ -132,6 +162,14 @@ public sealed class UsersOptions
 
     [Range(8, 128)]
     public int MinPasswordLength { get; init; } = 10;
+
+    public TimeSpan PendingExternalLoginLifetime { get; init; } = TimeSpan.FromMinutes(15);
+    [Range(1, 20)]
+    public int MaxPendingExternalLoginsPerEmail { get; init; } = 5;
+    [Required]
+    public string TermsOfServiceVersion { get; init; } = "1.0";
+    [Required]
+    public string PrivacyPolicyVersion { get; init; } = "1.0";
 }
 ```
 
@@ -153,6 +191,11 @@ In `Modulith.Modules.Users.Contracts/Events/`:
 - `EmailChangedV1` — carries old + new email so Notifications alerts both
 - `UserDeactivatedV1`
 - `UserErasureRequestedV1` — triggers cross-module erasure per ADR-0012
+- `ExternalLoginPendingV1` — carries raw confirmation token for Notifications; signals whether recipient is a new or existing user
+- `ExternalLoginLinkedV1` — carries `Email` (for Notifications cross-module use), `Provider`, `Subject`, `LinkedAt`
+- `ExternalLoginUnlinkedV1` — carries `Email`, `Provider`
+- `UserProvisionedFromExternalV1` — raised when a new user is created via Google confirm
+- `UserOnboardingCompletedV1` — raised when `CompleteOnboarding` is accepted
 
 Handlers for these events live in consuming modules (Notifications, Audit, any others). Users does not know who subscribes.
 
@@ -175,6 +218,10 @@ Handlers for these events live in consuming modules (Notifications, Audit, any o
 - **Never use `DateTime.UtcNow`.** Use `IClock`. Tests need control over time, and security invariants (token expiry) need deterministic verification.
 - **Compare hashes with `CryptographicOperations.FixedTimeEquals`** when doing application-level equality checks on token hashes or password hashes. (DB-level lookups via B-tree seek are fine; the timing attack surface is application-code comparison.)
 - **`MaxActiveRefreshTokensPerUser` enforcement.** When at the limit, the oldest active token is revoked on login to make room. Unbounded session counts would grow the `refresh_tokens` table without limit.
+- **`IGoogleIdTokenVerifier` must be `public`.** Wolverine handler discovery requires all constructor-injected types to be public-visible. `GoogleIdentity` (the return type) must also be `public` for the same reason.
+- **Don't put PII in `PendingExternalLogin.Email`.** The email is needed to dispatch the notification but is not personal data in the same sense as a user profile — it's a transient pre-account record keyed by the Google identity, not the user's stored email. The sweep job removes it after expiry.
+- **`SweepExpiredTokensHandler` also sweeps `PendingExternalLogins`.** Expired AND consumed records are deleted in the same job. Don't add a separate cleanup.
+- **`ExternalLoginLinkedV1` and `ExternalLoginUnlinkedV1` carry `Email`.** This is required for Notifications to send alerts without crossing module boundaries. If you add more external-login events, add `Email` if Notifications needs it.
 
 ---
 
@@ -229,17 +276,14 @@ The following are deliberately not shipped. Each is documented here with the sha
 - HIBP implementation (optional): k-anonymity lookup against `api.pwnedpasswords.com`.
 - Invoked from `User.SetPassword` via injected policy service.
 
-### External identity providers (OIDC federation)
+### External identity providers — Google (shipped — Phase 14)
 
-**Not shipped because:** the lightweight local user aggregate is the template's opinionated choice. Federation is a replacement, not an addition.
+See "Third-party authentication — Google" under "What this module does" above. Additional providers (GitHub, Microsoft, Apple) can be added by:
 
-**Extension shape:**
-
-- Replace Register/Login slices with OIDC callback handling.
-- Add `ExternalLogin` entity: `(Provider, Subject, UserId)` unique constraint.
-- On first external login, create a local `User` aggregate with a random password (never used).
-- Keep the local `User` as the source of truth; federation is about proof-of-identity at login time.
-- Password-reset and change-password flows become unavailable for federated-only users (document this per-deployment).
+1. Adding a value to `ExternalLoginProvider` enum.
+2. Adding `IXxxIdTokenVerifier` (same shape as `IGoogleIdTokenVerifier`).
+3. Reusing `PendingExternalLogin` and `ExternalLogin` — they are provider-agnostic.
+4. Adding six new slices (Login, Confirm, Link, Unlink, SetInitialPassword already exists, CompleteOnboarding already exists).
 
 ### Multi-tenancy / organization membership
 
