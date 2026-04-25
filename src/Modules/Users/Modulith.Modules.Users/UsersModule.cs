@@ -75,6 +75,9 @@ public static class UsersModule
             opts.AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>());
         });
 
+        services.AddMemoryCache();
+        services.AddHttpClient<IGoogleIdTokenVerifier, GoogleIdTokenVerifier>();
+
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtGenerator, JwtGenerator>();
         services.AddScoped<IRefreshTokenIssuer, RefreshTokenIssuer>();

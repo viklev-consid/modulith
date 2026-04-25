@@ -72,6 +72,13 @@ internal static class UsersErrors
     public static readonly Error ConcurrencyConflict =
         Error.Conflict("Users.ConcurrencyConflict", "The user record was modified concurrently. Please retry.");
 
+    // External login — Google verification
+    public static readonly Error InvalidIdToken =
+        Error.Unauthorized("Users.ExternalLogin.InvalidIdToken", "The identity token is invalid or could not be verified.");
+
+    public static readonly Error ExternalAuthUnavailable =
+        Error.Failure("Users.ExternalLogin.Unavailable", "External authentication is temporarily unavailable. Please try again later.");
+
     // External login errors
     public static readonly Error ExternalLoginAlreadyLinked =
         Error.Conflict("Users.ExternalLogin.AlreadyLinked", "This external account is already linked to your account.");
