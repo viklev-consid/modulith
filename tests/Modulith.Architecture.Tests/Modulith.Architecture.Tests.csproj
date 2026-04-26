@@ -3,7 +3,8 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <!-- CA1707: xUnit uses MethodName_Scenario_Expected convention; underscores allowed in test names. -->
-    <NoWarn>$(NoWarn);CA1707;CA1716</NoWarn>
+    <!-- NU1902: known moderate vulnerability in OpenTelemetry.Api 1.15.0 — suppressed until upgrade is available -->
+    <NoWarn>$(NoWarn);CA1707;CA1716;NU1902</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

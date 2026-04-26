@@ -43,9 +43,10 @@ internal sealed class PendingExternalLoginConfiguration : IEntityTypeConfigurati
         // Lookup by hashed token on confirmation.
         builder.HasIndex(p => p.TokenHash).IsUnique();
 
-        // Coalescing: find an active pending record for (provider, subject).
+        // Race-safe: at most one unconsumed pending row per (provider, subject).
         builder.HasIndex(p => new { p.Provider, p.Subject })
-            .HasFilter("consumed_at IS NULL");
+            .HasFilter("consumed_at IS NULL")
+            .IsUnique();
 
         // Sweep job: delete expired records.
         builder.HasIndex(p => p.ExpiresAt);

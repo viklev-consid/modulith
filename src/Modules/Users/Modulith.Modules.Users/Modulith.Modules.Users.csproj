@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <!-- CA1707: underscores in test/migration method names; CA1716: namespace conflicts with keywords -->
-    <NoWarn>$(NoWarn);CA1707</NoWarn>
+    <!-- NU1902: known moderate vulnerability in OpenTelemetry.Api 1.15.0 — suppressed until upgrade is available -->
+    <NoWarn>$(NoWarn);CA1707;NU1902</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +22,10 @@
     <PackageReference Include="ErrorOr" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />

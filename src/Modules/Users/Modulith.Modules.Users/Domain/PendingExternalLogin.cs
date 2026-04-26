@@ -93,6 +93,22 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
         return (pending, rawValue);
     }
 
+    /// <summary>
+    /// Rotates the token: generates a fresh raw value, overwrites the stored hash, and resets the
+    /// expiry. The caller receives the new raw value to embed in the re-sent confirmation email.
+    /// The previous raw token becomes invalid immediately.
+    /// </summary>
+    public string Refresh(TimeSpan lifetime, IClock clock)
+    {
+        var rawBytes = RandomNumberGenerator.GetBytes(32);
+        var rawValue = Convert.ToBase64String(rawBytes)
+            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+
+        TokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(rawValue));
+        ExpiresAt = clock.UtcNow.Add(lifetime);
+        return rawValue;
+    }
+
     public ErrorOr<Success> Consume(IClock clock)
     {
         if (!IsValid(clock))

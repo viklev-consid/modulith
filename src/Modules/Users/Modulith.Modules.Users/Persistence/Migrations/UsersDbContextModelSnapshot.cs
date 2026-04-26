@@ -207,6 +207,7 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasDatabaseName("ix_pending_external_logins_token_hash");
 
                     b.HasIndex("Provider", "Subject")
+                        .IsUnique()
                         .HasDatabaseName("ix_pending_external_logins_provider_subject")
                         .HasFilter("consumed_at IS NULL");
 

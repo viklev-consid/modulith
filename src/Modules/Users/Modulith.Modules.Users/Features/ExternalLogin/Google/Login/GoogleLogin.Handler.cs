@@ -7,6 +7,7 @@ using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
+using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
@@ -67,7 +68,7 @@ public sealed class GoogleLoginHandler(
                 RefreshTokenExpiresAt: refreshToken.ExpiresAt);
         }
 
-        // Uniform email-loop: all other cases create a pending record and return 202.
+        // Uniform email-loop: all other cases go through the pending record flow.
         var emailResult = Email.Create(identity.Email);
         if (emailResult.IsError)
         {
@@ -75,34 +76,73 @@ public sealed class GoogleLoginHandler(
             return UsersErrors.ExternalAuthUnavailable;
         }
 
-        var isExistingUser = await db.Users.AnyAsync(u => u.Email == emailResult.Value, ct);
+        var now = clock.UtcNow;
 
-        var activePendingCount = await db.PendingExternalLogins
-            .CountAsync(p => p.Provider == ExternalLoginProvider.Google
-                && p.Subject == identity.Subject
-                && p.ConsumedAt == null
-                && p.ExpiresAt > clock.UtcNow, ct);
+        // Step 1: Reuse an existing active pending record for (provider, subject).
+        // Refreshing rotates the token, invalidating the previous link, and re-sends a new one.
+        var activePending = await db.PendingExternalLogins
+            .FirstOrDefaultAsync(p =>
+                p.Provider == ExternalLoginProvider.Google &&
+                p.Subject == identity.Subject &&
+                p.ConsumedAt == null &&
+                p.ExpiresAt > now, ct);
 
-        if (activePendingCount < opts.MaxPendingExternalLoginsPerEmail)
+        if (activePending is not null)
         {
-            var (pending, rawToken) = PendingExternalLogin.Create(
-                ExternalLoginProvider.Google,
-                identity.Subject,
-                identity.Email,
-                identity.Name,
-                isExistingUser,
-                cmd.IpAddress,
-                cmd.UserAgent,
-                opts.PendingExternalLoginLifetime,
-                clock);
-
-            db.PendingExternalLogins.Add(pending);
+            var refreshedRawToken = activePending.Refresh(opts.PendingExternalLoginLifetime, clock);
             await db.SaveChangesAsync(ct);
 
             await bus.PublishAsync(new ExternalLoginPendingV1(
-                "Google", identity.Email, identity.Name, isExistingUser, rawToken, Guid.NewGuid()));
+                "Google", identity.Email, identity.Name, activePending.IsExistingUser, refreshedRawToken, Guid.NewGuid()));
             UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginPendingV1)));
+
+            return new GoogleLoginResponse(IsPending: true);
         }
+
+        // Step 2: Enforce per-email cap across all subjects to prevent subject-cycling abuse.
+        var activeByEmail = await db.PendingExternalLogins
+            .CountAsync(p =>
+                p.Email == identity.Email &&
+                p.ConsumedAt == null &&
+                p.ExpiresAt > now, ct);
+
+        if (activeByEmail >= opts.MaxPendingExternalLoginsPerEmail)
+        {
+            // Silent throttle — return 202 without creating a record or sending an email.
+            return new GoogleLoginResponse(IsPending: true);
+        }
+
+        // Step 3: Create a new pending record. The unique partial index on (provider, subject)
+        // WHERE consumed_at IS NULL is the race-safe backstop for concurrent creates.
+        var isExistingUser = await db.Users.AnyAsync(u => u.Email == emailResult.Value, ct);
+
+        var (pending, rawToken) = PendingExternalLogin.Create(
+            ExternalLoginProvider.Google,
+            identity.Subject,
+            identity.Email,
+            identity.Name,
+            isExistingUser,
+            cmd.IpAddress,
+            cmd.UserAgent,
+            opts.PendingExternalLoginLifetime,
+            clock);
+
+        db.PendingExternalLogins.Add(pending);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // Race: a concurrent request won the insert for (provider, subject).
+            // Treat as success — that request will publish the event and send the email.
+            return new GoogleLoginResponse(IsPending: true);
+        }
+
+        await bus.PublishAsync(new ExternalLoginPendingV1(
+            "Google", identity.Email, identity.Name, isExistingUser, rawToken, Guid.NewGuid()));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginPendingV1)));
 
         return new GoogleLoginResponse(IsPending: true);
     }
