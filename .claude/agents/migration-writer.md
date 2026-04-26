@@ -27,6 +27,19 @@ Creating migrations for a single module's `DbContext`, and only that. You do not
 5. Summarize: tables added, columns added/altered/dropped, indexes, constraints, anything destructive or unexpected.
 6. If anything looks destructive (drop column, drop table, change column type on non-empty table), flag it prominently and recommend a data-preserving approach.
 
+## Failure handling
+
+- If `dotnet build` fails or `dotnet ef` fails before generating migration files, you get at most one post-failure discriminating check and then you stop.
+- Prefer these discriminating checks, in order:
+	1. If `dotnet build` has not succeeded yet, use that build result as the decisive failure and hand back.
+	2. If `migrations add` failed after a successful build, run `dotnet ef migrations list --project <ModuleProject> --context <ContextName> --no-build`.
+	3. If the error already names a missing assembly, framework, or runtime, match it against known signatures and hand back; do not branch into general environment investigation.
+- Hand back to the main agent with the exact failing command, the decisive error lines, the most likely cause, and one concrete remediation to try.
+- If `dotnet ef` fails with `Could not load file or assembly 'System.Runtime, Version=10.0.0.0'` from `Microsoft.EntityFrameworkCore.Tools.ReflectionOperationExecutor`, and the repo targets `net10.0`, treat it as a known EF tooling/runtime mismatch.
+- In that case, tell the main agent to try adding a direct `Microsoft.EntityFrameworkCore.Design` package reference to the target module, pinned to the resolved EF Core version, then rerun `dotnet ef migrations list --project <ModuleProject> --context <ContextName> --no-build` before retrying `migrations add`.
+- Do not inspect local SDK inventories, NuGet package folders, git history, or machine environment details unless the main agent explicitly hands you a tooling-debug task instead of a migration-writing task.
+- Do not edit package-management or shared build files yourself for this class of failure; that remediation belongs to the main agent.
+
 ## Out of scope
 
 Running `dotnet ef database update` (user's call), modifying domain entities or EF configurations to change what the migration captures (hand back — that's a domain or configuration change), and anything outside the chosen module.
