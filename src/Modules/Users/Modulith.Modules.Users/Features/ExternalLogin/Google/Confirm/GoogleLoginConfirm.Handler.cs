@@ -27,8 +27,17 @@ public sealed class GoogleLoginConfirmHandler(
     private async Task<ErrorOr<GoogleLoginConfirmResponse>> HandleCoreAsync(GoogleLoginConfirmCommand cmd, CancellationToken ct)
     {
         var tokenHash = PendingExternalLogin.HashRawValue(cmd.Token);
+
+        // Lock the row inside the Wolverine-managed transaction so that two concurrent
+        // confirm requests for the same token block until the first one commits.
+        // The second reader then sees ConsumedAt populated and returns InvalidOrExpiredToken.
         var pending = await db.PendingExternalLogins
-            .FirstOrDefaultAsync(p => p.TokenHash == tokenHash, ct);
+            .FromSqlInterpolated($"""
+                SELECT * FROM users.pending_external_logins
+                WHERE token_hash = {tokenHash}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(ct);
 
         if (pending is null)
         {
@@ -81,7 +90,15 @@ public sealed class GoogleLoginConfirmHandler(
         }
 
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
-        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            return UsersErrors.ExternalLoginLinkedToOtherUser;
+        }
 
         await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, user.Email.Value, pending.Provider.ToString(), pending.Subject, now, Guid.NewGuid()));
         await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
@@ -134,9 +151,12 @@ public sealed class GoogleLoginConfirmHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg &&
+                                           string.Equals(pg.SqlState, "23505", StringComparison.Ordinal))
         {
-            return UsersErrors.EmailAlreadyRegistered;
+            return string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal)
+                ? UsersErrors.ExternalLoginLinkedToOtherUser
+                : UsersErrors.EmailAlreadyRegistered;
         }
 
         await bus.PublishAsync(new UserProvisionedFromExternalV1(

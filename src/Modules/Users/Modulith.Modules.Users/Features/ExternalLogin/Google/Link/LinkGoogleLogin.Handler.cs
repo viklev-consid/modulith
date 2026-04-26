@@ -6,6 +6,7 @@ using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
+using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ExternalLogin.Google.Link;
@@ -29,14 +30,6 @@ public sealed class LinkGoogleLoginHandler(
 
         var identity = identityResult.Value;
 
-        var alreadyLinked = await db.ExternalLogins
-            .AnyAsync(e => e.Provider == ExternalLoginProvider.Google && e.Subject == identity.Subject, ct);
-
-        if (alreadyLinked)
-        {
-            return UsersErrors.ExternalLoginLinkedToOtherUser;
-        }
-
         var user = await db.Users
             .Include(u => u.ExternalLogins)
             .FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
@@ -53,7 +46,14 @@ public sealed class LinkGoogleLoginHandler(
             return linkResult.Errors;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            return UsersErrors.ExternalLoginLinkedToOtherUser;
+        }
 
         await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, user.Email.Value, "Google", identity.Subject, now, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginLinkedV1)));
