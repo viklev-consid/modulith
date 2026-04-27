@@ -100,14 +100,14 @@ public sealed class GoogleLoginHandler(
         var normalizedEmail = emailResult.Value.Value;
         var now = clock.UtcNow;
 
-        // Step 1: Reuse an existing active pending record for (provider, subject).
-        // Refreshing rotates the token, invalidating the previous link, and re-sends a new one.
+        // Step 1: Reuse an existing unconsumed pending record for (provider, subject) — whether
+        // active or expired. Refreshing rotates the token and resets expiry, unblocking the
+        // partial unique index that would otherwise prevent a new insert for an expired row.
         var activePending = await db.PendingExternalLogins
             .FirstOrDefaultAsync(p =>
                 p.Provider == ExternalLoginProvider.Google &&
                 p.Subject == identity.Subject &&
-                p.ConsumedAt == null &&
-                p.ExpiresAt > now, ct);
+                p.ConsumedAt == null, ct);
 
         if (activePending is not null)
         {

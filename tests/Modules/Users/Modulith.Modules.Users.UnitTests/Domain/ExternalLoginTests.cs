@@ -66,6 +66,55 @@ public sealed class ExternalLoginTests
     }
 
     [Fact]
+    public void PendingExternalLogin_Refresh_RotatesTokenHash()
+    {
+        var clock = new FixedClock(DateTimeOffset.UtcNow);
+
+        var (pending, _) = PendingExternalLogin.Create(
+            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
+
+        var originalHash = pending.TokenHash.ToArray();
+        pending.Refresh(TimeSpan.FromMinutes(15), clock, "alice@example.com");
+
+        Assert.False(pending.TokenHash.SequenceEqual(originalHash));
+    }
+
+    [Fact]
+    public void PendingExternalLogin_Refresh_ResetsExpiryToFuture()
+    {
+        var clock = new FixedClock(DateTimeOffset.UtcNow);
+        var lifetime = TimeSpan.FromMinutes(15);
+
+        var (pending, _) = PendingExternalLogin.Create(
+            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            isExistingUser: false, createdFromIp: null, userAgent: null, lifetime, clock);
+
+        // Advance past expiry so the record is expired.
+        clock.Advance(TimeSpan.FromMinutes(16));
+        Assert.False(pending.IsValid(clock));
+
+        pending.Refresh(lifetime, clock, "alice@example.com");
+
+        Assert.Equal(clock.UtcNow.Add(lifetime), pending.ExpiresAt);
+        Assert.True(pending.IsValid(clock));
+    }
+
+    [Fact]
+    public void PendingExternalLogin_Refresh_NewRawValueHashMatchesStoredHash()
+    {
+        var clock = new FixedClock(DateTimeOffset.UtcNow);
+
+        var (pending, _) = PendingExternalLogin.Create(
+            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
+
+        var newRaw = pending.Refresh(TimeSpan.FromMinutes(15), clock, "alice@example.com");
+
+        Assert.True(pending.TokenHash.SequenceEqual(PendingExternalLogin.HashRawValue(newRaw)));
+    }
+
+    [Fact]
     public void PendingExternalLogin_IsValid_WhenFreshAndNotConsumed_ReturnsTrue()
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);

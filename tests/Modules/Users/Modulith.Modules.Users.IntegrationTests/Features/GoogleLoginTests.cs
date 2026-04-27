@@ -10,6 +10,7 @@ using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using Modulith.TestSupport;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -153,6 +154,63 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             .FirstOrDefaultAsync(p => p.Email == "longname@example.com");
         Assert.NotNull(pending);
         Assert.Equal(100, pending.DisplayName.Length);
+    }
+
+    [Fact]
+    public async Task GoogleLogin_WhenExpiredUnconsumedPendingExists_RefreshesAndReturns202()
+    {
+        // An expired-but-unconsumed pending row blocks any INSERT via the partial unique index
+        // (provider, subject) WHERE consumed_at IS NULL. The handler must refresh it rather than
+        // attempt a new insert, otherwise the catch block silently swallows the constraint violation
+        // and no email is sent.
+        const string subject = "sub-expired-pending";
+        const string email = "expired-pending@example.com";
+
+        fixture.GoogleVerifier.SetIdentity(subject, email, "Expired User");
+
+        // Seed an already-expired unconsumed pending login directly.
+        var pastClock = new TestClock();
+        pastClock.Set(DateTimeOffset.UtcNow.AddHours(-2));
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var (expiredPending, _) = PendingExternalLogin.Create(
+                ExternalLoginProvider.Google,
+                subject,
+                email,
+                "Expired User",
+                isExistingUser: false,
+                createdFromIp: null,
+                userAgent: null,
+                lifetime: TimeSpan.FromMinutes(15),
+                clock: pastClock);   // issued 2 h ago, expired 1 h 45 min ago
+            db.PendingExternalLogins.Add(expiredPending);
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+            new GoogleLoginRequest("any-id-token"));
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("pending_confirmation", body.GetProperty("status").GetString());
+
+        // The handler must have refreshed the row (not silently swallowed the constraint):
+        // exactly one unconsumed row exists and it has a future expiry.
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+            var pending = await db.PendingExternalLogins
+                .SingleOrDefaultAsync(p =>
+                    p.Provider == ExternalLoginProvider.Google &&
+                    p.Subject == subject &&
+                    p.ConsumedAt == null);
+            Assert.NotNull(pending);
+            Assert.True(pending.ExpiresAt > clock.UtcNow,
+                "Refreshed row must have a future expiry, not the original expired one.");
+        }
     }
 
     [Fact]
