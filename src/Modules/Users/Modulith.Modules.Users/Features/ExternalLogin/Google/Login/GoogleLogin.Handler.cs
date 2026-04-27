@@ -93,8 +93,11 @@ public sealed class GoogleLoginHandler(
             var refreshedRawToken = activePending.Refresh(opts.PendingExternalLoginLifetime, clock, identity.Email);
             await db.SaveChangesAsync(ct);
 
+            // Re-query live state — IsExistingUser on the pending record was snapshotted at creation
+            // and may have changed (e.g. the user registered with a password since then).
+            var isExistingUserNow = await db.Users.AnyAsync(u => u.Email == emailResult.Value, ct);
             await bus.PublishAsync(new ExternalLoginPendingV1(
-                "Google", normalizedEmail, identity.Name, activePending.IsExistingUser, refreshedRawToken, Guid.NewGuid()));
+                "Google", normalizedEmail, identity.Name, isExistingUserNow, refreshedRawToken, Guid.NewGuid()));
             UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginPendingV1)));
 
             return new GoogleLoginResponse(IsPending: true);

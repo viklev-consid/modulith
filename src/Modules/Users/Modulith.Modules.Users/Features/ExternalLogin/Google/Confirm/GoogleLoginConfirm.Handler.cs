@@ -50,48 +50,45 @@ public sealed class GoogleLoginConfirmHandler(
             return consumeResult.Errors;
         }
 
-        var opts = options.Value;
-        var now = clock.UtcNow;
-
-        if (pending.IsExistingUser)
-        {
-            return await ConfirmExistingUserAsync(pending, cmd, opts, now, ct);
-        }
-
-        return await ProvisionNewUserAsync(pending, cmd, opts, now, ct);
-    }
-
-    private async Task<ErrorOr<GoogleLoginConfirmResponse>> ConfirmExistingUserAsync(
-        PendingExternalLogin pending,
-        GoogleLoginConfirmCommand cmd,
-        UsersOptions opts,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
         var emailResult = Email.Create(pending.Email);
         if (emailResult.IsError)
         {
             return UsersErrors.ExternalAuthUnavailable;
         }
 
+        var email = emailResult.Value;
+        var opts = options.Value;
+        var now = clock.UtcNow;
+
+        // Re-query live state under lock — IsExistingUser was snapshotted at pending-creation time
+        // and may be stale (e.g. the user registered with a password between login and confirm).
         // Lock the user row so that two concurrent confirms for the same email+provider+subject
         // cannot both pass LinkExternalLogin's in-memory check and then race into SaveChanges.
-        // The second waiter sees the ExternalLogin already committed and fails at the aggregate level.
-        var emailStr = emailResult.Value.Value;
-        var user = await db.Users
+        var existingUser = await db.Users
             .FromSqlInterpolated($"""
                 SELECT * FROM users.users
-                WHERE email = {emailStr}
+                WHERE email = {email.Value}
                 FOR UPDATE
                 """)
             .Include(u => u.ExternalLogins)
             .FirstOrDefaultAsync(ct);
 
-        if (user is null)
+        if (existingUser is not null)
         {
-            return UsersErrors.UserNotFound;
+            return await LinkToExistingUserAsync(existingUser, pending, cmd, opts, now, ct);
         }
 
+        return await ProvisionNewUserAsync(email, pending, cmd, opts, now, ct);
+    }
+
+    private async Task<ErrorOr<GoogleLoginConfirmResponse>> LinkToExistingUserAsync(
+        User user,
+        PendingExternalLogin pending,
+        GoogleLoginConfirmCommand cmd,
+        UsersOptions opts,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
         var linkResult = user.LinkExternalLogin(pending.Provider, pending.Subject, now);
         if (linkResult.IsError)
         {
@@ -125,19 +122,14 @@ public sealed class GoogleLoginConfirmHandler(
     }
 
     private async Task<ErrorOr<GoogleLoginConfirmResponse>> ProvisionNewUserAsync(
+        Email email,
         PendingExternalLogin pending,
         GoogleLoginConfirmCommand cmd,
         UsersOptions opts,
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var emailResult = Email.Create(pending.Email);
-        if (emailResult.IsError)
-        {
-            return UsersErrors.ExternalAuthUnavailable;
-        }
-
-        var userResult = User.CreateExternal(emailResult.Value, pending.DisplayName, pending.Provider, pending.Subject, clock);
+        var userResult = User.CreateExternal(email, pending.DisplayName, pending.Provider, pending.Subject, clock);
         if (userResult.IsError)
         {
             return userResult.Errors;

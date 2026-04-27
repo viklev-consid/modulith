@@ -180,6 +180,39 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GoogleLoginConfirm_WhenUserRegisteredAfterLoginInitiated_LinksToExistingUser()
+    {
+        const string email = "latecreated@example.com";
+        const string subject = "sub-late-created";
+
+        // Pending created with isExistingUser=false — user didn't exist at login time.
+        var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
+
+        // User registers with a password *after* the pending record was created.
+        await _client.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest(email, "Password1!", "Alice"));
+
+        // Confirm should link Google to the now-existing account, not try to provision a new one.
+        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+            new GoogleLoginConfirmRequest(rawToken));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
+        Assert.NotNull(body);
+        Assert.False(body.IsNewUser);
+        Assert.NotEmpty(body.AccessToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var emailVal = Email.Create(email).Value;
+        var user = await db.Users
+            .Include(u => u.ExternalLogins)
+            .FirstAsync(u => u.Email == emailVal);
+        Assert.Single(user.ExternalLogins);
+        Assert.Equal(subject, user.ExternalLogins[0].Subject);
+    }
+
     private async Task<string> SeedPendingLoginAsync(
         string subject, string email, bool isExistingUser,
         TimeSpan? lifetime = null)
