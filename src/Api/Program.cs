@@ -25,6 +25,7 @@ using Modulith.Shared.Kernel.Interfaces;
 using Modulith.Api.Infrastructure.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
+using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -200,8 +201,15 @@ builder.Services
 // 12. Wolverine — messaging, outbox, background jobs
 builder.UseWolverine(opts =>
 {
+    opts.PersistMessagesWithPostgresql(
+        builder.Configuration.GetConnectionString("db")!,
+        "wolverine");
+
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
+
+    opts.Durability.OutboxStaleTime = TimeSpan.FromMinutes(5);
+    opts.Durability.InboxStaleTime = TimeSpan.FromMinutes(10);
 
     opts.Policies.AddMiddleware<FluentValidationMiddleware>(_ => true);
     opts.Policies.AddMiddleware<AuditMiddleware>(_ => true);

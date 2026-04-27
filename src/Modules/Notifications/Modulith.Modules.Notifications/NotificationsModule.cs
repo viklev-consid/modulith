@@ -12,6 +12,7 @@ using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 
 namespace Modulith.Modules.Notifications;
 
@@ -30,7 +31,7 @@ public static class NotificationsModule
 
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
-        services.AddDbContext<NotificationsDbContext>((sp, opts) =>
+        services.AddDbContextWithWolverineIntegration<NotificationsDbContext>((sp, opts) =>
         {
             opts.UseNpgsql(
                 configuration.GetConnectionString("db"),

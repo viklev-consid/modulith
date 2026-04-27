@@ -13,6 +13,7 @@
     <PackageReference Include="Microsoft.FeatureManagement.AspNetCore" />
     <PackageReference Include="Scalar.AspNetCore" />
     <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.Postgresql" />
   </ItemGroup>
 
   <ItemGroup>

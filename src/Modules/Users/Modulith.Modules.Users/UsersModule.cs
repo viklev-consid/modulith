@@ -42,6 +42,7 @@ using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 
 namespace Modulith.Modules.Users;
 
@@ -73,7 +74,7 @@ public static class UsersModule
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
-        services.AddDbContext<UsersDbContext>((sp, opts) =>
+        services.AddDbContextWithWolverineIntegration<UsersDbContext>((sp, opts) =>
         {
             opts.UseNpgsql(
                 configuration.GetConnectionString("db"),
