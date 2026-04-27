@@ -38,9 +38,15 @@ internal sealed class GoogleIdTokenVerifier(
 
         var sub = result.ClaimsIdentity.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         var email = result.ClaimsIdentity.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
+        var emailVerified = result.ClaimsIdentity.FindFirst("email_verified")?.Value;
         var name = result.ClaimsIdentity.FindFirst("name")?.Value;
 
         if (string.IsNullOrEmpty(sub) || string.IsNullOrEmpty(email))
+        {
+            return UsersErrors.InvalidIdToken;
+        }
+
+        if (!string.Equals(emailVerified, "true", StringComparison.OrdinalIgnoreCase))
         {
             return UsersErrors.InvalidIdToken;
         }
