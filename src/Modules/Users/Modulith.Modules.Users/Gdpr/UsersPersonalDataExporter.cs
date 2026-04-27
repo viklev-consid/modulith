@@ -22,12 +22,12 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
 
         var consents = await db.Consents
             .Where(c => c.UserId == user.UserId)
-            .Select(c => new { c.ConsentKey, c.Granted, c.RecordedAt })
+            .Select(c => new { c.ConsentKey, c.Granted, c.RecordedAt, c.GrantedFromIp, c.GrantedUserAgent })
             .ToListAsync(ct);
 
         var termsAcceptances = await db.TermsAcceptances
             .Where(t => t.UserId == userId)
-            .Select(t => new { t.Version, t.AcceptedAt })
+            .Select(t => new { t.Version, t.AcceptedAt, t.AcceptedFromIp, t.UserAgent })
             .ToListAsync(ct);
 
         var data = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -37,7 +37,9 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
             ["role"] = dbUser.Role.Name,
             ["hasPassword"] = dbUser.PasswordHash is not null,
             ["hasCompletedOnboarding"] = dbUser.HasCompletedOnboarding,
-            ["linkedProviders"] = dbUser.ExternalLogins.Select(e => e.Provider.ToString()).ToList(),
+            ["linkedLogins"] = dbUser.ExternalLogins
+                .Select(e => new { provider = e.Provider.ToString(), subject = e.Subject, linkedAt = e.LinkedAt })
+                .ToList(),
             ["createdAt"] = dbUser.CreatedAt,
             ["updatedAt"] = dbUser.UpdatedAt,
             ["consents"] = consents,
