@@ -1,7 +1,7 @@
 # 0031. Third-party authentication
 
 Date: 2026-04-24
-Status: Proposed
+Status: Accepted
 
 ## Context
 

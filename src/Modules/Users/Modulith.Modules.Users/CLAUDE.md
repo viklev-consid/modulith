@@ -46,7 +46,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `POST /v1/users/me/password/initial` — sets the first password for external-only users.
 - `POST /v1/users/me/onboarding` — requires `acceptTerms: true`; optional `acceptMarketingEmails: bool`. Records ToS acceptance, optionally grants `marketing-emails` consent, marks `HasCompletedOnboarding = true`.
 - `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` — verifies Google ID tokens via JWKS (cached in `IMemoryCache`). Fail-closed: returns `ExternalAuthUnavailable` if JWKS cannot be fetched.
-- `GoogleAuthOptions` — bound from `Modules:Users:Google:`. `ClientId` is `[Required]`.
+- `GoogleAuthOptions` — bound from `Modules:Users:Google:`. `ClientId` is `[Required]`. `JwksUri` defaults to `https://www.googleapis.com/oauth2/v3/certs`. `JwksCacheDuration` defaults to 60 minutes.
 
 **RBAC (shipped — Phase 13):**
 
@@ -58,7 +58,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `PUT /v1/users/{userId}/role` — requires `users.roles.write` (admin only)
 - `GET /v1/users` — requires `users.users.read` (admin only)
 - `GET /v1/users/{userId}` — requires `users.users.read` (admin only)
-- `GET /v1/users/me` — returns `role`, `permissions[]`, `permissionsVersion`
+- `GET /v1/users/me` — returns `userId` (Guid), `email`, `displayName`, `createdAt`, `role`, `permissions[]`, `permissionsVersion`, `hasPassword` (bool), `hasCompletedOnboarding` (bool), `linkedProviders` (sorted string[])
 - `AdminBootstrapper` hosted service for non-dev environments
 - See `docs/how-to/auth/use-rbac.md` and ADR-0030
 
@@ -141,7 +141,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 
 JWT concerns → shared `JwtOptions` (in `Shared.Infrastructure.Auth`), bound from `Jwt:` config section.
 
-Google options → `GoogleAuthOptions`, bound from `Modules:Users:Google:`. `ClientId` is `[Required]` — must be set in all environments including tests (tests use `"test-google-client-id"` via `ApiTestFixture`).
+Google options → `GoogleAuthOptions`, bound from `Modules:Users:Google:`. `ClientId` is `[Required]` — must be set in all environments including tests (tests use `"test-google-client-id"` via `ApiTestFixture`). `JwksUri` defaults to `https://www.googleapis.com/oauth2/v3/certs`. `JwksCacheDuration` defaults to 60 minutes.
 
 Users-specific options → `UsersOptions`, bound from `Modules:Users:`:
 
