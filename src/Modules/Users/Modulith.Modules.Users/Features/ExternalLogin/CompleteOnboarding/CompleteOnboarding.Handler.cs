@@ -6,6 +6,7 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
@@ -52,7 +53,17 @@ public sealed class CompleteOnboardingHandler(
             return onboardingResult.Errors;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            // A concurrent request already inserted the ToS row and completed onboarding.
+            // The unique constraint on (UserId, Version) fired, but the outcome is the same —
+            // treat this as a successful idempotent no-op rather than a 500.
+            return Result.Success;
+        }
 
         await bus.PublishAsync(new UserOnboardingCompletedV1(user.Id.Value, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserOnboardingCompletedV1)));
