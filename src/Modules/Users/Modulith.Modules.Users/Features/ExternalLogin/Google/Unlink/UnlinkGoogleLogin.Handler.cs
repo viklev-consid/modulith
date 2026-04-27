@@ -49,9 +49,9 @@ public sealed class UnlinkGoogleLoginHandler(UsersDbContext db, IRefreshTokenRev
         await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
 
         await db.SaveChangesAsync(ct);
+        await bus.PublishAsync(new ExternalLoginUnlinkedV1(user.Id.Value, user.Email.Value, "Google", Guid.NewGuid()));
         await tx.CommitAsync(ct);
 
-        await bus.PublishAsync(new ExternalLoginUnlinkedV1(user.Id.Value, user.Email.Value, "Google", Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginUnlinkedV1)));
 
         return Result.Success;

@@ -68,9 +68,9 @@ public sealed class GoogleLoginHandler(
 
                 var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
                 await db.SaveChangesAsync(ct);
+                await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
                 await tx.CommitAsync(ct);
 
-                await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
                 UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
 
                 var expiresAt = clock.UtcNow.AddMinutes(opts.AccessTokenLifetimeMinutes);

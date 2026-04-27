@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
@@ -123,6 +124,43 @@ public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsy
         var response = await _anon.DeleteAsync("/v1/users/me/auth/google/unlink");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UnlinkGoogleLogin_PublishesExternalLoginUnlinkedEvent()
+    {
+        // Verifies outbox atomicity: ExternalLoginUnlinkedV1 must be enqueued within the same
+        // transaction as the domain mutation. If the publish happened after commit the event
+        // would be lost on any failure between those two calls — leaving the user without an
+        // unlink alert and without an audit entry.
+        const string subject = "sub-unlink-event";
+        var (userId, accessToken) = await RegisterAndLoginAsync("unlinkpublish@example.com");
+        await SeedExternalLoginAsync(userId, subject);
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        await auth.DeleteAsync("/v1/users/me/auth/google/unlink");
+
+        // The Wolverine outbox delivers ExternalLoginUnlinkedV1 to OnExternalLoginUnlinkedHandler
+        // in the Audit module, which writes an AuditEntry. Poll until it appears.
+        using var scope = fixture.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var entry = await PollAsync(() =>
+            auditDb.AuditEntries.FirstOrDefaultAsync(e =>
+                e.EventType == "user.external_login.unlinked" && e.ActorId == userId));
+
+        Assert.NotNull(entry);
+    }
+
+    private static async Task<T?> PollAsync<T>(Func<Task<T?>> query, int attempts = 15, int delayMs = 200)
+        where T : class
+    {
+        for (var i = 0; i < attempts; i++)
+        {
+            var result = await query();
+            if (result is not null) { return result; }
+            await Task.Delay(delayMs);
+        }
+        return null;
     }
 
     private async Task<(Guid UserId, string AccessToken)> RegisterAndLoginAsync(string email)

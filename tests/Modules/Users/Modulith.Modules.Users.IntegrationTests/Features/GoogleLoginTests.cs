@@ -4,6 +4,7 @@ using System.Text.Json;
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
 using Modulith.Modules.Users.Features.Login;
@@ -263,5 +264,55 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         Assert.Equal(HttpStatusCode.Accepted, fastPathAfter.StatusCode);
         var body = await fastPathAfter.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("pending_confirmation", body.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task GoogleLogin_WhenLinked_PublishesUserLoggedInEvent()
+    {
+        // Verifies outbox atomicity: UserLoggedInV1 must be enqueued within the same transaction
+        // as the refresh-token insert. If publish happened after commit the event would be lost
+        // on any failure between those two calls — leaving a persisted refresh token with no
+        // matching login event.
+        const string email = "fastpath-event@example.com";
+        const string subject = "sub-fastpath-event";
+
+        await _client.PostAsJsonAsync("/v1/users/register", new RegisterRequest(email, "Password1!", "Alice"));
+
+        Guid userId;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+            var emailVal = Email.Create(email).Value;
+            var user = await db.Users.Include(u => u.ExternalLogins).FirstAsync(u => u.Email == emailVal);
+            userId = user.Id.Value;
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+            await db.SaveChangesAsync();
+        }
+
+        fixture.GoogleVerifier.SetIdentity(subject, email, "Alice");
+        await _client.PostAsJsonAsync("/v1/users/auth/google/login", new GoogleLoginRequest("any-id-token"));
+
+        // The Wolverine outbox delivers UserLoggedInV1 to OnUserLoggedInHandler in the Audit
+        // module, which writes an AuditEntry. Poll until it appears.
+        using var auditScope = fixture.Services.CreateScope();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var entry = await PollAsync(() =>
+            auditDb.AuditEntries.FirstOrDefaultAsync(e =>
+                e.EventType == "user.logged_in" && e.ActorId == userId));
+
+        Assert.NotNull(entry);
+    }
+
+    private static async Task<T?> PollAsync<T>(Func<Task<T?>> query, int attempts = 15, int delayMs = 200)
+        where T : class
+    {
+        for (var i = 0; i < attempts; i++)
+        {
+            var result = await query();
+            if (result is not null) { return result; }
+            await Task.Delay(delayMs);
+        }
+        return null;
     }
 }
