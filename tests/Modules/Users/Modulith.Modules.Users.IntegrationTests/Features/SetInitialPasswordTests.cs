@@ -3,7 +3,9 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
+using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
 using Modulith.Modules.Users.Features.Login;
+using Modulith.Modules.Users.Features.RefreshToken;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -107,6 +109,42 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task SetInitialPassword_RevokesOtherRefreshTokens_PreservesCurrentSession()
+    {
+        const string email = "setpwdrevoke@example.com";
+        const string subject = "sub-setpwd-revoke";
+
+        // Session 1 — confirm flow creates the user and issues real tokens
+        var rawToken1 = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
+        var confirm1Resp = await _anon.PostAsJsonAsync("/v1/users/auth/google/confirm",
+            new GoogleLoginConfirmRequest(rawToken1));
+        var session1 = await confirm1Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
+        Assert.NotNull(session1);
+
+        // Session 2 — second "device" confirms another pending login for the same account
+        var rawToken2 = await SeedPendingLoginAsync(subject, email, isExistingUser: true);
+        var confirm2Resp = await _anon.PostAsJsonAsync("/v1/users/auth/google/confirm",
+            new GoogleLoginConfirmRequest(rawToken2));
+        var session2 = await confirm2Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
+        Assert.NotNull(session2);
+
+        // Set initial password using session1's access token (carries rtid in claims)
+        var auth = fixture.CreateAuthenticatedClientWithToken(session1.AccessToken);
+        await auth.PostAsJsonAsync("/v1/users/me/password/initial",
+            new { password = "NewPassword1!" });
+
+        // session1 refresh token (the current session) should still work
+        var rt1Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+            new RefreshTokenRequest(session1.RefreshToken));
+        Assert.Equal(HttpStatusCode.OK, rt1Refresh.StatusCode);
+
+        // session2 refresh token (other session) should be revoked
+        var rt2Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+            new RefreshTokenRequest(session2.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, rt2Refresh.StatusCode);
+    }
+
     private async Task<(Guid UserId, string AccessToken)> SeedExternalUserAsync(string email)
     {
         const string subject = "sub-external-setpwd";
@@ -124,5 +162,21 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
 
         var accessToken = ApiTestFixture.GenerateTestToken(userId, email, "ExternalUser");
         return (userId, accessToken);
+    }
+
+    private async Task<string> SeedPendingLoginAsync(string subject, string email, bool isExistingUser)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+
+        var (pending, rawToken) = PendingExternalLogin.Create(
+            ExternalLoginProvider.Google, subject, email, "Test User",
+            isExistingUser, createdFromIp: null, userAgent: null,
+            TimeSpan.FromMinutes(15), clock);
+
+        db.PendingExternalLogins.Add(pending);
+        await db.SaveChangesAsync();
+        return rawToken;
     }
 }
