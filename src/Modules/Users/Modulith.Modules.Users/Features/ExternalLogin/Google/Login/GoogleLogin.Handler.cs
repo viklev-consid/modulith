@@ -36,36 +36,57 @@ public sealed class GoogleLoginHandler(
         var opts = options.Value;
 
         // Fast path: (provider, subject) already linked — issue tokens immediately.
-        var existingLogin = await db.ExternalLogins
-            .FirstOrDefaultAsync(e => e.Provider == ExternalLoginProvider.Google && e.Subject == identity.Subject, ct);
+        // Quick un-locked check avoids opening a transaction for the common email-loop path.
+        var maybeLinked = await db.ExternalLogins
+            .AnyAsync(e => e.Provider == ExternalLoginProvider.Google && e.Subject == identity.Subject, ct);
 
-        if (existingLogin is not null)
+        if (maybeLinked)
         {
-            var user = await db.Users
-                .Include(u => u.ExternalLogins)
-                .FirstOrDefaultAsync(u => u.Id == existingLogin.UserId, ct);
+            // Re-read with FOR UPDATE inside an explicit transaction to serialize with
+            // concurrent UnlinkGoogleLogin. If unlink wins the race, the row will be gone
+            // after we acquire the lock, and we fall through to the email-loop below.
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-            if (user is null)
+            var existingLogin = await db.ExternalLogins
+                .FromSqlInterpolated($"""
+                    SELECT * FROM users.external_logins
+                    WHERE provider = {ExternalLoginProvider.Google.ToString()} AND subject = {identity.Subject}
+                    FOR UPDATE
+                    """)
+                .FirstOrDefaultAsync(ct);
+
+            if (existingLogin is not null)
             {
-                return UsersErrors.UserNotFound;
+                var user = await db.Users
+                    .Include(u => u.ExternalLogins)
+                    .FirstOrDefaultAsync(u => u.Id == existingLogin.UserId, ct);
+
+                if (user is null)
+                {
+                    return UsersErrors.UserNotFound;
+                }
+
+                var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
+                UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
+
+                var expiresAt = clock.UtcNow.AddMinutes(opts.AccessTokenLifetimeMinutes);
+                var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
+
+                return new GoogleLoginResponse(
+                    IsPending: false,
+                    UserId: user.Id.Value,
+                    AccessToken: accessToken,
+                    AccessTokenExpiresAt: expiresAt,
+                    RefreshToken: rawRefreshToken,
+                    RefreshTokenExpiresAt: refreshToken.ExpiresAt);
             }
 
-            var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
-            await db.SaveChangesAsync(ct);
-
-            await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
-            UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
-
-            var expiresAt = clock.UtcNow.AddMinutes(opts.AccessTokenLifetimeMinutes);
-            var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
-
-            return new GoogleLoginResponse(
-                IsPending: false,
-                UserId: user.Id.Value,
-                AccessToken: accessToken,
-                AccessTokenExpiresAt: expiresAt,
-                RefreshToken: rawRefreshToken,
-                RefreshTokenExpiresAt: refreshToken.ExpiresAt);
+            // Unlink completed before we acquired the lock — fall through to the email loop.
+            // tx rolls back on dispose.
         }
 
         // Uniform email-loop: all other cases go through the pending record flow.
