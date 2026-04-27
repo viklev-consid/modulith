@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Persistence;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
 using Modulith.Modules.Users.Features.Register;
@@ -10,6 +11,7 @@ using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Npgsql;
+using Wolverine.Tracking;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -306,32 +308,27 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
 
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
-            new GoogleLoginConfirmRequest(rawToken));
+        HttpResponseMessage? response = null;
+        await fixture.ApplicationHost
+            .TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(15))
+            .WaitForMessageToBeReceivedAt<UserLoggedInV1>(fixture.ApplicationHost)
+            .ExecuteAndWaitAsync((Func<Wolverine.IMessageContext, Task>)(async _ =>
+            {
+                response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+                    new GoogleLoginConfirmRequest(rawToken));
+            }));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response!.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
         Assert.NotNull(body);
 
         using var auditScope = fixture.Services.CreateScope();
         var auditDb = auditScope.ServiceProvider.GetRequiredService<AuditDbContext>();
-        var entry = await PollAsync(() =>
-            auditDb.AuditEntries.FirstOrDefaultAsync(e =>
-                e.EventType == "user.logged_in" && e.ActorId == body.UserId));
+        var entry = await auditDb.AuditEntries.FirstOrDefaultAsync(e =>
+            e.EventType == "user.logged_in" && e.ActorId == body.UserId);
 
         Assert.NotNull(entry);
-    }
-
-    private static async Task<T?> PollAsync<T>(Func<Task<T?>> query, int attempts = 15, int delayMs = 200)
-        where T : class
-    {
-        for (var i = 0; i < attempts; i++)
-        {
-            var result = await query();
-            if (result is not null) { return result; }
-            await Task.Delay(delayMs);
-        }
-        return null;
     }
 
     private string GetUsersConnectionString()

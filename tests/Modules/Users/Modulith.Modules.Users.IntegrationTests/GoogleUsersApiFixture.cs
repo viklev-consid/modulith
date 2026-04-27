@@ -6,7 +6,9 @@ using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Users.IntegrationTests.Fakes;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
+using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.TestSupport;
+using Modulith.TestSupport.Fakes;
 
 namespace Modulith.Modules.Users.IntegrationTests;
 
@@ -20,6 +22,7 @@ public sealed class GoogleUsersApiFixture : ApiTestFixture
     protected override void ConfigureTestServices(IServiceCollection services)
     {
         services.AddSingleton<IGoogleIdTokenVerifier>(GoogleVerifier);
+        services.AddSingleton<IEmailSender, FakeEmailSender>();
     }
 
     protected override async Task MigrateAsync(IServiceProvider services)

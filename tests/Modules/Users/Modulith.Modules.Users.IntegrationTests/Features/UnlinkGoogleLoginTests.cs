@@ -3,12 +3,14 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Persistence;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Modulith.TestSupport;
+using Wolverine.Tracking;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -138,29 +140,21 @@ public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsy
         await SeedExternalLoginAsync(userId, subject);
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
-        await auth.DeleteAsync("/v1/users/me/auth/google/unlink");
+        await fixture.ApplicationHost
+            .TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(15))
+            .WaitForMessageToBeReceivedAt<ExternalLoginUnlinkedV1>(fixture.ApplicationHost)
+            .ExecuteAndWaitAsync((Func<Wolverine.IMessageContext, Task>)(async _ =>
+            {
+                await auth.DeleteAsync("/v1/users/me/auth/google/unlink");
+            }));
 
-        // The Wolverine outbox delivers ExternalLoginUnlinkedV1 to OnExternalLoginUnlinkedHandler
-        // in the Audit module, which writes an AuditEntry. Poll until it appears.
         using var scope = fixture.Services.CreateScope();
         var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-        var entry = await PollAsync(() =>
-            auditDb.AuditEntries.FirstOrDefaultAsync(e =>
-                e.EventType == "user.external_login.unlinked" && e.ActorId == userId));
+        var entry = await auditDb.AuditEntries.FirstOrDefaultAsync(e =>
+            e.EventType == "user.external_login.unlinked" && e.ActorId == userId);
 
         Assert.NotNull(entry);
-    }
-
-    private static async Task<T?> PollAsync<T>(Func<Task<T?>> query, int attempts = 15, int delayMs = 200)
-        where T : class
-    {
-        for (var i = 0; i < attempts; i++)
-        {
-            var result = await query();
-            if (result is not null) { return result; }
-            await Task.Delay(delayMs);
-        }
-        return null;
     }
 
     private async Task<(Guid UserId, string AccessToken)> RegisterAndLoginAsync(string email)
