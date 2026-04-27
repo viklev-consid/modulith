@@ -9,6 +9,7 @@ using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using Npgsql;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -225,6 +226,58 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         Assert.Equal(subject, user.ExternalLogins[0].Subject);
     }
 
+    [Fact]
+    public async Task GoogleLoginConfirm_WhenRegistrationCommitsDuringProvision_RetriesExistingUserLinkPath()
+    {
+        const string email = "latecollision@example.com";
+        const string subject = "sub-late-collision";
+
+        var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
+        var connectionString = GetUsersConnectionString();
+
+        await InstallExternalProvisionDelayTriggerAsync(connectionString, email);
+
+        try
+        {
+            var confirmTask = _client.PostAsJsonAsync(
+                "/v1/users/auth/google/confirm",
+                new GoogleLoginConfirmRequest(rawToken));
+
+            await WaitForExternalProvisionInsertAsync(connectionString);
+
+            var registerResponse = await _client.PostAsJsonAsync(
+                "/v1/users/register",
+                new RegisterRequest(email, "Password1!", "Alice"));
+
+            Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+
+            var confirmResponse = await confirmTask;
+
+            Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
+
+            var body = await confirmResponse.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
+            Assert.NotNull(body);
+            Assert.False(body.IsNewUser);
+            Assert.NotEmpty(body.AccessToken);
+
+            using var scope = fixture.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var emailVal = Email.Create(email).Value;
+            var users = await db.Users
+                .Include(u => u.ExternalLogins)
+                .Where(u => u.Email == emailVal)
+                .ToListAsync();
+
+            Assert.Single(users);
+            Assert.Single(users[0].ExternalLogins);
+            Assert.Equal(subject, users[0].ExternalLogins[0].Subject);
+        }
+        finally
+        {
+            await RemoveExternalProvisionDelayTriggerAsync(connectionString);
+        }
+    }
+
     private async Task<string> SeedPendingLoginAsync(
         string subject, string email, bool isExistingUser,
         TimeSpan? lifetime = null)
@@ -279,5 +332,92 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
             await Task.Delay(delayMs);
         }
         return null;
+    }
+
+    private string GetUsersConnectionString()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        return db.Database.GetConnectionString() ?? throw new InvalidOperationException("Users test connection string is not configured.");
+    }
+
+    private static async Task InstallExternalProvisionDelayTriggerAsync(string connectionString, string email)
+    {
+        var escapedEmail = email.Replace("'", "''", StringComparison.Ordinal);
+
+        const string triggerName = "tr_test_delay_external_user_insert";
+        const string functionName = "users.test_delay_external_user_insert";
+
+        var sql = $"""
+            DROP TRIGGER IF EXISTS {triggerName} ON users.users;
+            DROP FUNCTION IF EXISTS {functionName}();
+
+            CREATE FUNCTION {functionName}()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+            BEGIN
+                IF NEW.email = '{escapedEmail}' AND NEW.password_hash IS NULL THEN
+                    PERFORM pg_sleep(3);
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$;
+
+            CREATE TRIGGER {triggerName}
+            BEFORE INSERT ON users.users
+            FOR EACH ROW
+            EXECUTE FUNCTION {functionName}();
+            """;
+
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    private static async Task RemoveExternalProvisionDelayTriggerAsync(string connectionString)
+    {
+        const string sql = """
+            DROP TRIGGER IF EXISTS tr_test_delay_external_user_insert ON users.users;
+            DROP FUNCTION IF EXISTS users.test_delay_external_user_insert();
+            """;
+
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    private static async Task WaitForExternalProvisionInsertAsync(string connectionString)
+    {
+        const string sql = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_stat_activity
+                WHERE pid <> pg_backend_pid()
+                  AND datname = current_database()
+                  AND state = 'active'
+                  AND query ~* 'insert\s+into\s+"?users"?\."?users"?'
+            );
+            """;
+
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync();
+
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            var result = await cmd.ExecuteScalarAsync();
+            if (result is true)
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("Timed out waiting for GoogleLoginConfirm provisioning insert to start.");
     }
 }

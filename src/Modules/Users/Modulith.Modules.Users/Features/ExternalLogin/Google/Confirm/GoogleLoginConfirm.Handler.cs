@@ -66,17 +66,7 @@ public sealed class GoogleLoginConfirmHandler(
         // cannot both pass LinkExternalLogin's in-memory check and then race into SaveChanges.
         // Explicit column list (not SELECT *) is required: xmin is a PostgreSQL system column and
         // is not exposed by SELECT * from a subquery, but EF Core needs it for the concurrency token.
-        var existingUser = await db.Users
-            .FromSqlInterpolated($"""
-                SELECT id, created_at, created_by, display_name, email,
-                       has_completed_onboarding, password_hash, role,
-                       updated_at, updated_by, xmin
-                FROM users.users
-                WHERE email = {email.Value}
-                FOR UPDATE
-                """)
-            .Include(u => u.ExternalLogins)
-            .FirstOrDefaultAsync(ct);
+        var existingUser = await LoadUserForEmailAsync(email, ct);
 
         if (existingUser is not null)
         {
@@ -149,9 +139,8 @@ public sealed class GoogleLoginConfirmHandler(
         }
 
         db.Users.Add(user);
-        db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.WelcomeEmail, now, cmd.IpAddress, cmd.UserAgent));
-
-        var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
+        var consent = Consent.Grant(user.Id.Value, ConsentKeys.WelcomeEmail, now, cmd.IpAddress, cmd.UserAgent);
+        db.Consents.Add(consent);
 
         try
         {
@@ -160,10 +149,23 @@ public sealed class GoogleLoginConfirmHandler(
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg &&
                                            string.Equals(pg.SqlState, "23505", StringComparison.Ordinal))
         {
-            return string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal)
-                ? UsersErrors.ExternalLoginLinkedToOtherUser
-                : UsersErrors.EmailAlreadyRegistered;
+            if (string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal))
+            {
+                return UsersErrors.ExternalLoginLinkedToOtherUser;
+            }
+
+            if (string.Equals(pg.ConstraintName, "ix_users_email", StringComparison.Ordinal))
+            {
+                // Registration committed after our existing-user lookup but before this insert.
+                // Roll the failed graph out of the DbContext and retry through the link path.
+                return await RetryLinkAfterConcurrentRegistrationAsync(user, consent, email, pending, cmd, opts, now, ct);
+            }
+
+            return UsersErrors.EmailAlreadyRegistered;
         }
+
+        var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
+        await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new UserProvisionedFromExternalV1(
             user.Id.Value, pending.Provider.ToString(), pending.Subject,
@@ -180,5 +182,65 @@ public sealed class GoogleLoginConfirmHandler(
             rawRefreshToken,
             refreshToken.ExpiresAt,
             IsNewUser: true);
+    }
+
+    private async Task<ErrorOr<GoogleLoginConfirmResponse>> RetryLinkAfterConcurrentRegistrationAsync(
+        User provisionedUser,
+        Consent consent,
+        Email email,
+        PendingExternalLogin pending,
+        GoogleLoginConfirmCommand cmd,
+        UsersOptions opts,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        DetachFailedProvisioningAttempt(provisionedUser, consent);
+
+        var existingUser = await LoadUserForEmailAsync(email, ct);
+        if (existingUser is null)
+        {
+            return UsersErrors.EmailAlreadyRegistered;
+        }
+
+        return await LinkToExistingUserAsync(existingUser, pending, cmd, opts, now, ct);
+    }
+
+    private async Task<User?> LoadUserForEmailAsync(Email email, CancellationToken ct)
+        => await db.Users
+            .FromSqlInterpolated($"""
+                SELECT id, created_at, created_by, display_name, email,
+                       has_completed_onboarding, password_hash, role,
+                       updated_at, updated_by, xmin
+                FROM users.users
+                WHERE email = {email.Value}
+                FOR UPDATE
+                """)
+            .Include(u => u.ExternalLogins)
+            .FirstOrDefaultAsync(ct);
+
+    private void DetachFailedProvisioningAttempt(User user, Consent consent)
+    {
+        var logins = user.ExternalLogins.ToArray();
+
+        foreach (var login in logins)
+        {
+            var loginEntry = db.Entry(login);
+            if (loginEntry.State != EntityState.Detached)
+            {
+                loginEntry.State = EntityState.Detached;
+            }
+        }
+
+        var consentEntry = db.Entry(consent);
+        if (consentEntry.State != EntityState.Detached)
+        {
+            consentEntry.State = EntityState.Detached;
+        }
+
+        var userEntry = db.Entry(user);
+        if (userEntry.State != EntityState.Detached)
+        {
+            userEntry.State = EntityState.Detached;
+        }
     }
 }
