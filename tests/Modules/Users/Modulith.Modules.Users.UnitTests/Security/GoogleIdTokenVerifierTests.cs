@@ -27,10 +27,10 @@ public sealed class GoogleIdTokenVerifierTests : IDisposable
         _rsa = RSA.Create(2048);
         _signingKey = new RsaSecurityKey(_rsa) { KeyId = "test-key-id" };
 
-        var jwk = JsonWebKeyConverter.ConvertFromRSASecurityKey(_signingKey);
-        var jwks = new JsonWebKeySet();
-        jwks.Keys.Add(jwk);
-        _jwksJson = jwks.ToString() ?? throw new InvalidOperationException("Failed to serialize JWKS.");
+        var p = _rsa.ExportParameters(includePrivateParameters: false);
+        var n = Base64UrlEncoder.Encode(p.Modulus!);
+        var e = Base64UrlEncoder.Encode(p.Exponent!);
+        _jwksJson = $$"""{"keys":[{"kty":"RSA","kid":"test-key-id","use":"sig","n":"{{n}}","e":"{{e}}"}]}""";
     }
 
     public void Dispose() => _rsa.Dispose();
