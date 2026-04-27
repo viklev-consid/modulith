@@ -10,6 +10,7 @@ namespace Modulith.Modules.Users.Domain;
 public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
 {
     private const int MaxUserAgentLength = 512;
+    private const int MaxDisplayNameLength = 100;
 
     private PendingExternalLogin(
         PendingExternalLoginId id,
@@ -75,6 +76,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(rawValue));
 
         var ua = userAgent?.Length > MaxUserAgentLength ? userAgent[..MaxUserAgentLength] : userAgent;
+        var truncatedDisplayName = displayName.Length > MaxDisplayNameLength ? displayName[..MaxDisplayNameLength] : displayName;
 
         var normalizedEmail = email.Trim().ToLowerInvariant();
 
@@ -84,7 +86,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
             provider,
             subject,
             normalizedEmail,
-            displayName,
+            truncatedDisplayName,
             isExistingUser,
             hash,
             createdFromIp,

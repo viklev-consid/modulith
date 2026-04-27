@@ -116,4 +116,23 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         Assert.NotNull(pending);
         Assert.False(pending.IsExistingUser);
     }
+
+    [Fact]
+    public async Task GoogleLogin_WhenDisplayNameExceedsColumnLimit_TruncatesAndReturns202()
+    {
+        var overlong = new string('A', 150);
+        fixture.GoogleVerifier.SetIdentity("sub-longname", "longname@example.com", overlong);
+
+        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+            new GoogleLoginRequest("any-id-token"));
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var pending = await db.PendingExternalLogins
+            .FirstOrDefaultAsync(p => p.Email == "longname@example.com");
+        Assert.NotNull(pending);
+        Assert.Equal(100, pending.DisplayName.Length);
+    }
 }
