@@ -74,9 +74,18 @@ public sealed class GoogleLoginConfirmHandler(
             return UsersErrors.ExternalAuthUnavailable;
         }
 
+        // Lock the user row so that two concurrent confirms for the same email+provider+subject
+        // cannot both pass LinkExternalLogin's in-memory check and then race into SaveChanges.
+        // The second waiter sees the ExternalLogin already committed and fails at the aggregate level.
+        var emailStr = emailResult.Value.Value;
         var user = await db.Users
+            .FromSqlInterpolated($"""
+                SELECT * FROM users.users
+                WHERE email = {emailStr}
+                FOR UPDATE
+                """)
             .Include(u => u.ExternalLogins)
-            .FirstOrDefaultAsync(u => u.Email == emailResult.Value, ct);
+            .FirstOrDefaultAsync(ct);
 
         if (user is null)
         {

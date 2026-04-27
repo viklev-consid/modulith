@@ -30,9 +30,17 @@ public sealed class LinkGoogleLoginHandler(
 
         var identity = identityResult.Value;
 
+        // Lock the user row so that two concurrent link requests for the same user cannot both
+        // pass LinkExternalLogin's in-memory check and then race into SaveChanges.
+        // The second waiter sees the ExternalLogin already committed and fails at the aggregate level.
         var user = await db.Users
+            .FromSqlInterpolated($"""
+                SELECT * FROM users.users
+                WHERE id = {cmd.UserId}
+                FOR UPDATE
+                """)
             .Include(u => u.ExternalLogins)
-            .FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
+            .FirstOrDefaultAsync(ct);
 
         if (user is null)
         {
@@ -50,9 +58,12 @@ public sealed class LinkGoogleLoginHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg &&
+                                           string.Equals(pg.SqlState, "23505", StringComparison.Ordinal))
         {
-            return UsersErrors.ExternalLoginLinkedToOtherUser;
+            return string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal)
+                ? UsersErrors.ExternalLoginLinkedToOtherUser
+                : UsersErrors.ExternalLoginAlreadyLinked;
         }
 
         await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, user.Email.Value, "Google", identity.Subject, now, Guid.NewGuid()));
