@@ -243,13 +243,28 @@ public sealed class ExternalLoginTests
     }
 
     [Fact]
-    public void User_LinkExternalLogin_FailsWhenSameProviderAndSubjectAlreadyLinked()
+    public void User_LinkExternalLogin_FailsWhenProviderAlreadyLinked_SameSubject()
     {
         var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
         user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
         var result = user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ErrorOr.ErrorType.Conflict, result.FirstError.Type);
+    }
+
+    [Fact]
+    public void User_LinkExternalLogin_FailsWhenProviderAlreadyLinked_DifferentSubject()
+    {
+        // Guard is provider-level, not subject-level. A second Google account is rejected
+        // even when its subject differs from the one already linked.
+        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        user.ClearDomainEvents();
+
+        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, "google-subject-99999", DateTimeOffset.UtcNow);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Conflict, result.FirstError.Type);
@@ -273,15 +288,21 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_UnlinkExternalLogin_SucceedsWhenAnotherExternalLoginExists()
     {
+        // With a single provider (Google) a user cannot hold two external logins, so
+        // "another external login" as the retained credential cannot be tested here.
+        // This scenario becomes testable once a second provider is added.
+        // The password-as-retained-credential path is covered by SucceedsWhenPasswordExists.
+        //
+        // What we CAN assert is that the attempted setup (two Google logins) is itself
+        // rejected — confirming the invariant that prevents the backdoor scenario.
         var clock = new FixedClock(DateTimeOffset.UtcNow);
         var user = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock).Value;
         user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, clock.UtcNow);
-        user.LinkExternalLogin(ExternalLoginProvider.Google, "other-subject", clock.UtcNow);
-        user.ClearDomainEvents();
 
-        var result = user.UnlinkExternalLogin(ExternalLoginProvider.Google);
+        var secondLink = user.LinkExternalLogin(ExternalLoginProvider.Google, "other-subject", clock.UtcNow);
 
-        Assert.False(result.IsError);
+        Assert.True(secondLink.IsError);
+        Assert.Equal(ErrorOr.ErrorType.Conflict, secondLink.FirstError.Type);
     }
 
     [Fact]

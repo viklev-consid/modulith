@@ -76,6 +76,29 @@ public sealed class LinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsync
     }
 
     [Fact]
+    public async Task LinkGoogleLogin_WhenDifferentGoogleSubjectAlreadyLinked_Returns409()
+    {
+        // Regression test: a user who already has one Google account linked must not be able
+        // to attach a second Google subject. Without the (user_id, provider) unique constraint
+        // the second link would succeed, leaving an unremovable backdoor credential — the
+        // unlink endpoint targets provider only, so one of the two subjects would survive
+        // any unlink attempt.
+        var (_, accessToken) = await RegisterAndLoginAsync("twoGoogle@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        fixture.GoogleVerifier.SetIdentity("sub-google-A", "extA@google.com", "Alice");
+        var first = await auth.PostAsJsonAsync("/v1/users/me/auth/google/link",
+            new LinkGoogleLoginRequest("token-A"));
+        Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
+
+        fixture.GoogleVerifier.SetIdentity("sub-google-B", "extB@google.com", "Alice");
+        var second = await auth.PostAsJsonAsync("/v1/users/me/auth/google/link",
+            new LinkGoogleLoginRequest("token-B"));
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
     public async Task LinkGoogleLogin_WhenSameSubjectAlreadyLinkedToSelf_Returns409()
     {
         const string subject = "sub-self-link";

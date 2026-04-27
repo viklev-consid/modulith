@@ -157,14 +157,15 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 
     /// <summary>
     /// Links an external provider identity to this user.
-    /// Fails if the same (provider, subject) is already linked to this user.
+    /// Fails if any credential for this provider is already linked to this user —
+    /// the model enforces at most one external login per provider per user.
     /// </summary>
     public ErrorOr<Success> LinkExternalLogin(
         ExternalLoginProvider provider,
         string subject,
         DateTimeOffset linkedAt)
     {
-        if (_externalLogins.Any(e => e.Provider == provider && string.Equals(e.Subject, subject, StringComparison.Ordinal)))
+        if (_externalLogins.Any(e => e.Provider == provider))
         {
             return UsersErrors.ExternalLoginAlreadyLinked;
         }
