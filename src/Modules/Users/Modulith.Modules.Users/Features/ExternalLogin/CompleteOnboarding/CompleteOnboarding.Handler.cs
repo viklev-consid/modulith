@@ -33,6 +33,11 @@ public sealed class CompleteOnboardingHandler(
 
         var now = clock.UtcNow;
 
+        if (!cmd.AcceptTerms)
+        {
+            return UsersErrors.TermsNotAccepted;
+        }
+
         var tosKey = $"tos:{opts.TermsOfServiceVersion}";
         var alreadyAccepted = await db.TermsAcceptances
             .AnyAsync(t => t.UserId == user.Id && t.Version == tosKey, ct);

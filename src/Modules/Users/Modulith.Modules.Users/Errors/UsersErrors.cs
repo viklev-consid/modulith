@@ -101,6 +101,9 @@ internal static class UsersErrors
     public static readonly Error OnboardingRequired =
         Error.Unauthorized("Users.Onboarding.Required", "Account setup is not complete. Please complete onboarding first.");
 
+    public static readonly Error TermsNotAccepted =
+        Error.Validation("Users.Onboarding.TermsNotAccepted", "Terms of service must be accepted.");
+
     // Pagination
     public static readonly Error PageInvalid =
         Error.Validation("Users.Query.PageInvalid", $"Page number must be between 1 and {Shared.Kernel.Pagination.PageRequest.MaxPage}.");
