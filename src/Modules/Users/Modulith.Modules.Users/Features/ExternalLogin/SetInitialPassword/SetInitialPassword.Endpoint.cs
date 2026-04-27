@@ -31,7 +31,7 @@ internal static class SetInitialPasswordEndpoint
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
-                var command = new SetInitialPasswordCommand(userId, request.Password, currentUser.ActiveRefreshTokenId);
+                var command = new SetInitialPasswordCommand(userId, request.Password, request.GoogleIdToken);
                 var result = await bus.InvokeAsync<ErrorOr<Success>>(command, ct);
                 return result.ToProblemDetailsOr(_ => Results.NoContent());
             })

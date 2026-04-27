@@ -1,12 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
-using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.RefreshToken;
-using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Modulith.TestSupport;
@@ -29,7 +28,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/password/initial",
-            new { password = "NewPassword1!" });
+            new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
@@ -42,7 +41,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
         await auth.PostAsJsonAsync("/v1/users/me/password/initial",
-            new { password = "NewPassword1!" });
+            new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -59,10 +58,10 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
         await auth.PostAsJsonAsync("/v1/users/me/password/initial",
-            new { password = "NewPassword1!" });
+            new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
         var loginResp = await _anon.PostAsJsonAsync("/v1/users/login",
-            new LoginRequest(email, "NewPassword1!"));
+            new { email, password = "NewPassword1!" });
 
         Assert.Equal(HttpStatusCode.OK, loginResp.StatusCode);
     }
@@ -70,20 +69,17 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
     [Fact]
     public async Task SetInitialPassword_WhenUserAlreadyHasPassword_Returns409()
     {
-        var reg = await _anon.PostAsJsonAsync("/v1/users/register",
-            new RegisterRequest("haspwd@example.com", "Password1!", "Alice"));
-        var regBody = await reg.Content.ReadFromJsonAsync<RegisterResponse>();
-        Assert.NotNull(regBody);
+        const string email = "haspwd@example.com";
+        var (_, accessToken) = await SeedExternalUserAsync(email);
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
-        var login = await _anon.PostAsJsonAsync("/v1/users/login",
-            new LoginRequest("haspwd@example.com", "Password1!"));
-        var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginBody);
+        // First call succeeds and sets the password.
+        await auth.PostAsJsonAsync("/v1/users/me/password/initial",
+            new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
-        var auth = fixture.CreateAuthenticatedClientWithToken(loginBody.AccessToken);
-
+        // Second call must be rejected — password is already set.
         var response = await auth.PostAsJsonAsync("/v1/users/me/password/initial",
-            new { password = "NewPassword1!" });
+            new { password = "AnotherPassword1!", googleIdToken = "fake-google-token" });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -95,7 +91,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/password/initial",
-            new { password = "short" });
+            new { password = "short", googleIdToken = "fake-google-token" });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -104,13 +100,40 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
     public async Task SetInitialPassword_WhenUnauthenticated_Returns401()
     {
         var response = await _anon.PostAsJsonAsync("/v1/users/me/password/initial",
-            new { password = "NewPassword1!" });
+            new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task SetInitialPassword_RevokesOtherRefreshTokens_PreservesCurrentSession()
+    public async Task SetInitialPassword_WithInvalidGoogleToken_Returns401()
+    {
+        var (_, accessToken) = await SeedExternalUserAsync("setpwdinvalidtoken@example.com");
+        fixture.GoogleVerifier.SetError(Error.Unauthorized("Google.InvalidToken", "Token verification failed."));
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/password/initial",
+            new { password = "NewPassword1!", googleIdToken = "bad-token" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetInitialPassword_WithMismatchedGoogleSubject_Returns401()
+    {
+        var (_, accessToken) = await SeedExternalUserAsync("setpwdmismatch@example.com");
+        // Verifier returns a different subject than the one linked to this user.
+        fixture.GoogleVerifier.SetIdentity("some-other-google-sub", "other@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/password/initial",
+            new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetInitialPassword_RevokesAllRefreshTokens_IncludingCurrentSession()
     {
         const string email = "setpwdrevoke@example.com";
         const string subject = "sub-setpwd-revoke";
@@ -131,17 +154,18 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         var session2 = await confirm2Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
         Assert.NotNull(session2);
 
-        // Set initial password using session1's access token (carries rtid in claims)
+        // Step-up: present the Google ID token for the subject linked during account provisioning.
+        fixture.GoogleVerifier.SetIdentity(subject, email);
         var auth = fixture.CreateAuthenticatedClientWithToken(session1.AccessToken);
         await auth.PostAsJsonAsync("/v1/users/me/password/initial",
-            new { password = "NewPassword1!" });
+            new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
-        // session1 refresh token (the current session) should still work
+        // session1 refresh token (the requesting session) must also be revoked — no stolen-token persistence.
         var rt1Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(session1.RefreshToken));
-        Assert.Equal(HttpStatusCode.OK, rt1Refresh.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, rt1Refresh.StatusCode);
 
-        // session2 refresh token (other session) should be revoked
+        // session2 refresh token (other session) must be revoked.
         var rt2Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(session2.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, rt2Refresh.StatusCode);
@@ -157,10 +181,14 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
             var clock = scope.ServiceProvider.GetRequiredService<IClock>();
             var emailVal = Email.Create(email).Value;
             var user = User.CreateExternal(emailVal, "ExternalUser", ExternalLoginProvider.Google, subject, clock).Value;
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             userId = user.Id.Value;
         }
+
+        // Configure the fake verifier to match the seeded Google subject.
+        fixture.GoogleVerifier.SetIdentity(subject, email);
 
         var accessToken = ApiTestFixture.GenerateTestToken(userId, email, "ExternalUser");
         return (userId, accessToken);

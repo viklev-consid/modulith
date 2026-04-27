@@ -13,6 +13,7 @@ public sealed class SetInitialPasswordHandler(
     UsersDbContext db,
     IPasswordHasher passwordHasher,
     IRefreshTokenRevoker tokenRevoker,
+    IGoogleIdTokenVerifier googleVerifier,
     IMessageBus bus)
 {
     public async Task<ErrorOr<Success>> Handle(SetInitialPasswordCommand cmd, CancellationToken ct)
@@ -20,11 +21,33 @@ public sealed class SetInitialPasswordHandler(
 
     private async Task<ErrorOr<Success>> HandleCoreAsync(SetInitialPasswordCommand cmd, CancellationToken ct)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
+        // Step-up: verify the caller controls the Google account currently linked to this user.
+        var identityResult = await googleVerifier.VerifyAsync(cmd.GoogleIdToken, ct);
+        if (identityResult.IsError)
+        {
+            return identityResult.Errors;
+        }
+
+        var identity = identityResult.Value;
+
+        var user = await db.Users
+            .Include(u => u.ExternalLogins)
+            .FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
 
         if (user is null)
         {
             return UsersErrors.UserNotFound;
+        }
+
+        // The presented Google token's subject must match a linked Google login on this account.
+        // Return InvalidIdToken for both "no Google link" and "wrong subject" — no oracle.
+        var subjectMatches = user.ExternalLogins.Any(e =>
+            e.Provider == ExternalLoginProvider.Google &&
+            string.Equals(e.Subject, identity.Subject, StringComparison.Ordinal));
+
+        if (!subjectMatches)
+        {
+            return UsersErrors.InvalidIdToken;
         }
 
         var hash = new PasswordHash(passwordHasher.Hash(cmd.Password));
@@ -34,13 +57,9 @@ public sealed class SetInitialPasswordHandler(
             return result.Errors;
         }
 
-        RefreshTokenId? keepId = null;
-        if (cmd.ActiveRefreshTokenId is not null && Guid.TryParse(cmd.ActiveRefreshTokenId, out var parsed))
-        {
-            keepId = new RefreshTokenId(parsed);
-        }
-
-        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct, except: keepId);
+        // Revoke all refresh tokens — including the current session.
+        // A stolen token used to set the initial password must not keep the attacker's session alive.
+        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
 
         await db.SaveChangesAsync(ct);
 
