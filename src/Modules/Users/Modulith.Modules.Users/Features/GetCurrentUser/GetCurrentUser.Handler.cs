@@ -25,7 +25,7 @@ public sealed class GetCurrentUserHandler(UsersDbContext db, IPermissionCatalog 
         var roleName = query.TokenRole ?? user.Role.Name;
         var permissions = permissionCatalog.GetPermissionsForRole(roleName);
         var permissionsVersion = permissionCatalog.GetPermissionsVersion(roleName);
-        var linkedProviders = user.ExternalLogins.Select(e => e.Provider.ToString()).ToList();
+        var linkedProviders = user.ExternalLogins.Select(e => e.Provider.ToString()).Order(StringComparer.Ordinal).ToList();
 
         return new GetCurrentUserResponse(
             user.Id.Value,
