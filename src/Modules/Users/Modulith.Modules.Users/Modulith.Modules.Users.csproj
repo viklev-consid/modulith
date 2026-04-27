@@ -2,8 +2,7 @@
 
   <PropertyGroup>
     <!-- CA1707: underscores in test/migration method names; CA1716: namespace conflicts with keywords -->
-    <!-- NU1902: known moderate vulnerability in OpenTelemetry.Api 1.15.0 — suppressed until upgrade is available -->
-    <NoWarn>$(NoWarn);CA1707;NU1902</NoWarn>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

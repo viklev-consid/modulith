@@ -23,9 +23,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
     public const string TestJwtIssuer = "modulith-test";
     public const string TestJwtAudience = "modulith-test";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
 
     private Respawner? _respawner;
