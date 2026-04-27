@@ -1,6 +1,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
@@ -23,18 +24,6 @@ public sealed class CompleteOnboardingHandler(
     {
         var opts = options.Value;
 
-        if (!string.Equals(cmd.TermsVersion, opts.TermsOfServiceVersion, StringComparison.Ordinal))
-        {
-            return Error.Validation("Users.Onboarding.TermsVersionMismatch",
-                $"Expected ToS version '{opts.TermsOfServiceVersion}'.");
-        }
-
-        if (!string.Equals(cmd.PrivacyPolicyVersion, opts.PrivacyPolicyVersion, StringComparison.Ordinal))
-        {
-            return Error.Validation("Users.Onboarding.PrivacyVersionMismatch",
-                $"Expected Privacy Policy version '{opts.PrivacyPolicyVersion}'.");
-        }
-
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
         if (user is null)
         {
@@ -43,19 +32,18 @@ public sealed class CompleteOnboardingHandler(
 
         var now = clock.UtcNow;
 
-        var existingVersions = await db.TermsAcceptances
-            .Where(t => t.UserId == user.Id)
-            .Select(t => t.Version)
-            .ToHashSetAsync(ct);
+        var tosKey = $"tos:{opts.TermsOfServiceVersion}";
+        var alreadyAccepted = await db.TermsAcceptances
+            .AnyAsync(t => t.UserId == user.Id && t.Version == tosKey, ct);
 
-        if (!existingVersions.Contains($"tos:{cmd.TermsVersion}"))
+        if (!alreadyAccepted)
         {
-            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, $"tos:{cmd.TermsVersion}", now, cmd.IpAddress, cmd.UserAgent));
+            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, tosKey, now, cmd.IpAddress, cmd.UserAgent));
         }
 
-        if (!existingVersions.Contains($"pp:{cmd.PrivacyPolicyVersion}"))
+        if (cmd.AcceptMarketingEmails)
         {
-            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, $"pp:{cmd.PrivacyPolicyVersion}", now, cmd.IpAddress, cmd.UserAgent));
+            db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.MarketingEmail, now, cmd.IpAddress, cmd.UserAgent));
         }
 
         var onboardingResult = user.CompleteOnboarding();

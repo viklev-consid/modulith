@@ -144,7 +144,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **TestSupport.** A test project containing shared fixtures and helpers such as `ApiTestFixture`, `AuthenticatedClientBuilder`, object mothers, Verify settings, test clocks, and HTTP stubs. Referenced by all module test projects.
 
-**Terms Acceptance.** An immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`, `"pp:1.0"`). Created by the `CompleteOnboarding` slice. Keyed by `(UserId, Version)` with a unique constraint — calling `CompleteOnboarding` a second time with the same versions is a no-op. Distinct from *Consent*, which gates optional processing; terms acceptance is required for account activation.
+**Terms Acceptance.** An immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`). Created by the `CompleteOnboarding` slice, which writes a single ToS row keyed to the current `UsersOptions.TermsOfServiceVersion`. Keyed by `(UserId, Version)` with a unique constraint — re-submitting `CompleteOnboarding` when a row for the current version already exists is a no-op. Distinct from *Consent*, which gates optional processing (e.g. `marketing-emails`); terms acceptance is required for account activation.
 
 **Transport.** The layer that physically delivers a notification: `IEmailSender`, `ISmsSender`. Lives in `Shared.Infrastructure`. Distinct from orchestration (templates, preferences), which is the Notifications module's job.
 

@@ -19,7 +19,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - **ExternalLogin** — entity linking a `(Provider, Subject)` pair to a `User`. Owned by the `User` aggregate via `_externalLogins`. Unique constraint on `(provider, subject)` across all users.
 - **ExternalLoginProvider** — enum (`Google`).
 - **PendingExternalLogin** — pre-account record created during the email-loop for unlinked Google accounts. Identified by a random 256-bit token, stored as SHA-256 hash. Not linked to a `User` (may precede account creation). Single-use via `Consume(IClock)`; expires after `PendingExternalLoginLifetime`.
-- **TermsAcceptance** — immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`, `"pp:1.0"`). Keyed by `(UserId, Version)`, unique constraint.
+- **TermsAcceptance** — immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`). `CompleteOnboarding` writes a single ToS row keyed to the current `UsersOptions.TermsOfServiceVersion`. Keyed by `(UserId, Version)`, unique constraint.
 
 ---
 
@@ -44,7 +44,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `POST /v1/users/me/auth/google/link` — links Google to an existing authenticated user.
 - `DELETE /v1/users/me/auth/google/unlink` — unlinks Google; enforces credential-retention guardrail.
 - `POST /v1/users/me/password/initial` — sets the first password for external-only users.
-- `POST /v1/users/me/onboarding` — accepts ToS + Privacy Policy versions, marks `HasCompletedOnboarding = true`.
+- `POST /v1/users/me/onboarding` — requires `acceptTerms: true`; optional `acceptMarketingEmails: bool`. Records ToS acceptance, optionally grants `marketing-emails` consent, marks `HasCompletedOnboarding = true`.
 - `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` — verifies Google ID tokens via JWKS (cached in `IMemoryCache`). Fail-closed: returns `ExternalAuthUnavailable` if JWKS cannot be fetched.
 - `GoogleAuthOptions` — bound from `Modules:Users:Google:`. `ClientId` is `[Required]`.
 
@@ -75,7 +75,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 15. Credential-retention guardrail: `UnlinkExternalLogin` fails if the user has no other credential (password or other external login).
 16. Uniform email-loop: `GoogleLogin` never reveals whether an email is registered. Both new and existing emails get 202.
 17. `PendingExternalLogin` tokens are stored as SHA-256 hashes. Raw value exists only in the email body. `IsValid` returns false if expired OR already consumed.
-18. `TermsAcceptance` inserts are idempotent in the handler — re-submitting `CompleteOnboarding` with the same versions is a no-op on the DB level.
+18. `TermsAcceptance` inserts are idempotent in the handler — re-submitting `CompleteOnboarding` when a ToS row for the current version already exists is a no-op on the DB level.
 5. `SingleUseToken` values are stored as SHA-256 hashes. Raw tokens exist only in HTTP responses (to Notifications) and in email bodies. Never logged, never persisted in plaintext.
 6. `RefreshToken` values are stored as SHA-256 hashes with the same discipline.
 7. Password comparison uses constant-time equality (BCrypt's default).

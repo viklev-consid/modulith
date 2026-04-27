@@ -2,7 +2,6 @@ namespace Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
 
 public sealed record CompleteOnboardingCommand(
     Guid UserId,
-    string TermsVersion,
-    string PrivacyPolicyVersion,
+    bool AcceptMarketingEmails,
     string? IpAddress,
     string? UserAgent);
