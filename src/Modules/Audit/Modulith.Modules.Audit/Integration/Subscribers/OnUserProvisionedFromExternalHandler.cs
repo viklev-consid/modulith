@@ -13,7 +13,7 @@ public sealed class OnUserProvisionedFromExternalHandler(AuditDbContext db, IClo
         using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnUserProvisionedFromExternalHandler));
         AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserProvisionedFromExternalV1)));
 
-        var payload = JsonSerializer.Serialize(new { @event.UserId, @event.Provider, @event.ProvisionedAt });
+        var payload = JsonSerializer.Serialize(new { @event.Provider });
         var entry = AuditEntry.Create(
             eventType: "user.provisioned_from_external",
             actorId: @event.UserId,

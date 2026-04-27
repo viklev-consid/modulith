@@ -13,7 +13,7 @@ public sealed class OnExternalLoginLinkedHandler(AuditDbContext db, IClock clock
         using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnExternalLoginLinkedHandler));
         AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginLinkedV1)));
 
-        var payload = JsonSerializer.Serialize(new { @event.UserId, @event.Provider, @event.LinkedAt });
+        var payload = JsonSerializer.Serialize(new { @event.Provider });
         var entry = AuditEntry.Create(
             eventType: "user.external_login.linked",
             actorId: @event.UserId,
