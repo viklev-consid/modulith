@@ -17,19 +17,25 @@ internal sealed class GoogleIdTokenVerifier(
     public async Task<ErrorOr<GoogleIdentity>> VerifyAsync(string idToken, CancellationToken ct = default)
     {
         var opts = options.Value;
-        var keys = await GetSigningKeysAsync(opts, ct);
+        var keys = await GetSigningKeysAsync(opts, forceRefresh: false, ct);
         if (keys is null)
         {
             return UsersErrors.ExternalAuthUnavailable;
         }
 
-        var result = await TokenHandler.ValidateTokenAsync(idToken, new TokenValidationParameters
+        var result = await ValidateAsync(idToken, opts, keys);
+
+        // Cached JWKS may be stale after a Google key rotation. On a kid miss,
+        // force one refresh and retry before failing closed.
+        if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
         {
-            ValidIssuers = ["accounts.google.com", "https://accounts.google.com"],
-            ValidAudience = opts.ClientId,
-            IssuerSigningKeys = keys,
-            ValidateLifetime = true,
-        });
+            keys = await GetSigningKeysAsync(opts, forceRefresh: true, ct);
+            if (keys is null)
+            {
+                return UsersErrors.ExternalAuthUnavailable;
+            }
+            result = await ValidateAsync(idToken, opts, keys);
+        }
 
         if (!result.IsValid)
         {
@@ -54,10 +60,19 @@ internal sealed class GoogleIdTokenVerifier(
         return new GoogleIdentity(sub, email, name ?? email);
     }
 
-    private async Task<IEnumerable<SecurityKey>?> GetSigningKeysAsync(GoogleAuthOptions opts, CancellationToken ct)
+    private static Task<TokenValidationResult> ValidateAsync(string idToken, GoogleAuthOptions opts, IEnumerable<SecurityKey> keys) =>
+        TokenHandler.ValidateTokenAsync(idToken, new TokenValidationParameters
+        {
+            ValidIssuers = ["accounts.google.com", "https://accounts.google.com"],
+            ValidAudience = opts.ClientId,
+            IssuerSigningKeys = keys,
+            ValidateLifetime = true,
+        });
+
+    private async Task<IEnumerable<SecurityKey>?> GetSigningKeysAsync(GoogleAuthOptions opts, bool forceRefresh, CancellationToken ct)
     {
         const string cacheKey = "users:google:jwks";
-        if (cache.TryGetValue(cacheKey, out IEnumerable<SecurityKey>? cached))
+        if (!forceRefresh && cache.TryGetValue(cacheKey, out IEnumerable<SecurityKey>? cached))
         {
             return cached;
         }
