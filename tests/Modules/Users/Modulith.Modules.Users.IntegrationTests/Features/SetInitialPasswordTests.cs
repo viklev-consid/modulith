@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
+using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
 using Modulith.Modules.Users.Features.RefreshToken;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -171,17 +172,19 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         var session1 = await confirm1Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
         Assert.NotNull(session1);
 
-        // Session 2 — second "device" confirms another pending login for the same account.
-        // Must use a different Google subject so LinkToExistingUserAsync doesn't collide
-        // with the Google link already created by session 1's ProvisionNewUserAsync.
-        var rawToken2 = await SeedPendingLoginAsync("sub-setpwd-revoke-2", email, isExistingUser: true);
-        var confirm2Resp = await _anon.PostAsJsonAsync("/v1/users/auth/google/confirm",
-            new GoogleLoginConfirmRequest(rawToken2));
-        var session2 = await confirm2Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
+        // Session 2 — second "device" logs in via the already-linked Google subject (fast path).
+        // With the one-provider-per-user rule, confirming a second Google subject for the same
+        // user returns 409. Use the GoogleLogin fast path instead: (Google, subject) already
+        // linked → 200 + tokens immediately, no pending-login round-trip needed.
+        fixture.GoogleVerifier.SetIdentity(subject, email);
+        var login2Resp = await _anon.PostAsJsonAsync("/v1/users/auth/google/login",
+            new GoogleLoginRequest("fake-google-token"));
+        Assert.Equal(HttpStatusCode.OK, login2Resp.StatusCode);
+        var session2 = await login2Resp.Content.ReadFromJsonAsync<GoogleLoginResponse>();
         Assert.NotNull(session2);
+        Assert.NotNull(session2.RefreshToken);
 
         // Step-up: present the Google ID token for the subject linked during account provisioning.
-        fixture.GoogleVerifier.SetIdentity(subject, email);
         var auth = fixture.CreateAuthenticatedClientWithToken(session1.AccessToken);
         await auth.PostAsJsonAsync("/v1/users/me/password/initial",
             new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
@@ -193,7 +196,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
 
         // session2 refresh token (other session) must be revoked.
         var rt2Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
-            new RefreshTokenRequest(session2.RefreshToken));
+            new RefreshTokenRequest(session2.RefreshToken!));
         Assert.Equal(HttpStatusCode.Unauthorized, rt2Refresh.StatusCode);
     }
 
