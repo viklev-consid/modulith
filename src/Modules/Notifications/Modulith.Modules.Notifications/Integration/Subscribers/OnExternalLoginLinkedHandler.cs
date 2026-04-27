@@ -19,9 +19,10 @@ public sealed class OnExternalLoginLinkedHandler(
         using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnExternalLoginLinkedHandler));
         NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginLinkedV1)));
 
-        db.NotificationLogs.Add(NotificationLog.Create(
+        var log = NotificationLog.Create(
             @event.UserId, @event.Email, NotificationType.ExternalLoginLinked,
-            ExternalLoginLinkedTemplate.Subject, clock.UtcNow, @event.EventId));
+            ExternalLoginLinkedTemplate.Subject, clock.UtcNow, @event.EventId);
+        db.NotificationLogs.Add(log);
 
         try
         {
@@ -29,7 +30,13 @@ public sealed class OnExternalLoginLinkedHandler(
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
-            return;
+            db.Entry(log).State = EntityState.Detached;
+            log = await db.NotificationLogs
+                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
+            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
+            {
+                return;
+            }
         }
 
         var message = new EmailMessage(
@@ -39,5 +46,7 @@ public sealed class OnExternalLoginLinkedHandler(
             PlainTextBody: ExternalLoginLinkedTemplate.PlainTextBody(@event.Provider));
 
         await emailSender.SendAsync(message, ct);
+        log.MarkSent();
+        await db.SaveChangesAsync(ct);
     }
 }

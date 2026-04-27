@@ -27,8 +27,9 @@ public sealed class OnExternalLoginPendingHandler(
             ? ExternalLoginPendingExistingUserTemplate.Subject
             : ExternalLoginPendingNewUserTemplate.Subject;
 
-        db.NotificationLogs.Add(NotificationLog.Create(
-            Guid.Empty, @event.Email, notificationType, subject, clock.UtcNow, @event.EventId));
+        var log = NotificationLog.Create(
+            Guid.Empty, @event.Email, notificationType, subject, clock.UtcNow, @event.EventId);
+        db.NotificationLogs.Add(log);
 
         try
         {
@@ -36,7 +37,13 @@ public sealed class OnExternalLoginPendingHandler(
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
-            return;
+            db.Entry(log).State = EntityState.Detached;
+            log = await db.NotificationLogs
+                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
+            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
+            {
+                return;
+            }
         }
 
         var (htmlBody, plainBody) = @event.IsExistingUser
@@ -52,5 +59,7 @@ public sealed class OnExternalLoginPendingHandler(
             PlainTextBody: plainBody);
 
         await emailSender.SendAsync(message, ct);
+        log.MarkSent();
+        await db.SaveChangesAsync(ct);
     }
 }

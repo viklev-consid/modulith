@@ -21,6 +21,7 @@ public sealed class NotificationLog : Entity<NotificationLogId>
         Subject = subject;
         SentAt = sentAt;
         IdempotencyKey = idempotencyKey;
+        DeliveryStatus = NotificationDeliveryStatus.Pending;
     }
 
     public Guid UserId { get; private set; }
@@ -29,6 +30,9 @@ public sealed class NotificationLog : Entity<NotificationLogId>
     public string Subject { get; private set; } = string.Empty;
     public DateTimeOffset SentAt { get; private set; }
     public Guid IdempotencyKey { get; private set; }
+    public NotificationDeliveryStatus DeliveryStatus { get; private set; }
+
+    public void MarkSent() => DeliveryStatus = NotificationDeliveryStatus.Sent;
 
     public static NotificationLog Create(
         Guid userId,

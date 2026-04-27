@@ -19,9 +19,10 @@ public sealed class OnPasswordChangedHandler(
         using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnPasswordChangedHandler));
         NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordChangedV1)));
 
-        db.NotificationLogs.Add(NotificationLog.Create(
+        var log = NotificationLog.Create(
             @event.UserId, @event.Email, NotificationType.PasswordChanged,
-            PasswordChangedTemplate.Subject, clock.UtcNow, @event.EventId));
+            PasswordChangedTemplate.Subject, clock.UtcNow, @event.EventId);
+        db.NotificationLogs.Add(log);
 
         try
         {
@@ -29,7 +30,13 @@ public sealed class OnPasswordChangedHandler(
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
-            return;
+            db.Entry(log).State = EntityState.Detached;
+            log = await db.NotificationLogs
+                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
+            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
+            {
+                return;
+            }
         }
 
         var message = new EmailMessage(
@@ -39,5 +46,7 @@ public sealed class OnPasswordChangedHandler(
             PlainTextBody: PasswordChangedTemplate.PlainTextBody);
 
         await emailSender.SendAsync(message, ct);
+        log.MarkSent();
+        await db.SaveChangesAsync(ct);
     }
 }
