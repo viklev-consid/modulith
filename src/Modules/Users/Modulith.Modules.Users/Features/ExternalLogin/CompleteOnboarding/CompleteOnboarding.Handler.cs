@@ -47,6 +47,8 @@ public sealed class CompleteOnboardingHandler(
             db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.MarketingEmail, now, cmd.IpAddress, cmd.UserAgent));
         }
 
+        var wasAlreadyCompleted = user.HasCompletedOnboarding;
+
         var onboardingResult = user.CompleteOnboarding();
         if (onboardingResult.IsError)
         {
@@ -65,8 +67,11 @@ public sealed class CompleteOnboardingHandler(
             return Result.Success;
         }
 
-        await bus.PublishAsync(new UserOnboardingCompletedV1(user.Id.Value, Guid.NewGuid()));
-        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserOnboardingCompletedV1)));
+        if (!wasAlreadyCompleted)
+        {
+            await bus.PublishAsync(new UserOnboardingCompletedV1(user.Id.Value, Guid.NewGuid()));
+            UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserOnboardingCompletedV1)));
+        }
 
         return Result.Success;
     }
