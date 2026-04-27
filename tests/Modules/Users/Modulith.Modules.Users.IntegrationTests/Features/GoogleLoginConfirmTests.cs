@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
 using Modulith.Modules.Users.Features.Register;
@@ -240,5 +241,43 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         db.PendingExternalLogins.Add(pending);
         await db.SaveChangesAsync();
         return rawToken;
+    }
+
+    [Fact]
+    public async Task GoogleLoginConfirm_ForNewUser_PublishesUserLoggedInEvent()
+    {
+        // Verifies that the new-user provisioning path emits UserLoggedInV1 so the first
+        // external sign-in appears in the audit trail alongside UserProvisionedFromExternalV1.
+        const string email = "newgoogle-event@example.com";
+        const string subject = "sub-new-confirm-event";
+
+        var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
+
+        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+            new GoogleLoginConfirmRequest(rawToken));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
+        Assert.NotNull(body);
+
+        using var auditScope = fixture.Services.CreateScope();
+        var auditDb = auditScope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var entry = await PollAsync(() =>
+            auditDb.AuditEntries.FirstOrDefaultAsync(e =>
+                e.EventType == "user.logged_in" && e.ActorId == body.UserId));
+
+        Assert.NotNull(entry);
+    }
+
+    private static async Task<T?> PollAsync<T>(Func<Task<T?>> query, int attempts = 15, int delayMs = 200)
+        where T : class
+    {
+        for (var i = 0; i < attempts; i++)
+        {
+            var result = await query();
+            if (result is not null) { return result; }
+            await Task.Delay(delayMs);
+        }
+        return null;
     }
 }
