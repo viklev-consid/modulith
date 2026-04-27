@@ -28,12 +28,14 @@ internal static class GoogleLoginEndpoint
                 var ua = httpContext.Request.Headers.UserAgent.ToString();
                 var command = new GoogleLoginCommand(request.IdToken, ip, ua);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GoogleLoginResponse>>(command, ct);
-                return result.ToProblemDetailsOr(r => r.IsPending ? Results.Accepted() : Results.Ok(r));
+                return result.ToProblemDetailsOr(r => r.IsPending
+                    ? Results.Accepted(value: new GoogleLoginPendingResponse())
+                    : Results.Ok(r));
             })
         .WithName("GoogleLogin")
         .WithSummary("Authenticate with a Google ID token. Returns 200 with tokens if the account is linked, or 202 if a confirmation email was sent.")
         .Produces<GoogleLoginResponse>()
-        .Produces(StatusCodes.Status202Accepted)
+        .Produces<GoogleLoginPendingResponse>(StatusCodes.Status202Accepted)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status409Conflict)

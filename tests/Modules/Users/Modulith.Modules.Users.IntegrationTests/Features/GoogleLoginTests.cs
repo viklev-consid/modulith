@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,8 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("pending_confirmation", body.GetProperty("status").GetString());
     }
 
     [Fact]
@@ -44,6 +47,8 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("pending_confirmation", body.GetProperty("status").GetString());
     }
 
     [Fact]
@@ -127,6 +132,8 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("pending_confirmation", body.GetProperty("status").GetString());
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
