@@ -21,15 +21,27 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task CompleteOnboarding_WithCorrectVersions_Returns204()
+    public async Task CompleteOnboarding_WithAcceptTermsTrue_Returns204()
     {
         var (_, accessToken) = await SeedExternalUserAsync("onboard@example.com");
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { termsVersion = "1.0", privacyPolicyVersion = "1.0" });
+            new { acceptTerms = true, acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WithAcceptTermsFalse_Returns422()
+    {
+        var (_, accessToken) = await SeedExternalUserAsync("onboardreject@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
+            new { acceptTerms = false, acceptMarketingEmails = false });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
@@ -40,7 +52,7 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { termsVersion = "1.0", privacyPolicyVersion = "1.0" });
+            new { acceptTerms = true, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -50,47 +62,57 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
     }
 
     [Fact]
-    public async Task CompleteOnboarding_RecordsTermsAcceptancesInDatabase()
+    public async Task CompleteOnboarding_RecordsSingleTosAcceptanceInDatabase()
     {
         const string email = "onboardterms@example.com";
         var (userId, accessToken) = await SeedExternalUserAsync(email);
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { termsVersion = "1.0", privacyPolicyVersion = "1.0" });
+            new { acceptTerms = true, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         var acceptances = await db.TermsAcceptances
             .Where(t => t.UserId == new UserId(userId))
             .ToListAsync();
-        Assert.Equal(2, acceptances.Count);
-        Assert.Contains(acceptances, t => string.Equals(t.Version, "tos:1.0", StringComparison.Ordinal));
-        Assert.Contains(acceptances, t => string.Equals(t.Version, "pp:1.0", StringComparison.Ordinal));
+        Assert.Single(acceptances);
+        Assert.Equal("tos:1.0", acceptances[0].Version);
     }
 
     [Fact]
-    public async Task CompleteOnboarding_WithWrongTermsVersion_Returns422()
+    public async Task CompleteOnboarding_WithMarketingConsent_RecordsConsentRow()
     {
-        var (_, accessToken) = await SeedExternalUserAsync("onboardwrongtos@example.com");
+        const string email = "onboardmarketing@example.com";
+        var (userId, accessToken) = await SeedExternalUserAsync(email);
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
-        var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { termsVersion = "0.9", privacyPolicyVersion = "1.0" });
+        await auth.PostAsJsonAsync("/v1/users/me/onboarding",
+            new { acceptTerms = true, acceptMarketingEmails = true });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var consent = await db.Consents
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.ConsentKey == "notifications:marketing_email");
+        Assert.NotNull(consent);
+        Assert.True(consent.Granted);
     }
 
     [Fact]
-    public async Task CompleteOnboarding_WithWrongPrivacyPolicyVersion_Returns422()
+    public async Task CompleteOnboarding_WithoutMarketingConsent_DoesNotRecordConsentRow()
     {
-        var (_, accessToken) = await SeedExternalUserAsync("onboardwrongpp@example.com");
+        const string email = "onboardnomarketing@example.com";
+        var (userId, accessToken) = await SeedExternalUserAsync(email);
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
 
-        var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { termsVersion = "1.0", privacyPolicyVersion = "0.9" });
+        await auth.PostAsJsonAsync("/v1/users/me/onboarding",
+            new { acceptTerms = true, acceptMarketingEmails = false });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var hasConsent = await db.Consents
+            .AnyAsync(c => c.UserId == userId && c.ConsentKey == "notifications:marketing_email");
+        Assert.False(hasConsent);
     }
 
     [Fact]
@@ -98,7 +120,7 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
     {
         var (_, accessToken) = await SeedExternalUserAsync("onboardidempotent@example.com");
         var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
-        var body = new { termsVersion = "1.0", privacyPolicyVersion = "1.0" };
+        var body = new { acceptTerms = true, acceptMarketingEmails = false };
 
         var first = await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);
         var second = await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);
@@ -111,7 +133,7 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
     public async Task CompleteOnboarding_WhenUnauthenticated_Returns401()
     {
         var response = await _anon.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { termsVersion = "1.0", privacyPolicyVersion = "1.0" });
+            new { acceptTerms = true, acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -128,7 +150,7 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
         var auth = fixture.CreateAuthenticatedClientWithToken(loginBody.AccessToken);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { termsVersion = "1.0", privacyPolicyVersion = "1.0" });
+            new { acceptTerms = true, acceptMarketingEmails = false });
 
         // Password users have HasCompletedOnboarding=true already but CompleteOnboarding is idempotent
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);

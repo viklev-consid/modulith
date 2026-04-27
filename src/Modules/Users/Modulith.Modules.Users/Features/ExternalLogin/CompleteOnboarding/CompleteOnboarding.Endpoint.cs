@@ -39,7 +39,7 @@ internal static class CompleteOnboardingEndpoint
                 return result.ToProblemDetailsOr(_ => Results.NoContent());
             })
         .WithName("CompleteOnboarding")
-        .WithSummary("Accept the terms of service and privacy policy to complete account setup.")
+        .WithSummary("Accept the terms of service to complete account setup.")
         .Produces(StatusCodes.Status204NoContent)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
