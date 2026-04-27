@@ -44,7 +44,7 @@ public sealed class CompleteOnboardingHandler(
 
         if (cmd.AcceptMarketingEmails)
         {
-            db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.MarketingEmail, now, cmd.IpAddress, cmd.UserAgent));
+            db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.MarketingEmail, now, cmd.IpAddress, cmd.UserAgent, opts.PrivacyPolicyVersion));
         }
 
         var wasAlreadyCompleted = user.HasCompletedOnboarding;

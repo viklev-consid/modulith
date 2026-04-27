@@ -22,7 +22,7 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
 
         var consents = await db.Consents
             .Where(c => c.UserId == user.UserId)
-            .Select(c => new { c.ConsentKey, c.Granted, c.RecordedAt, c.GrantedFromIp, c.GrantedUserAgent })
+            .Select(c => new { c.ConsentKey, c.Granted, c.RecordedAt, c.GrantedFromIp, c.GrantedUserAgent, c.PolicyVersion })
             .ToListAsync(ct);
 
         var termsAcceptances = await db.TermsAcceptances
