@@ -122,8 +122,10 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         var session1 = await confirm1Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
         Assert.NotNull(session1);
 
-        // Session 2 — second "device" confirms another pending login for the same account
-        var rawToken2 = await SeedPendingLoginAsync(subject, email, isExistingUser: true);
+        // Session 2 — second "device" confirms another pending login for the same account.
+        // Must use a different Google subject so LinkToExistingUserAsync doesn't collide
+        // with the Google link already created by session 1's ProvisionNewUserAsync.
+        var rawToken2 = await SeedPendingLoginAsync("sub-setpwd-revoke-2", email, isExistingUser: true);
         var confirm2Resp = await _anon.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken2));
         var session2 = await confirm2Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();

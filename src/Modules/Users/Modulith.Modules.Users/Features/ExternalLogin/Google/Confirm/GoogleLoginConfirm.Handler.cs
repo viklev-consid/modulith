@@ -64,9 +64,14 @@ public sealed class GoogleLoginConfirmHandler(
         // and may be stale (e.g. the user registered with a password between login and confirm).
         // Lock the user row so that two concurrent confirms for the same email+provider+subject
         // cannot both pass LinkExternalLogin's in-memory check and then race into SaveChanges.
+        // Explicit column list (not SELECT *) is required: xmin is a PostgreSQL system column and
+        // is not exposed by SELECT * from a subquery, but EF Core needs it for the concurrency token.
         var existingUser = await db.Users
             .FromSqlInterpolated($"""
-                SELECT * FROM users.users
+                SELECT id, created_at, created_by, display_name, email,
+                       has_completed_onboarding, password_hash, role,
+                       updated_at, updated_by, xmin
+                FROM users.users
                 WHERE email = {email.Value}
                 FOR UPDATE
                 """)

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
+using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -141,5 +142,57 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             .FirstOrDefaultAsync(p => p.Email == "longname@example.com");
         Assert.NotNull(pending);
         Assert.Equal(100, pending.DisplayName.Length);
+    }
+
+    [Fact]
+    public async Task GoogleLogin_AfterUnlink_FallsBackToEmailLoop()
+    {
+        const string email = "postunlink@example.com";
+        const string subject = "sub-postunlink";
+
+        // Register a user with a password so the credential-retention guardrail allows unlink.
+        var regResp = await _client.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest(email, "Password1!", "Alice"));
+        var regBody = await regResp.Content.ReadFromJsonAsync<RegisterResponse>();
+        Assert.NotNull(regBody);
+
+        // Seed Google as a linked provider directly in the DB.
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+            var user = await db.Users
+                .Include(u => u.ExternalLogins)
+                .FirstAsync(u => u.Id == new UserId(regBody.UserId));
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+            await db.SaveChangesAsync();
+        }
+
+        // Confirm the fast path works before unlink.
+        fixture.GoogleVerifier.SetIdentity(subject, email, "Alice");
+        var fastPathBefore = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+            new GoogleLoginRequest("any-id-token"));
+        Assert.Equal(HttpStatusCode.OK, fastPathBefore.StatusCode);
+
+        // Obtain a session token to authenticate the unlink request.
+        var loginResp = await _client.PostAsJsonAsync("/v1/users/login",
+            new LoginRequest(email, "Password1!"));
+        var loginBody = await loginResp.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginBody);
+        var auth = fixture.CreateAuthenticatedClientWithToken(loginBody.AccessToken);
+
+        // Unlink Google — revokes all sessions and deletes the ExternalLogin row.
+        var unlinkResp = await auth.DeleteAsync("/v1/users/me/auth/google/unlink");
+        Assert.Equal(HttpStatusCode.NoContent, unlinkResp.StatusCode);
+
+        // The fast path must now be dead: the ExternalLogin row is gone, so login must
+        // fall through to the email loop and return 202 instead of 200 with tokens.
+        fixture.GoogleVerifier.SetIdentity(subject, email, "Alice");
+        var fastPathAfter = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+            new GoogleLoginRequest("any-id-token"));
+
+        Assert.Equal(HttpStatusCode.Accepted, fastPathAfter.StatusCode);
+        var body = await fastPathAfter.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("pending_confirmation", body.GetProperty("status").GetString());
     }
 }

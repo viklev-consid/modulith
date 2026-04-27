@@ -29,7 +29,8 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
         var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
-        // Assert — poll until Wolverine outbox delivers UserRegisteredV1 and the notification log is written
+        // Assert — poll until Wolverine outbox delivers UserRegisteredV1 and the notification
+        // log is written with DeliveryStatus=Sent (log first appears as Pending, so we wait for Sent).
         Domain.NotificationLog? log = null;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         while (!cts.IsCancellationRequested)
@@ -37,7 +38,9 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
             using var scope = fixture.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
             log = await db.NotificationLogs
-                .FirstOrDefaultAsync(l => l.UserId == userId, cts.Token);
+                .FirstOrDefaultAsync(
+                    l => l.UserId == userId && l.DeliveryStatus == Domain.NotificationDeliveryStatus.Sent,
+                    cts.Token);
             if (log is not null)
             {
                 break;
@@ -49,6 +52,7 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
         Assert.NotNull(log);
         Assert.Equal("notifications-test@example.com", log.RecipientEmail);
         Assert.Equal(Domain.NotificationType.WelcomeEmail, log.NotificationType);
+        Assert.Equal(Domain.NotificationDeliveryStatus.Sent, log.DeliveryStatus);
 
         // Assert the fake sender captured the email
         var sentEmail = fixture.EmailSender.SentMessages
@@ -70,13 +74,15 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
         var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
-        // Wait for the log to appear
+        // Wait for the log to appear with DeliveryStatus=Sent, confirming the handler completed.
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         while (!cts.IsCancellationRequested)
         {
             using var scope = fixture.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
-            var exists = await db.NotificationLogs.AnyAsync(l => l.UserId == userId, cts.Token);
+            var exists = await db.NotificationLogs.AnyAsync(
+                l => l.UserId == userId && l.DeliveryStatus == Domain.NotificationDeliveryStatus.Sent,
+                cts.Token);
             if (exists)
             {
                 break;

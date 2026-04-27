@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Audit.Domain;
+using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
@@ -96,6 +98,8 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
             .FirstOrDefaultAsync(c => c.UserId == userId && c.ConsentKey == "notifications:marketing_email");
         Assert.NotNull(consent);
         Assert.True(consent.Granted);
+        // PolicyVersion must carry the privacy-policy version from UsersOptions (default "1.0").
+        Assert.Equal("1.0", consent.PolicyVersion);
     }
 
     [Fact]
@@ -154,6 +158,42 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
 
         // Password users have HasCompletedOnboarding=true already but CompleteOnboarding is idempotent
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_PublishesOnboardingEventExactlyOnce()
+    {
+        const string email = "onboardonce@example.com";
+        var (userId, accessToken) = await SeedExternalUserAsync(email);
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+        var body = new { acceptTerms = true, acceptMarketingEmails = false };
+
+        // First call — should publish UserOnboardingCompletedV1 exactly once.
+        await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);
+
+        // Poll until the Audit entry appears, confirming the event was dispatched and handled.
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        AuditEntry? entry = null;
+        while (!cts.IsCancellationRequested)
+        {
+            using var scope = fixture.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+            entry = await db.AuditEntries.FirstOrDefaultAsync(
+                e => e.ActorId == userId && e.EventType == "user.onboarding.completed", cts.Token);
+            if (entry is not null) { break; }
+            await Task.Delay(200, cts.Token);
+        }
+        Assert.NotNull(entry);
+
+        // Second call — handler must suppress the event because HasCompletedOnboarding is already true.
+        await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);
+
+        // No second message was published to the outbox, so the count must remain at 1.
+        using var finalScope = fixture.Services.CreateScope();
+        var finalDb = finalScope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var count = await finalDb.AuditEntries.CountAsync(
+            e => e.ActorId == userId && e.EventType == "user.onboarding.completed");
+        Assert.Equal(1, count);
     }
 
     private async Task<(Guid UserId, string AccessToken)> SeedExternalUserAsync(string email)

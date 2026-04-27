@@ -35,7 +35,10 @@ public sealed class LinkGoogleLoginHandler(
         // The second waiter sees the ExternalLogin already committed and fails at the aggregate level.
         var user = await db.Users
             .FromSqlInterpolated($"""
-                SELECT * FROM users.users
+                SELECT id, created_at, created_by, display_name, email,
+                       has_completed_onboarding, password_hash, role,
+                       updated_at, updated_by, xmin
+                FROM users.users
                 WHERE id = {cmd.UserId}
                 FOR UPDATE
                 """)

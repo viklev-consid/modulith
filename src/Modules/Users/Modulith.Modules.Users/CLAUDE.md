@@ -222,6 +222,7 @@ Handlers for these events live in consuming modules (Notifications, Audit, any o
 - **Don't put PII in `PendingExternalLogin.Email`.** The email is needed to dispatch the notification but is not personal data in the same sense as a user profile — it's a transient pre-account record keyed by the Google identity, not the user's stored email. The sweep job removes it after expiry.
 - **`SweepExpiredTokensHandler` also sweeps `PendingExternalLogins`.** Expired AND consumed records are deleted in the same job. Don't add a separate cleanup.
 - **`ExternalLoginLinkedV1` and `ExternalLoginUnlinkedV1` carry `Email`.** This is required for Notifications to send alerts without crossing module boundaries. If you add more external-login events, add `Email` if Notifications needs it.
+- **Don't modify `GoogleLoginHandler` (fast path) or `UnlinkGoogleLoginHandler` without preserving the `FOR UPDATE` lock.** Both handlers hold a `SELECT … FOR UPDATE` on the same `external_logins` row — login by `(provider, subject)`, unlink by `(user_id, provider)`. Login wraps the lock and token issuance in an explicit transaction (`BeginTransactionAsync` → `FOR UPDATE` → `IssueAsync` → `CommitAsync`). Unlink wraps the lock, delete, and revocation in an equivalent transaction. Removing either lock, collapsing them into separate transactions, or re-ordering the lock and the state read re-opens the race where login can mint a valid session after unlink completed.
 
 ---
 
