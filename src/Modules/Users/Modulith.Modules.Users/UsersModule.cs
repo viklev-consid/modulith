@@ -87,6 +87,7 @@ public static class UsersModule
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtGenerator, JwtGenerator>();
         services.AddScoped<IRefreshTokenIssuer, RefreshTokenIssuer>();
+        services.AddScoped<IRefreshTokenRevoker, RefreshTokenRevoker>();
         services.AddScoped<ISingleUseTokenService, SingleUseTokenService>();
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();

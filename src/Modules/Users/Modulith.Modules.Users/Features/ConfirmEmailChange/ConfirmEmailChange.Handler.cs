@@ -15,6 +15,7 @@ public sealed class ConfirmEmailChangeHandler(
     UsersDbContext db,
     ISingleUseTokenService tokenService,
     IClock clock,
+    IRefreshTokenRevoker tokenRevoker,
     IMessageBus bus)
 {
     public async Task<ErrorOr<ConfirmEmailChangeResponse>> Handle(ConfirmEmailChangeCommand cmd, CancellationToken ct)
@@ -63,10 +64,7 @@ public sealed class ConfirmEmailChangeHandler(
 
         db.PendingEmailChanges.Remove(pending);
 
-        // Revoke all refresh tokens — email change is a security event.
-        await db.RefreshTokens
-            .Where(t => t.UserId == user.Id && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
+        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
 
         try
         {

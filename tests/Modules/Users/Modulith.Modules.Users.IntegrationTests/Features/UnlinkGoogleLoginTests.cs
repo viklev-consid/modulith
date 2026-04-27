@@ -89,6 +89,35 @@ public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsy
     }
 
     [Fact]
+    public async Task UnlinkGoogleLogin_RevokesAllActiveRefreshTokens()
+    {
+        const string subject = "sub-unlink-tokens";
+        var (userId, accessToken) = await RegisterAndLoginAsync("unlinkrevoke@example.com");
+        await SeedExternalLoginAsync(userId, subject);
+
+        // Seed a second refresh token (simulates a second active session).
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+            var (token, _) = RefreshToken.Issue(new UserId(userId), TimeSpan.FromDays(30), clock, "ua2", "1.2.3.4");
+            db.RefreshTokens.Add(token);
+            await db.SaveChangesAsync();
+        }
+
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+        await auth.DeleteAsync("/v1/users/me/auth/google/unlink");
+
+        using var verifyScope = fixture.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var active = await verifyDb.RefreshTokens
+            .Where(t => t.UserId == new UserId(userId) && t.RevokedAt == null)
+            .CountAsync();
+
+        Assert.Equal(0, active);
+    }
+
+    [Fact]
     public async Task UnlinkGoogleLogin_WhenUnauthenticated_Returns401()
     {
         var response = await _anon.DeleteAsync("/v1/users/me/auth/google/unlink");

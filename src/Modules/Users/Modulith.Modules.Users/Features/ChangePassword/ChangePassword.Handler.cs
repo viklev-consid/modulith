@@ -5,7 +5,6 @@ using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
-using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ChangePassword;
@@ -13,7 +12,7 @@ namespace Modulith.Modules.Users.Features.ChangePassword;
 public sealed class ChangePasswordHandler(
     UsersDbContext db,
     IPasswordHasher passwordHasher,
-    IClock clock,
+    IRefreshTokenRevoker tokenRevoker,
     IMessageBus bus)
 {
     public async Task<ErrorOr<ChangePasswordResponse>> Handle(ChangePasswordCommand cmd, CancellationToken ct)
@@ -35,15 +34,13 @@ public sealed class ChangePasswordHandler(
         var newHash = new PasswordHash(passwordHasher.Hash(cmd.NewPassword));
         user.SetPassword(newHash);
 
-        // Revoke all refresh tokens except the one on the current request (user's session continues).
-        var query = db.RefreshTokens.Where(t => t.UserId == user.Id && t.RevokedAt == null);
-
-        if (cmd.ActiveRefreshTokenId is not null && Guid.TryParse(cmd.ActiveRefreshTokenId, out var keepId))
+        RefreshTokenId? keepId = null;
+        if (cmd.ActiveRefreshTokenId is not null && Guid.TryParse(cmd.ActiveRefreshTokenId, out var parsed))
         {
-            query = query.Where(t => t.Id != new RefreshTokenId(keepId));
+            keepId = new RefreshTokenId(parsed);
         }
 
-        await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
+        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct, except: keepId);
 
         await db.SaveChangesAsync(ct);
 

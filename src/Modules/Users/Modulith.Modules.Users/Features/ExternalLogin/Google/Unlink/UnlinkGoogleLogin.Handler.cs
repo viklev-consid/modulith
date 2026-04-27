@@ -4,11 +4,12 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Modules.Users.Security;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ExternalLogin.Google.Unlink;
 
-public sealed class UnlinkGoogleLoginHandler(UsersDbContext db, IMessageBus bus)
+public sealed class UnlinkGoogleLoginHandler(UsersDbContext db, IRefreshTokenRevoker tokenRevoker, IMessageBus bus)
 {
     public async Task<ErrorOr<Success>> Handle(UnlinkGoogleLoginCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(UnlinkGoogleLoginHandler), () => HandleCoreAsync(cmd, ct));
@@ -29,6 +30,8 @@ public sealed class UnlinkGoogleLoginHandler(UsersDbContext db, IMessageBus bus)
         {
             return unlinkResult.Errors;
         }
+
+        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
 
         await db.SaveChangesAsync(ct);
 

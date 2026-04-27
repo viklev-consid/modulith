@@ -4,15 +4,15 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Modules.Users.Security;
 using Modulith.Modules.Users.Security.Authorization;
-using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ChangeUserRole;
 
 public sealed class ChangeUserRoleHandler(
     UsersDbContext db,
-    IClock clock,
+    IRefreshTokenRevoker tokenRevoker,
     IMessageBus bus,
     IPermissionCatalog permissionCatalog)
 {
@@ -69,9 +69,7 @@ public sealed class ChangeUserRoleHandler(
         // Revoke all active refresh tokens only after the role change is committed.
         // Running this before SaveChanges would allow the revocation to be committed
         // even when a concurrency conflict causes the role mutation to be rejected.
-        await db.RefreshTokens
-            .Where(t => t.UserId == targetUserId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
+        await tokenRevoker.RevokeAllForUserAsync(targetUserId, ct);
 
         await bus.PublishAsync(new UserRoleChangedV1(
             cmd.TargetUserId,
