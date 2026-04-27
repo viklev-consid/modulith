@@ -76,12 +76,14 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
 
         var ua = userAgent?.Length > MaxUserAgentLength ? userAgent[..MaxUserAgentLength] : userAgent;
 
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
         var now = clock.UtcNow;
         var pending = new PendingExternalLogin(
             PendingExternalLoginId.New(),
             provider,
             subject,
-            email,
+            normalizedEmail,
             displayName,
             isExistingUser,
             hash,
@@ -94,11 +96,12 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
     }
 
     /// <summary>
-    /// Rotates the token: generates a fresh raw value, overwrites the stored hash, and resets the
-    /// expiry. The caller receives the new raw value to embed in the re-sent confirmation email.
-    /// The previous raw token becomes invalid immediately.
+    /// Rotates the token: generates a fresh raw value, overwrites the stored hash, resets the
+    /// expiry, and corrects the stored email to its normalized form. The caller receives the new
+    /// raw value to embed in the re-sent confirmation email. The previous raw token becomes invalid
+    /// immediately.
     /// </summary>
-    public string Refresh(TimeSpan lifetime, IClock clock)
+    public string Refresh(TimeSpan lifetime, IClock clock, string email)
     {
         var rawBytes = RandomNumberGenerator.GetBytes(32);
         var rawValue = Convert.ToBase64String(rawBytes)
@@ -106,6 +109,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
 
         TokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(rawValue));
         ExpiresAt = clock.UtcNow.Add(lifetime);
+        Email = email.Trim().ToLowerInvariant();
         return rawValue;
     }
 

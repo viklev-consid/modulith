@@ -90,7 +90,7 @@ public sealed class GoogleLoginHandler(
 
         if (activePending is not null)
         {
-            var refreshedRawToken = activePending.Refresh(opts.PendingExternalLoginLifetime, clock);
+            var refreshedRawToken = activePending.Refresh(opts.PendingExternalLoginLifetime, clock, identity.Email);
             await db.SaveChangesAsync(ct);
 
             await bus.PublishAsync(new ExternalLoginPendingV1(
