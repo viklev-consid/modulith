@@ -15,6 +15,7 @@ public sealed class ResetPasswordHandler(
     IPasswordHasher passwordHasher,
     ISingleUseTokenService tokenService,
     IClock clock,
+    IRefreshTokenRevoker tokenRevoker,
     IMessageBus bus)
 {
     public async Task<ErrorOr<ResetPasswordResponse>> Handle(ResetPasswordCommand cmd, CancellationToken ct)
@@ -43,10 +44,7 @@ public sealed class ResetPasswordHandler(
         var newHash = new PasswordHash(passwordHasher.Hash(cmd.NewPassword));
         user.SetPassword(newHash);
 
-        // Revoke all refresh tokens — password was reset (security event).
-        await db.RefreshTokens
-            .Where(t => t.UserId == user.Id && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
+        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
 
         await db.SaveChangesAsync(ct);
 

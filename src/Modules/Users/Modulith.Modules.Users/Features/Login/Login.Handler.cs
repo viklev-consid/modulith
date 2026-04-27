@@ -37,7 +37,7 @@ public sealed class LoginHandler(
             return UsersErrors.InvalidCredentials;
         }
 
-        if (!passwordHasher.Verify(cmd.Password, user.PasswordHash.Value))
+        if (user.PasswordHash is null || !passwordHasher.Verify(cmd.Password, user.PasswordHash.Value))
         {
             return UsersErrors.InvalidCredentials;
         }

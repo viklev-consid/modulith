@@ -4,12 +4,12 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
-using Modulith.Shared.Kernel.Interfaces;
+using Modulith.Modules.Users.Security;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.LogoutAll;
 
-public sealed class LogoutAllHandler(UsersDbContext db, IClock clock, IMessageBus bus)
+public sealed class LogoutAllHandler(UsersDbContext db, IRefreshTokenRevoker tokenRevoker, IMessageBus bus)
 {
     public async Task<ErrorOr<LogoutAllResponse>> Handle(LogoutAllCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(LogoutAllHandler), () => HandleCoreAsync(cmd, ct));
@@ -24,9 +24,7 @@ public sealed class LogoutAllHandler(UsersDbContext db, IClock clock, IMessageBu
             return UsersErrors.UserNotFound;
         }
 
-        await db.RefreshTokens
-            .Where(t => t.UserId == userId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, clock.UtcNow), ct);
+        await tokenRevoker.RevokeAllForUserAsync(userId, ct);
 
         await bus.PublishAsync(new UserLoggedOutAllDevicesV1(cmd.UserId));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedOutAllDevicesV1)));

@@ -19,4 +19,15 @@ public sealed class UsersOptions
 
     [Range(8, 128)]
     public int MinPasswordLength { get; init; } = 10;
+
+    public TimeSpan PendingExternalLoginLifetime { get; init; } = TimeSpan.FromMinutes(15);
+
+    [Range(1, 20)]
+    public int MaxPendingExternalLoginsPerEmail { get; init; } = 5;
+
+    [Required]
+    public string TermsOfServiceVersion { get; init; } = "1.0";
+
+    [Required]
+    public string PrivacyPolicyVersion { get; init; } = "1.0";
 }

@@ -4,6 +4,16 @@ A production-grade modular monolith template for building RESTful APIs in .NET 1
 
 Modulith is opinionated. It encodes a set of decisions that have been made deliberately, with trade-offs documented. It is designed to be equally ergonomic for humans and for AI coding agents.
 
+## Why a modular monolith
+
+A modular monolith is the pragmatic middle ground between a traditional monolith and microservices. You keep the operational simplicity of one deployable unit, one runtime, and one local development environment, while still enforcing real boundaries around business capabilities.
+
+Those boundaries matter even if you never extract a service. Each module owns its own domain, persistence, endpoints, and public contracts, so changes can stay local to the capability they belong to instead of leaking into the whole codebase. That gives you room to make architectural decisions at the module boundary rather than turning every design choice into an application-wide one. In this template, that plays out as vertical slices: each module is a vertical slice of business capability, and features inside the module are organized as vertical slices because that optimizes for the most common task in a growing system: changing a feature.
+
+The trade-off is real. One host still means one bad deployment can affect everything, and scaling stays vertical until a module is extracted. A modular monolith without enforced boundaries is also just a monolith with better folder names. That is why this template treats contracts, per-module schemas, and architectural tests as non-negotiable.
+
+Those same properties also make the codebase easier for AI agents to work in. Clear module ownership reduces ambiguity about where code belongs, vertical slices reduce the amount of code needed to understand a feature, and architectural tests turn boundary mistakes into fast feedback. See [Working with AI agents](#working-with-ai-agents) below for the agent-specific tooling this template adds.
+
 ## What you get
 
 - **Vertical slice architecture** with per-feature folders

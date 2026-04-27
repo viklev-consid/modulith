@@ -9,6 +9,12 @@ using OpenTelemetry;
 using Modulith.Modules.Users.ConsentManagement;
 using Modulith.Modules.Users.Features.ChangePassword;
 using Modulith.Modules.Users.Features.ConfirmEmailChange;
+using Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
+using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
+using Modulith.Modules.Users.Features.ExternalLogin.Google.Link;
+using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
+using Modulith.Modules.Users.Features.ExternalLogin.Google.Unlink;
+using Modulith.Modules.Users.Features.ExternalLogin.SetInitialPassword;
 using Modulith.Modules.Users.Features.DeleteAccount;
 using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ForgotPassword;
@@ -56,6 +62,11 @@ public static class UsersModule
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<GoogleAuthOptions>()
+            .Bind(configuration.GetSection("Modules:Users:Google"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
         services.AddPermissions(UsersPermissions.All);
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -70,9 +81,13 @@ public static class UsersModule
             opts.AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>());
         });
 
+        services.AddMemoryCache();
+        services.AddHttpClient<IGoogleIdTokenVerifier, GoogleIdTokenVerifier>();
+
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtGenerator, JwtGenerator>();
         services.AddScoped<IRefreshTokenIssuer, RefreshTokenIssuer>();
+        services.AddScoped<IRefreshTokenRevoker, RefreshTokenRevoker>();
         services.AddScoped<ISingleUseTokenService, SingleUseTokenService>();
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
@@ -130,6 +145,14 @@ public static class UsersModule
         opts.Discovery.IncludeType<ListUsersHandler>();
         opts.Discovery.IncludeType<GetUserByIdHandler>();
 
+        // External login handlers — Phase 14
+        opts.Discovery.IncludeType<GoogleLoginHandler>();
+        opts.Discovery.IncludeType<GoogleLoginConfirmHandler>();
+        opts.Discovery.IncludeType<LinkGoogleLoginHandler>();
+        opts.Discovery.IncludeType<UnlinkGoogleLoginHandler>();
+        opts.Discovery.IncludeType<SetInitialPasswordHandler>();
+        opts.Discovery.IncludeType<CompleteOnboardingHandler>();
+
         return opts;
     }
 
@@ -155,6 +178,14 @@ public static class UsersModule
         ChangeUserRoleEndpoint.Map(app);
         ListUsersEndpoint.Map(app);
         GetUserByIdEndpoint.Map(app);
+
+        // External login endpoints — Phase 14
+        GoogleLoginEndpoint.Map(app);
+        GoogleLoginConfirmEndpoint.Map(app);
+        LinkGoogleLoginEndpoint.Map(app);
+        UnlinkGoogleLoginEndpoint.Map(app);
+        SetInitialPasswordEndpoint.Map(app);
+        CompleteOnboardingEndpoint.Map(app);
 
         return app;
     }

@@ -21,11 +21,10 @@ public sealed class SmokeCollection : ICollectionFixture<SmokeTestFixture> { }
 public sealed class SmokeTestFixture : ApiTestFixture
 {
     // Mailpit: SMTP on 1025, HTTP API on 8025.
-    private readonly IContainer _mailpit = new ContainerBuilder()
-        .WithImage("axllent/mailpit:latest")
+    private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:latest")
         .WithPortBinding(1025, assignRandomHostPort: true)
         .WithPortBinding(8025, assignRandomHostPort: true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(8025))
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8025, _ => { }))
         .Build();
 
     /// <summary>Base URL of the Mailpit HTTP API (e.g. http://localhost:PORT).</summary>

@@ -7,8 +7,8 @@ using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
-using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.Register;
@@ -41,7 +41,7 @@ public sealed class RegisterHandler(
         }
 
         var passwordHash = new PasswordHash(passwordHasher.Hash(cmd.Password));
-        var userResult = User.Create(email, passwordHash, cmd.DisplayName);
+        var userResult = User.CreateWithPassword(email, passwordHash, cmd.DisplayName);
         if (userResult.IsError)
         {
             return userResult.Errors;
@@ -60,7 +60,7 @@ public sealed class RegisterHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // A concurrent registration claimed the same email between our pre-check and commit.
             return UsersErrors.EmailAlreadyRegistered;

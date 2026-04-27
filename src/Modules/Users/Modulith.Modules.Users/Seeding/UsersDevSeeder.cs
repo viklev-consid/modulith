@@ -65,7 +65,7 @@ internal sealed class UsersDevSeeder(
         }
 
         var passwordHash = new PasswordHash(passwordHasher.Hash(password));
-        var userResult = User.Create(emailResult.Value, passwordHash, displayName, role);
+        var userResult = User.CreateWithPassword(emailResult.Value, passwordHash, displayName, role);
         if (userResult.IsError)
         {
             return;

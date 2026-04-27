@@ -29,6 +29,12 @@ public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock, I
             .Where(p => !db.SingleUseTokens.Any(t => t.Id == p.TokenId))
             .ExecuteDeleteAsync(ct);
 
+        // Pending external logins: delete expired and consumed records immediately (no grace period).
+        // Consumed records are safe to delete — they are single-use and the confirmation is complete.
+        await db.PendingExternalLogins
+            .Where(p => p.ExpiresAt < clock.UtcNow || p.ConsumedAt != null)
+            .ExecuteDeleteAsync(ct);
+
         // Re-schedule for next day.
         await bus.PublishAsync(new SweepExpiredTokens(), new DeliveryOptions { ScheduledTime = clock.UtcNow.AddDays(1) });
     }

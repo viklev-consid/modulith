@@ -6,8 +6,9 @@ This module delivers transactional notifications to users and keeps a log of wha
 
 ## Domain vocabulary
 
-- **NotificationLog** — an immutable record that a notification was sent. Identified by `NotificationLogId`.
-- **NotificationType** — an enum classifying the notification (`WelcomeEmail`, `PasswordResetRequest`, `PasswordResetConfirmation`, `PasswordChanged`, `EmailChangeRequest`, `EmailChanged`).
+- **NotificationLog** — a record that a notification was attempted or sent. Identified by `NotificationLogId`. Carries a `DeliveryStatus` (`Pending` / `Sent`) that tracks whether the SMTP send actually completed.
+- **NotificationType** — an enum classifying the notification (`WelcomeEmail`, `PasswordResetRequest`, `PasswordResetConfirmation`, `PasswordChanged`, `EmailChangeRequest`, `EmailChanged`, `ExternalLoginPendingExistingUser`, `ExternalLoginPendingNewUser`, `ExternalLoginLinked`, `ExternalLoginUnlinked`).
+- **NotificationDeliveryStatus** — `Pending = 0` (log row written, send not yet confirmed) / `Sent = 1` (send confirmed).
 - **IConsentRegistry** — interface (in `Shared.Infrastructure`) implemented by the Users module. Returns whether a user has consented to a given notification purpose.
 
 ---
@@ -22,15 +23,18 @@ This module delivers transactional notifications to users and keeps a log of wha
 | `PasswordChangedV1` | Password changed alert | Registered email address |
 | `EmailChangeRequestedV1` | Email change confirmation link | **New** email address |
 | `EmailChangedV1` | Email changed alert | **Old** email address |
+| `ExternalLoginPendingV1` | Pending confirmation link | Registered email address |
+| `ExternalLoginLinkedV1` | Provider linked alert | Registered email address |
+| `ExternalLoginUnlinkedV1` | Provider unlinked alert | Registered email address |
 
 ---
 
 ## Invariants
 
-1. Every handler is idempotent — each `NotificationLog` row carries a unique `IdempotencyKey` (sourced from `@event.EventId`) backed by a DB-level unique constraint. The handler inserts the log row first; a `DbUpdateException` with a unique-constraint violation means the event was already processed and the handler returns early.
-2. The log is written *before* the email is sent. Because Wolverine wraps the handler in a transaction, if `SendAsync` throws the transaction is rolled back, the log row is not persisted, and the retry will re-insert and re-send correctly. This prevents the double-send that the old send-before-log ordering could cause when `SaveChangesAsync` failed after a successful send.
-3. `IConsentRegistry` gates every notification type. The welcome email checks `ConsentKeys.WelcomeEmail`. Security notifications (`PasswordReset*`, `PasswordChanged`, `EmailChange*`) are transactional — they bypass consent because they are security-critical.
-4. `PasswordResetRequestedV1` and `EmailChangeRequestedV1` carry a raw token — embed it in the email body link, never log it.
+1. Every handler is idempotent. Each `NotificationLog` row carries a unique `IdempotencyKey` (sourced from `@event.EventId`) backed by a DB-level unique constraint. On a duplicate event delivery the insert throws `DbUpdateException` with a unique-constraint violation; the handler then checks `DeliveryStatus` and returns early only when it is `Sent` — meaning the email actually went out in a prior attempt.
+2. `DeliveryStatus` tracks the real delivery outcome, not just whether the log row was written. The sequence is: insert log as `Pending` → send email → call `log.MarkSent()` + `SaveChangesAsync`. If `SendAsync` throws the row stays `Pending`; on the next retry the handler sees the `Pending` row and retries the send rather than silently dropping it.
+3. `IConsentRegistry` gates every notification type. The welcome email checks `ConsentKeys.WelcomeEmail`. Security notifications (`PasswordReset*`, `PasswordChanged`, `EmailChange*`, `ExternalLogin*`) are transactional — they bypass consent because they are security-critical.
+4. `PasswordResetRequestedV1`, `EmailChangeRequestedV1`, and `ExternalLoginPendingV1` carry a raw token — embed it in the email body link, never log it.
 
 ---
 
@@ -38,9 +42,40 @@ This module delivers transactional notifications to users and keeps a log of wha
 
 1. Add an entry to the `NotificationType` enum.
 2. Add a template in `Templates/` (static class with `Subject`, `HtmlBody`, `PlainTextBody`).
-3. Write a handler in `Integration/Subscribers/` subscribing to the triggering event.
-4. Include an idempotency guard: add the log row first (with `@event.EventId` as `idempotencyKey`), catch `DbUpdateException.IsUniqueConstraintViolation()` and return early, then send the email.
-5. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
+3. Write a handler in `Integration/Subscribers/` subscribing to the triggering event. Follow the exact pattern below (copy from any existing handler).
+4. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
+
+### Idempotency + delivery-status pattern
+
+```csharp
+var log = NotificationLog.Create(@event.UserId, @event.Email, NotificationType.Foo,
+    FooTemplate.Subject, clock.UtcNow, @event.EventId);
+db.NotificationLogs.Add(log);
+
+try
+{
+    await db.SaveChangesAsync(ct);
+}
+catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+{
+    db.Entry(log).State = EntityState.Detached;
+    log = await db.NotificationLogs.FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
+    if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
+    {
+        return;   // already delivered — truly idempotent
+    }
+    // DeliveryStatus is Pending: previous send failed. Fall through to retry.
+}
+
+await emailSender.SendAsync(message, ct);
+log.MarkSent();
+await db.SaveChangesAsync(ct);
+```
+
+Key rules:
+- **Always detach the failed entity** (`db.Entry(log).State = EntityState.Detached`) before reloading it; otherwise Wolverine's `AutoApplyTransactions` middleware will try to re-insert the `Added` entity on the next `SaveChangesAsync`.
+- **Only short-circuit on `Sent`**, not on the presence of the row. A `Pending` row means the previous attempt's SMTP call failed; retrying is correct.
+- **Two explicit `SaveChangesAsync` calls** are intentional: the first commits the `Pending` log before touching SMTP, the second persists `MarkSent()`. Wolverine does not wrap these in a single outer DB transaction.
 
 ---
 
@@ -53,6 +88,6 @@ This module delivers transactional notifications to users and keeps a log of wha
 ## Known footguns
 
 - `SmtpEmailSender` is a real SMTP client — integration tests must override `IEmailSender` with a fake to avoid SMTP dial failures.
-- Raw tokens arrive in `PasswordResetRequestedV1.RawToken` and `EmailChangeRequestedV1.RawToken`. Embed them in email body links; never log them. Serilog destructuring masks known token property names, but defense-in-depth means not calling the log statement at all.
-- The idempotency key is `@event.EventId` (set by the publishing handler in Users). All events in `Users.Contracts` carry this field. The unique constraint on `NotificationLog.IdempotencyKey` makes the dedup race-safe — catch `DbUpdateException.IsUniqueConstraintViolation()` rather than doing a pre-check with `AnyAsync`.
+- Raw tokens arrive in `PasswordResetRequestedV1.RawToken`, `EmailChangeRequestedV1.RawToken`, and `ExternalLoginPendingV1.RawToken`. Embed them in email body links; never log them. Serilog destructuring masks known token property names, but defense-in-depth means not calling the log statement at all.
+- The unique constraint on `NotificationLog.IdempotencyKey` makes duplicate-detection race-safe — catch `DbUpdateException.IsUniqueConstraintViolation()` rather than doing a pre-check with `AnyAsync`. But do NOT return early on the constraint alone; check `DeliveryStatus == Sent` first or you will silently drop mail after any transient SMTP failure.
 - Adding a subscriber for a new event requires registering the handler in `NotificationsModule.AddNotificationsHandlers`; forgetting this means handlers are never discovered by Wolverine.

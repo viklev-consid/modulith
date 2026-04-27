@@ -71,8 +71,7 @@ By convention, these operations revoke all the user's refresh tokens (or all exc
 - Password reset (all)
 - Password change (all except current — user's active session continues)
 - Email change (all — treat as a full session invalidation)
-
-This limits the blast radius if any of these flows is triggered by an attacker with a stolen token.
+- External login unlink (all — if the provider account was compromised, all sessions issued via it are closed)
 
 ### Anti-enumeration
 

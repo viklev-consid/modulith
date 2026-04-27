@@ -59,6 +59,12 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnPasswordChangedHandler>();
         opts.Discovery.IncludeType<OnEmailChangedHandler>();
         opts.Discovery.IncludeType<OnUserRoleChangedHandler>();
+
+        // External login audit subscribers — Phase 14
+        opts.Discovery.IncludeType<OnExternalLoginLinkedHandler>();
+        opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
+        opts.Discovery.IncludeType<OnUserOnboardingCompletedHandler>();
+        opts.Discovery.IncludeType<OnUserProvisionedFromExternalHandler>();
         return opts;
     }
 

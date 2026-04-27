@@ -5,6 +5,7 @@ using DotNet.Testcontainers.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Respawn;
@@ -23,9 +24,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
     public const string TestJwtIssuer = "modulith-test";
     public const string TestJwtAudience = "modulith-test";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
 
     private Respawner? _respawner;
@@ -40,10 +39,26 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Jwt:Audience", TestJwtAudience);
         builder.UseSetting("Jwt:SigningKey", TestJwtKey);
 
+        // Satisfies GoogleAuthOptions [Required] validation so all tests can start.
+        builder.UseSetting("Modules:Users:Google:ClientId", "test-google-client-id");
+
         builder.ConfigureServices(services => ConfigureTestServices(services));
     }
 
     protected virtual void ConfigureTestServices(IServiceCollection services) { }
+
+    /// <summary>
+    /// The generic <see cref="IHost"/> backing this factory. Available after
+    /// <see cref="IAsyncLifetime.InitializeAsync"/> has run.
+    /// Use this to call Wolverine's <c>TrackActivity()</c> in integration tests.
+    /// </summary>
+    public IHost ApplicationHost { get; private set; } = null!;
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        ApplicationHost = base.CreateHost(builder);
+        return ApplicationHost;
+    }
 
     async Task IAsyncLifetime.InitializeAsync()
     {

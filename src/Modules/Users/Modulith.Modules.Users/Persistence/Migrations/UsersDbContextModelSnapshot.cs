@@ -18,7 +18,7 @@ namespace Modulith.Modules.Users.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("users")
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -39,6 +39,21 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("granted");
 
+                    b.Property<string>("GrantedFromIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("granted_from_ip");
+
+                    b.Property<string>("GrantedUserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("granted_user_agent");
+
+                    b.Property<string>("PolicyVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("policy_version");
+
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("recorded_at");
@@ -54,6 +69,49 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasDatabaseName("ix_consents_user_id_consent_key");
 
                     b.ToTable("consents", "users");
+                });
+
+            modelBuilder.Entity("Modulith.Modules.Users.Domain.ExternalLogin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("LinkedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("linked_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_external_logins");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_external_logins_user_id");
+
+                    b.HasIndex("Provider", "Subject")
+                        .IsUnique()
+                        .HasDatabaseName("ix_external_logins_provider_subject");
+
+                    b.HasIndex("UserId", "Provider")
+                        .IsUnique()
+                        .HasDatabaseName("ix_external_logins_user_id_provider");
+
+                    b.ToTable("external_logins", "users");
                 });
 
             modelBuilder.Entity("Modulith.Modules.Users.Domain.PendingEmailChange", b =>
@@ -84,6 +142,85 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasDatabaseName("ix_pending_email_changes_user_id");
 
                     b.ToTable("pending_email_changes", "users");
+                });
+
+            modelBuilder.Entity("Modulith.Modules.Users.Domain.PendingExternalLogin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<string>("CreatedFromIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("created_from_ip");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsExistingUser")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_existing_user");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("subject");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_hash");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("user_agent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pending_external_logins");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_pending_external_logins_expires_at");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pending_external_logins_token_hash");
+
+                    b.HasIndex("Provider", "Subject")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pending_external_logins_provider_subject")
+                        .HasFilter("consumed_at IS NULL");
+
+                    b.ToTable("pending_external_logins", "users");
                 });
 
             modelBuilder.Entity("Modulith.Modules.Users.Domain.RefreshToken", b =>
@@ -190,6 +327,46 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                     b.ToTable("user_tokens", "users");
                 });
 
+            modelBuilder.Entity("Modulith.Modules.Users.Domain.TermsAcceptance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<string>("AcceptedFromIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("accepted_from_ip");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_terms_acceptances");
+
+                    b.HasIndex("UserId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_terms_acceptances_user_id_version");
+
+                    b.ToTable("terms_acceptances", "users");
+                });
+
             modelBuilder.Entity("Modulith.Modules.Users.Domain.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -217,8 +394,13 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasColumnType("character varying(254)")
                         .HasColumnName("email");
 
+                    b.Property<bool>("HasCompletedOnboarding")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("has_completed_onboarding");
+
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
@@ -255,6 +437,16 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                     b.ToTable("users", "users");
                 });
 
+            modelBuilder.Entity("Modulith.Modules.Users.Domain.ExternalLogin", b =>
+                {
+                    b.HasOne("Modulith.Modules.Users.Domain.User", null)
+                        .WithMany("ExternalLogins")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_external_logins_users_user_id");
+                });
+
             modelBuilder.Entity("Modulith.Modules.Users.Domain.PendingEmailChange", b =>
                 {
                     b.HasOne("Modulith.Modules.Users.Domain.User", null)
@@ -283,6 +475,21 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("Modulith.Modules.Users.Domain.TermsAcceptance", b =>
+                {
+                    b.HasOne("Modulith.Modules.Users.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_terms_acceptances_users_user_id");
+                });
+
+            modelBuilder.Entity("Modulith.Modules.Users.Domain.User", b =>
+                {
+                    b.Navigation("ExternalLogins");
                 });
 #pragma warning restore 612, 618
         }

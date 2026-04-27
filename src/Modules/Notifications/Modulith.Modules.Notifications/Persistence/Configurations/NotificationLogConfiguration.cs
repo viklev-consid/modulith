@@ -33,6 +33,10 @@ internal sealed class NotificationLogConfiguration : IEntityTypeConfiguration<No
         builder.Property(n => n.IdempotencyKey)
             .IsRequired();
 
+        builder.Property(n => n.DeliveryStatus)
+            .IsRequired()
+            .HasDefaultValue(NotificationDeliveryStatus.Pending);
+
         builder.HasIndex(n => n.UserId);
         builder.HasIndex(n => n.IdempotencyKey)
             .IsUnique();

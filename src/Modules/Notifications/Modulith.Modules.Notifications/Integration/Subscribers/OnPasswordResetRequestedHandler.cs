@@ -19,9 +19,10 @@ public sealed class OnPasswordResetRequestedHandler(
         using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnPasswordResetRequestedHandler));
         NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(PasswordResetRequestedV1)));
 
-        db.NotificationLogs.Add(NotificationLog.Create(
+        var log = NotificationLog.Create(
             @event.UserId, @event.Email, NotificationType.PasswordResetRequest,
-            PasswordResetRequestTemplate.Subject, clock.UtcNow, @event.EventId));
+            PasswordResetRequestTemplate.Subject, clock.UtcNow, @event.EventId);
+        db.NotificationLogs.Add(log);
 
         try
         {
@@ -29,7 +30,13 @@ public sealed class OnPasswordResetRequestedHandler(
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
-            return;
+            db.Entry(log).State = EntityState.Detached;
+            log = await db.NotificationLogs
+                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
+            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
+            {
+                return;
+            }
         }
 
         // The raw token is passed through as-is; the consuming client constructs the
@@ -41,5 +48,7 @@ public sealed class OnPasswordResetRequestedHandler(
             PlainTextBody: PasswordResetRequestTemplate.PlainTextBody(@event.RawToken));
 
         await emailSender.SendAsync(message, ct);
+        log.MarkSent();
+        await db.SaveChangesAsync(ct);
     }
 }

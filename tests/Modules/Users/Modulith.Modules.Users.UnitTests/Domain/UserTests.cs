@@ -12,7 +12,7 @@ public sealed class UserTests
     [Fact]
     public void Create_WithValidArguments_ReturnsUser()
     {
-        var result = User.Create(ValidEmail, ValidHash, "Alice");
+        var result = User.CreateWithPassword(ValidEmail, ValidHash, "Alice");
 
         Assert.False(result.IsError);
         Assert.Equal(ValidEmail, result.Value.Email);
@@ -22,7 +22,7 @@ public sealed class UserTests
     [Fact]
     public void Create_RaisesUserRegisteredEvent()
     {
-        var result = User.Create(ValidEmail, ValidHash, "Alice");
+        var result = User.CreateWithPassword(ValidEmail, ValidHash, "Alice");
 
         Assert.Single(result.Value.DomainEvents);
         Assert.IsType<UserRegistered>(result.Value.DomainEvents.First());
@@ -31,7 +31,7 @@ public sealed class UserTests
     [Fact]
     public void Create_WithEmptyDisplayName_ReturnsValidationError()
     {
-        var result = User.Create(ValidEmail, ValidHash, "");
+        var result = User.CreateWithPassword(ValidEmail, ValidHash, "");
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Validation, result.FirstError.Type);
@@ -40,7 +40,7 @@ public sealed class UserTests
     [Fact]
     public void Create_WithTooLongDisplayName_ReturnsValidationError()
     {
-        var result = User.Create(ValidEmail, ValidHash, new string('x', 101));
+        var result = User.CreateWithPassword(ValidEmail, ValidHash, new string('x', 101));
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Validation, result.FirstError.Type);
@@ -49,7 +49,7 @@ public sealed class UserTests
     [Fact]
     public void Create_TrimsDisplayName()
     {
-        var result = User.Create(ValidEmail, ValidHash, "  Alice  ");
+        var result = User.CreateWithPassword(ValidEmail, ValidHash, "  Alice  ");
 
         Assert.False(result.IsError);
         Assert.Equal("Alice", result.Value.DisplayName);
@@ -58,7 +58,7 @@ public sealed class UserTests
     [Fact]
     public void ChangeEmail_ToDifferentEmail_Succeeds()
     {
-        var user = User.Create(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
         user.ClearDomainEvents();
         var newEmail = Email.Create("alice-new@example.com").Value;
 
@@ -73,7 +73,7 @@ public sealed class UserTests
     [Fact]
     public void ChangeEmail_ToSameEmail_ReturnsConflict()
     {
-        var user = User.Create(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
 
         var result = user.ChangeEmail(ValidEmail);
 
