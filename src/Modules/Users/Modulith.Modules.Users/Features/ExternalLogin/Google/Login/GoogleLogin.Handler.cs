@@ -109,8 +109,7 @@ public sealed class GoogleLoginHandler(
 
         if (activeByEmail >= opts.MaxPendingExternalLoginsPerEmail)
         {
-            // Silent throttle — return 202 without creating a record or sending an email.
-            return new GoogleLoginResponse(IsPending: true);
+            return UsersErrors.MaxPendingLoginsReached;
         }
 
         // Step 3: Create a new pending record. The unique partial index on (provider, subject)

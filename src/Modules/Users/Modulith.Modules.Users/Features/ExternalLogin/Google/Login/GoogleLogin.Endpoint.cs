@@ -36,6 +36,7 @@ internal static class GoogleLoginEndpoint
         .Produces(StatusCodes.Status202Accepted)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status409Conflict)
         .AllowAnonymous()
         .RequireRateLimiting("auth");
 }
