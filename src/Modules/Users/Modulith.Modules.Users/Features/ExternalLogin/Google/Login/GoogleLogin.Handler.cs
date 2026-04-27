@@ -76,6 +76,7 @@ public sealed class GoogleLoginHandler(
             return UsersErrors.ExternalAuthUnavailable;
         }
 
+        var normalizedEmail = emailResult.Value.Value;
         var now = clock.UtcNow;
 
         // Step 1: Reuse an existing active pending record for (provider, subject).
@@ -93,7 +94,7 @@ public sealed class GoogleLoginHandler(
             await db.SaveChangesAsync(ct);
 
             await bus.PublishAsync(new ExternalLoginPendingV1(
-                "Google", identity.Email, identity.Name, activePending.IsExistingUser, refreshedRawToken, Guid.NewGuid()));
+                "Google", normalizedEmail, identity.Name, activePending.IsExistingUser, refreshedRawToken, Guid.NewGuid()));
             UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginPendingV1)));
 
             return new GoogleLoginResponse(IsPending: true);
@@ -102,7 +103,7 @@ public sealed class GoogleLoginHandler(
         // Step 2: Enforce per-email cap across all subjects to prevent subject-cycling abuse.
         var activeByEmail = await db.PendingExternalLogins
             .CountAsync(p =>
-                p.Email == identity.Email &&
+                p.Email == normalizedEmail &&
                 p.ConsumedAt == null &&
                 p.ExpiresAt > now, ct);
 
@@ -119,7 +120,7 @@ public sealed class GoogleLoginHandler(
         var (pending, rawToken) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google,
             identity.Subject,
-            identity.Email,
+            normalizedEmail,
             identity.Name,
             isExistingUser,
             cmd.IpAddress,
@@ -141,7 +142,7 @@ public sealed class GoogleLoginHandler(
         }
 
         await bus.PublishAsync(new ExternalLoginPendingV1(
-            "Google", identity.Email, identity.Name, isExistingUser, rawToken, Guid.NewGuid()));
+            "Google", normalizedEmail, identity.Name, isExistingUser, rawToken, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginPendingV1)));
 
         return new GoogleLoginResponse(IsPending: true);
