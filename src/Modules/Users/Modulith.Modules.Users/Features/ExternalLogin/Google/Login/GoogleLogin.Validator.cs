@@ -6,6 +6,6 @@ internal sealed class GoogleLoginValidator : AbstractValidator<GoogleLoginReques
 {
     public GoogleLoginValidator()
     {
-        RuleFor(x => x.IdToken).NotEmpty();
+        RuleFor(x => x.IdToken).NotEmpty().MaximumLength(4096);
     }
 }

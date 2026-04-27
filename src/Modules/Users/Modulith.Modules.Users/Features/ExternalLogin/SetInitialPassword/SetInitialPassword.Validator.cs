@@ -9,9 +9,11 @@ internal sealed class SetInitialPasswordValidator : AbstractValidator<SetInitial
     {
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(options.Value.MinPasswordLength);
+            .MinimumLength(options.Value.MinPasswordLength)
+            .MaximumLength(128);
 
         RuleFor(x => x.GoogleIdToken)
-            .NotEmpty();
+            .NotEmpty()
+            .MaximumLength(4096);
     }
 }

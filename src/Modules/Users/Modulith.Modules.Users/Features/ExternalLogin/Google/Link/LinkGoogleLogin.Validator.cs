@@ -6,6 +6,6 @@ internal sealed class LinkGoogleLoginValidator : AbstractValidator<LinkGoogleLog
 {
     public LinkGoogleLoginValidator()
     {
-        RuleFor(x => x.IdToken).NotEmpty();
+        RuleFor(x => x.IdToken).NotEmpty().MaximumLength(4096);
     }
 }

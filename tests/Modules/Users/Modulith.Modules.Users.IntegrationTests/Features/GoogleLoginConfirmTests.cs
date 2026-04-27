@@ -181,6 +181,17 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
     }
 
     [Fact]
+    public async Task GoogleLoginConfirm_WhenTokenExceedsMaxLength_Returns422()
+    {
+        var oversized = new string('a', 65);
+
+        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+            new GoogleLoginConfirmRequest(oversized));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GoogleLoginConfirm_WhenUserRegisteredAfterLoginInitiated_LinksToExistingUser()
     {
         const string email = "latecreated@example.com";

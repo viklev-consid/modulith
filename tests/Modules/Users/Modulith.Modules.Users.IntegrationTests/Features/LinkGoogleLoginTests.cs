@@ -136,6 +136,31 @@ public sealed class LinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsync
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task LinkGoogleLogin_WhenIdTokenEmpty_Returns422()
+    {
+        var (_, accessToken) = await RegisterAndLoginAsync("linkgoogle-empty@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/auth/google/link",
+            new LinkGoogleLoginRequest(""));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LinkGoogleLogin_WhenIdTokenExceedsMaxLength_Returns422()
+    {
+        var (_, accessToken) = await RegisterAndLoginAsync("linkgoogle-oversize@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+        var oversized = new string('a', 4097);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/auth/google/link",
+            new LinkGoogleLoginRequest(oversized));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
     private async Task<(Guid UserId, string AccessToken)> RegisterAndLoginAsync(string email)
     {
         var reg = await _anon.PostAsJsonAsync("/v1/users/register",

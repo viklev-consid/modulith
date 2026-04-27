@@ -97,6 +97,32 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
     }
 
     [Fact]
+    public async Task SetInitialPassword_WithPasswordExceedingMaxLength_Returns422()
+    {
+        var (_, accessToken) = await SeedExternalUserAsync("setpwdlong@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+        var oversized = new string('A', 129) + "1!";
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/password/initial",
+            new { password = oversized, googleIdToken = "fake-google-token" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetInitialPassword_WhenGoogleIdTokenExceedsMaxLength_Returns422()
+    {
+        var (_, accessToken) = await SeedExternalUserAsync("setpwdtokenlong@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+        var oversized = new string('a', 4097);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/password/initial",
+            new { password = "NewPassword1!", googleIdToken = oversized });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task SetInitialPassword_WhenUnauthenticated_Returns401()
     {
         var response = await _anon.PostAsJsonAsync("/v1/users/me/password/initial",

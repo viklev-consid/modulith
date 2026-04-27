@@ -6,6 +6,6 @@ internal sealed class GoogleLoginConfirmValidator : AbstractValidator<GoogleLogi
 {
     public GoogleLoginConfirmValidator()
     {
-        RuleFor(x => x.Token).NotEmpty();
+        RuleFor(x => x.Token).NotEmpty().MaximumLength(64);
     }
 }

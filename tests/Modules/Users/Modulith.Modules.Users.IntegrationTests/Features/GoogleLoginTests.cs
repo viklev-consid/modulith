@@ -108,6 +108,17 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
     }
 
     [Fact]
+    public async Task GoogleLogin_WhenIdTokenExceedsMaxLength_Returns422()
+    {
+        var oversized = new string('a', 4097);
+
+        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+            new GoogleLoginRequest(oversized));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GoogleLogin_EmailLoop_CreatesPendingRecordInDatabase()
     {
         fixture.GoogleVerifier.SetIdentity("sub-pending", "pending@example.com", "Pending User");
