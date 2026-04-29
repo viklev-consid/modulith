@@ -43,7 +43,14 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         // Satisfies GoogleAuthOptions [Required] validation so all tests can start.
         builder.UseSetting("Modules:Users:Google:ClientId", "test-google-client-id");
 
-        builder.ConfigureServices(services => ConfigureTestServices(services));
+        builder.ConfigureServices(services =>
+        {
+            // Cap host shutdown so Wolverine's DurabilityAgent (which retries against the
+            // already-stopped Postgres container) cannot keep the test process alive past
+            // this deadline. Default is 30 s; 5 s is ample for any real graceful-stop work.
+            services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(5));
+            ConfigureTestServices(services);
+        });
     }
 
     protected virtual void ConfigureTestServices(IServiceCollection services) { }
@@ -170,8 +177,25 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     async Task IAsyncLifetime.DisposeAsync()
     {
+        // Stop the host with a hard deadline before tearing down the database.
+        // Wolverine's DurabilityAgent polls Postgres in a background loop; without
+        // a deadline it keeps retrying after the container stops, blocking process exit.
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await ApplicationHost.StopAsync(cts.Token);
+        }
+        catch (OperationCanceledException) { /* deadline reached — expected */ }
+
         await _postgres.DisposeAsync();
         await DisposeAdditionalContainersAsync();
+
+        // Explicitly dispose WebApplicationFactory (TestServer, service provider)
+        // since xUnit only calls IAsyncLifetime.DisposeAsync(), not base Dispose().
+        // WebApplicationFactory only implements IDisposable (not IAsyncDisposable).
+#pragma warning disable S6966
+        Dispose();
+#pragma warning restore S6966
     }
 
     /// <summary>Override to dispose extra containers started in StartAdditionalContainersAsync.</summary>
