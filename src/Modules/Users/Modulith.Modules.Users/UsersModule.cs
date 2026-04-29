@@ -93,7 +93,8 @@ public static class UsersModule
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, UsersPersonalDataEraser>();
+        services.AddScoped<UsersPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<UsersPersonalDataEraser>());
         services.AddScoped<PersonalDataOrchestrator>();
 
         services.AddHealthChecks()

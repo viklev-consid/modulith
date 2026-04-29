@@ -34,7 +34,8 @@ public static class AuditModule
         });
 
         services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, AuditPersonalDataEraser>();
+        services.AddScoped<AuditPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<AuditPersonalDataEraser>());
 
         services.AddSingleton<IResourcePolicy<AuditTrailResource>, AuditTrailPolicy>();
 
@@ -65,6 +66,7 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
         opts.Discovery.IncludeType<OnUserOnboardingCompletedHandler>();
         opts.Discovery.IncludeType<OnUserProvisionedFromExternalHandler>();
+        opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         return opts;
     }
 

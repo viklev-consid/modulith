@@ -39,7 +39,8 @@ public static class NotificationsModule
         });
 
         services.AddScoped<IPersonalDataExporter, NotificationsPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, NotificationsPersonalDataEraser>();
+        services.AddScoped<NotificationsPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<NotificationsPersonalDataEraser>());
         services.AddScoped<NotificationSendGuard>();
 
         services.AddHealthChecks()
@@ -65,6 +66,7 @@ public static class NotificationsModule
         opts.Discovery.IncludeType<OnExternalLoginPendingHandler>();
         opts.Discovery.IncludeType<OnExternalLoginLinkedHandler>();
         opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
+        opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         return opts;
     }
 

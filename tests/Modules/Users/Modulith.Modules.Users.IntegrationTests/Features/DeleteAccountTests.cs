@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Features.Register;
+using Wolverine;
+using Wolverine.Tracking;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -52,4 +55,35 @@ public sealed class DeleteAccountTests(GdprApiFixture fixture) : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task DeleteAccount_PublishesUserErasureRequestedV1()
+    {
+        // Arrange
+        var registerResp = await (await _anonymous.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest("erasure-event@example.com", "Password1!", "Erasure")))
+            .Content.ReadFromJsonAsync<RegisterResponse>();
+
+        var client = fixture.CreateAuthenticatedClient(
+            registerResp!.UserId, "erasure-event@example.com", "Erasure");
+
+        // Act — TrackActivity waits for the handler and all cascading subscribers to settle
+        Func<IMessageContext, Task> act = async _ =>
+        {
+            var resp = await client.DeleteAsync("/v1/users/me");
+            Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+        };
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
+
+        // Assert replay safety — re-delivering UserErasureRequestedV1 for an already-erased user
+        // must be a no-op, not an error. If any subscriber throws, InvokeMessageAndWaitAsync throws.
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .InvokeMessageAndWaitAsync(
+                new UserErasureRequestedV1(registerResp.UserId, "Erasure", Guid.NewGuid()));
+    }
 }
+

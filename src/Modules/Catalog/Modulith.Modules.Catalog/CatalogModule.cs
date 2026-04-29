@@ -48,7 +48,8 @@ public static class CatalogModule
         services.AddValidatorsFromAssemblyContaining<CreateProductValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 
         services.AddScoped<IPersonalDataExporter, CatalogPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, CatalogPersonalDataEraser>();
+        services.AddScoped<CatalogPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<CatalogPersonalDataEraser>());
 
         services.AddHealthChecks()
             .AddDbContextCheck<CatalogDbContext>("catalog-db", tags: ["ready"]);
@@ -71,6 +72,7 @@ public static class CatalogModule
         opts.Discovery.IncludeType<GetProductByIdHandler>();
         opts.Discovery.IncludeType<ListProductsHandler>();
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
+        opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         return opts;
     }
 
