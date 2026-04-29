@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Users.Contracts.Events;
 using Wolverine;
 using Wolverine.Tracking;
 
@@ -63,6 +64,7 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
         var request = new { Email = "idempotency-test@example.com", Password = "Password1!", DisplayName = "Idempotent User" };
         HttpResponseMessage? registerResponse = null;
 
+        // First delivery — via HTTP registration (also sets up consent for the user).
         Func<IMessageContext, Task> act = async _ =>
         {
             registerResponse = await _client.PostAsJsonAsync("/v1/users/register", request);
@@ -72,7 +74,22 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
             .ExecuteAndWaitAsync(act);
 
         Assert.Equal(HttpStatusCode.Created, registerResponse!.StatusCode);
+        var body = await registerResponse!.Content.ReadFromJsonAsync<JsonDocument>();
+        var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
+        // Retrieve the EventId that the notification handler persisted as the idempotency key.
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        var log = await db.NotificationLogs.FirstAsync(l => l.UserId == userId);
+        var originalEventId = log.IdempotencyKey;
+
+        // Second delivery — same event with the same EventId, simulating a Wolverine retry.
+        var redelivery = new UserRegisteredV1(userId, "idempotency-test@example.com", "Idempotent User", originalEventId);
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .PublishMessageAndWaitAsync(redelivery);
+
+        // The idempotency guard must have suppressed the second send.
         var emailsToUser = fixture.EmailSender.SentMessages
             .Count(m => string.Equals(m.To, "idempotency-test@example.com", StringComparison.Ordinal));
         Assert.Equal(1, emailsToUser);
