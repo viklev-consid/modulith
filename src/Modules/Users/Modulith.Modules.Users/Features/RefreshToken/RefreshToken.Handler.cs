@@ -1,11 +1,13 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
+using Wolverine;
 
 namespace Modulith.Modules.Users.Features.RefreshToken;
 
@@ -14,7 +16,8 @@ public sealed class RefreshTokenHandler(
     IJwtGenerator jwtGenerator,
     IRefreshTokenIssuer refreshTokenIssuer,
     IOptions<UsersOptions> options,
-    IClock clock)
+    IClock clock,
+    IMessageBus bus)
 {
     public async Task<ErrorOr<RefreshTokenResponse>> Handle(RefreshTokenCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(RefreshTokenHandler), () => HandleCoreAsync(cmd, ct));
@@ -39,6 +42,9 @@ public sealed class RefreshTokenHandler(
             await db.RefreshTokens
                 .Where(t => t.UserId == existing.UserId && t.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
+
+            await bus.PublishAsync(new RefreshTokenReuseDetectedV1(existing.UserId.Value, Guid.NewGuid()));
+            UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(RefreshTokenReuseDetectedV1)));
 
             await db.SaveChangesAsync(ct);
             return UsersErrors.RefreshTokenRevoked;
