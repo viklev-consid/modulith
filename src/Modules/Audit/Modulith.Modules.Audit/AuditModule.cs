@@ -55,6 +55,7 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
         opts.Discovery.IncludeType<OnUserEmailChangedHandler>();
         opts.Discovery.IncludeType<OnUserLoggedInHandler>();
+        opts.Discovery.IncludeType<OnUserLoggedOutHandler>();
         opts.Discovery.IncludeType<OnUserLoggedOutAllDevicesHandler>();
         opts.Discovery.IncludeType<OnPasswordResetHandler>();
         opts.Discovery.IncludeType<OnPasswordChangedHandler>();
