@@ -15,7 +15,8 @@ namespace Modulith.Modules.Notifications.Integration.Subscribers;
 public sealed class OnExternalLoginPendingHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
-    IClock clock)
+    IClock clock,
+    NotificationSendGuard sendGuard)
 {
     public async Task Handle(ExternalLoginPendingV1 @event, CancellationToken ct)
     {
@@ -41,12 +42,11 @@ public sealed class OnExternalLoginPendingHandler(
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             db.Entry(log).State = EntityState.Detached;
-            log = await db.NotificationLogs
-                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
-            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
-            {
-                return;
-            }
+        }
+
+        if (!await sendGuard.TryClaimAsync(@event.EventId, ct))
+        {
+            return;
         }
 
         var (htmlBody, plainBody) = @event.IsExistingUser
@@ -62,7 +62,6 @@ public sealed class OnExternalLoginPendingHandler(
             PlainTextBody: plainBody);
 
         await emailSender.SendAsync(message, ct);
-        log.MarkSent();
-        await db.SaveChangesAsync(ct);
+        await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

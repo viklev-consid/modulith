@@ -49,6 +49,10 @@ namespace Modulith.Modules.Notifications.Persistence.Migrations
                         .HasColumnType("character varying(320)")
                         .HasColumnName("recipient_email");
 
+                    b.Property<DateTimeOffset?>("SendingClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sending_claimed_at");
+
                     b.Property<DateTimeOffset>("SentAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sent_at");

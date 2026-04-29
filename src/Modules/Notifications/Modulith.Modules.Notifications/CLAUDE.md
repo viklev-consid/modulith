@@ -6,9 +6,10 @@ This module delivers transactional notifications to users and keeps a log of wha
 
 ## Domain vocabulary
 
-- **NotificationLog** — a record that a notification was attempted or sent. Identified by `NotificationLogId`. Carries a `DeliveryStatus` (`Pending` / `Sent`) that tracks whether the SMTP send actually completed.
+- **NotificationLog** — a record that a notification was attempted or sent. Identified by `NotificationLogId`. Carries a `DeliveryStatus` (`Pending` / `Sending` / `Sent`) and a `SendingClaimedAt` timestamp that tracks the exclusive send claim.
 - **NotificationType** — an enum classifying the notification (`WelcomeEmail`, `PasswordResetRequest`, `PasswordResetConfirmation`, `PasswordChanged`, `EmailChangeRequest`, `EmailChanged`, `ExternalLoginPendingExistingUser`, `ExternalLoginPendingNewUser`, `ExternalLoginLinked`, `ExternalLoginUnlinked`).
-- **NotificationDeliveryStatus** — `Pending = 0` (log row written, send not yet confirmed) / `Sent = 1` (send confirmed).
+- **NotificationDeliveryStatus** — `Pending = 0` (row written, not yet claimed) / `Sending = 2` (exclusive claim held, SMTP in progress) / `Sent = 1` (delivery confirmed).
+- **NotificationSendGuard** — scoped service in `Integration/Subscribers/` that owns the atomic claim/recovery logic. Inject it into every notification handler.
 - **IConsentRegistry** — interface (in `Shared.Infrastructure`) implemented by the Users module. Returns whether a user has consented to a given notification purpose.
 
 ---
@@ -31,8 +32,8 @@ This module delivers transactional notifications to users and keeps a log of wha
 
 ## Invariants
 
-1. Every handler is idempotent. Each `NotificationLog` row carries a unique `IdempotencyKey` (sourced from `@event.EventId`) backed by a DB-level unique constraint. On a duplicate event delivery the insert throws `DbUpdateException` with a unique-constraint violation; the handler then checks `DeliveryStatus` and returns early only when it is `Sent` — meaning the email actually went out in a prior attempt.
-2. `DeliveryStatus` tracks the real delivery outcome, not just whether the log row was written. The sequence is: insert log as `Pending` → send email → call `log.MarkSent()` + `SaveChangesAsync`. If `SendAsync` throws the row stays `Pending`; on the next retry the handler sees the `Pending` row and retries the send rather than silently dropping it.
+1. Every handler is idempotent. Each `NotificationLog` row carries a unique `IdempotencyKey` (sourced from `@event.EventId`) backed by a DB-level unique constraint. On a duplicate event delivery the insert throws `DbUpdateException` with a unique-constraint violation; the handler detaches the entity and falls through to the claim step.
+2. `DeliveryStatus` uses a three-phase protocol to prevent duplicate sends. The sequence is: insert log as `Pending` → atomically transition `Pending → Sending` (`NotificationSendGuard.TryClaimAsync`) → send email → transition `Sending → Sent` (`NotificationSendGuard.MarkSentAsync`). If the process crashes between the claim and the `MarkSentAsync` call, the row stays `Sending`; `TryClaimAsync` will reset it to `Pending` and re-claim it after `StuckSendingThreshold` (5 minutes) has elapsed.
 3. `IConsentRegistry` gates every notification type. The welcome email checks `ConsentKeys.WelcomeEmail`. Security notifications (`PasswordReset*`, `PasswordChanged`, `EmailChange*`, `ExternalLogin*`) are transactional — they bypass consent because they are security-critical.
 4. `PasswordResetRequestedV1`, `EmailChangeRequestedV1`, and `ExternalLoginPendingV1` carry a raw token — embed it in the email body link, never log it.
 
@@ -45,9 +46,10 @@ This module delivers transactional notifications to users and keeps a log of wha
 3. Write a handler in `Integration/Subscribers/` subscribing to the triggering event. Follow the exact pattern below (copy from any existing handler).
 4. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
 
-### Idempotency + delivery-status pattern
+### Idempotency + atomic send-claim pattern
 
 ```csharp
+// 1. Insert log as Pending; idempotency key unique constraint prevents duplicate rows.
 var log = NotificationLog.Create(@event.UserId, @event.Email, NotificationType.Foo,
     FooTemplate.Subject, clock.UtcNow, @event.EventId);
 db.NotificationLogs.Add(log);
@@ -58,24 +60,32 @@ try
 }
 catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
 {
+    // Row already exists from a prior attempt — detach and fall through to the claim.
     db.Entry(log).State = EntityState.Detached;
-    log = await db.NotificationLogs.FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
-    if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
-    {
-        return;   // already delivered — truly idempotent
-    }
-    // DeliveryStatus is Pending: previous send failed. Fall through to retry.
 }
 
+// 2. Atomically claim the send slot (Pending → Sending).
+//    Returns false if the row is already Sending (another instance in-flight) or Sent.
+//    Stale Sending rows (> 5 min) are automatically reset to Pending and re-claimed.
+if (!await sendGuard.TryClaimAsync(@event.EventId, ct))
+{
+    return;
+}
+
+// 3. We hold the exclusive claim — send the email.
+var message = new EmailMessage(To: @event.Email, Subject: FooTemplate.Subject,
+    HtmlBody: FooTemplate.HtmlBody(...), PlainTextBody: FooTemplate.PlainTextBody(...));
+
 await emailSender.SendAsync(message, ct);
-log.MarkSent();
-await db.SaveChangesAsync(ct);
+
+// 4. Confirm delivery (Sending → Sent).
+await sendGuard.MarkSentAsync(@event.EventId, ct);
 ```
 
 Key rules:
-- **Always detach the failed entity** (`db.Entry(log).State = EntityState.Detached`) before reloading it; otherwise Wolverine's `AutoApplyTransactions` middleware will try to re-insert the `Added` entity on the next `SaveChangesAsync`.
-- **Only short-circuit on `Sent`**, not on the presence of the row. A `Pending` row means the previous attempt's SMTP call failed; retrying is correct.
-- **Two explicit `SaveChangesAsync` calls** are intentional: the first commits the `Pending` log before touching SMTP, the second persists `MarkSent()`. Wolverine does not wrap these in a single outer DB transaction.
+- **Always detach the failed entity** (`db.Entry(log).State = EntityState.Detached`) before the claim; otherwise Wolverine's `AutoApplyTransactions` middleware will try to re-insert the `Added` entity on any subsequent `SaveChangesAsync`.
+- **Never call `log.MarkSent()` directly** — use `sendGuard.MarkSentAsync`. The guard issues an `ExecuteUpdateAsync` that bypasses EF change tracking, which is correct here because handlers are `[NonTransactional]`.
+- **Inject `NotificationSendGuard sendGuard`** in the handler's primary constructor alongside `db` and `clock`.
 
 ---
 
@@ -89,5 +99,6 @@ Key rules:
 
 - `SmtpEmailSender` is a real SMTP client — integration tests must override `IEmailSender` with a fake to avoid SMTP dial failures.
 - Raw tokens arrive in `PasswordResetRequestedV1.RawToken`, `EmailChangeRequestedV1.RawToken`, and `ExternalLoginPendingV1.RawToken`. Embed them in email body links; never log them. Serilog destructuring masks known token property names, but defense-in-depth means not calling the log statement at all.
-- The unique constraint on `NotificationLog.IdempotencyKey` makes duplicate-detection race-safe — catch `DbUpdateException.IsUniqueConstraintViolation()` rather than doing a pre-check with `AnyAsync`. But do NOT return early on the constraint alone; check `DeliveryStatus == Sent` first or you will silently drop mail after any transient SMTP failure.
+- The unique constraint on `NotificationLog.IdempotencyKey` makes duplicate-detection race-safe — catch `DbUpdateException.IsUniqueConstraintViolation()` rather than doing a pre-check with `AnyAsync`. But do NOT short-circuit on the constraint alone; always fall through to `TryClaimAsync`.
 - Adding a subscriber for a new event requires registering the handler in `NotificationsModule.AddNotificationsHandlers`; forgetting this means handlers are never discovered by Wolverine.
+- Rows stuck permanently in `Sending` (e.g. process killed before `MarkSentAsync`) are recovered automatically after 5 minutes by the next Wolverine retry. If Wolverine's retry schedule is exhausted before the threshold, the row will remain `Sending` and require manual intervention. Monitor for long-lived `Sending` rows in your observability stack.

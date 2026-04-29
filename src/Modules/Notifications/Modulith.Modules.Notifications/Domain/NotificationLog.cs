@@ -31,6 +31,9 @@ public sealed class NotificationLog : Entity<NotificationLogId>
     public DateTimeOffset SentAt { get; private set; }
     public Guid IdempotencyKey { get; private set; }
     public NotificationDeliveryStatus DeliveryStatus { get; private set; }
+    /// <summary>Timestamp at which the exclusive send claim was taken (Pending → Sending).
+    /// Null until the claim is first acquired. Used to detect stuck Sending rows.</summary>
+    public DateTimeOffset? SendingClaimedAt { get; private set; }
 
     public void MarkSent() => DeliveryStatus = NotificationDeliveryStatus.Sent;
 

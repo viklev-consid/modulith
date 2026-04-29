@@ -104,6 +104,48 @@ public sealed class EmailChangeTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task ConfirmEmailChange_WhenTargetEmailTakenByRace_Returns400AndDoesNotRevokeTokens()
+    {
+        // Arrange: alice has a pending change to newalice@example.com
+        var login = await RegisterAndLoginAsync("alice@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(login.AccessToken);
+
+        string rawToken;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var tokenService = scope.ServiceProvider.GetRequiredService<ISingleUseTokenService>();
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var user = await db.Users.FirstAsync(u => u.Email == Domain.Email.Create("alice@example.com").Value);
+
+            var newEmailResult = Domain.Email.Create("newalice@example.com");
+            Assert.False(newEmailResult.IsError);
+
+            var (sut, raw) = tokenService.Create(
+                user.Id, Domain.TokenPurpose.EmailChange, TimeSpan.FromMinutes(30));
+
+            var pending = Domain.PendingEmailChange.Create(user.Id, newEmailResult.Value, sut.Id);
+            db.PendingEmailChanges.Add(pending);
+            await db.SaveChangesAsync();
+            rawToken = raw;
+        }
+
+        // Simulate the race: another user registers the target email before alice confirms
+        await _anon.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest("newalice@example.com", "Password1!", "Bob"));
+
+        // Act: alice confirms — should fail due to uniqueness violation
+        var confirm = await auth.PostAsJsonAsync("/v1/users/me/email/confirm",
+            new ConfirmEmailChangeRequest(rawToken));
+
+        Assert.Equal(HttpStatusCode.BadRequest, confirm.StatusCode);
+
+        // Assert: alice's session must still be valid — no spurious logout
+        var refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+            new RefreshTokenRequest(login.RefreshToken));
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+    }
+
     private async Task<LoginResponse> RegisterAndLoginAsync(string email)
     {
         await _anon.PostAsJsonAsync("/v1/users/register",

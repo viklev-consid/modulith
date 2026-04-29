@@ -19,7 +19,8 @@ namespace Modulith.Modules.Notifications.Integration.Subscribers;
 public sealed class OnEmailChangedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
-    IClock clock)
+    IClock clock,
+    NotificationSendGuard sendGuard)
 {
     public async Task Handle(EmailChangedV1 @event, CancellationToken ct)
     {
@@ -39,12 +40,11 @@ public sealed class OnEmailChangedHandler(
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             db.Entry(log).State = EntityState.Detached;
-            log = await db.NotificationLogs
-                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
-            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
-            {
-                return;
-            }
+        }
+
+        if (!await sendGuard.TryClaimAsync(@event.EventId, ct))
+        {
+            return;
         }
 
         var message = new EmailMessage(
@@ -54,7 +54,6 @@ public sealed class OnEmailChangedHandler(
             PlainTextBody: EmailChangedTemplate.PlainTextBody(@event.NewEmail));
 
         await emailSender.SendAsync(message, ct);
-        log.MarkSent();
-        await db.SaveChangesAsync(ct);
+        await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

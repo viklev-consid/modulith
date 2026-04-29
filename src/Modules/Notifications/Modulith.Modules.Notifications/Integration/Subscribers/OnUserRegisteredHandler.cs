@@ -17,7 +17,8 @@ public sealed class OnUserRegisteredHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IConsentRegistry consentRegistry,
-    IClock clock)
+    IClock clock,
+    NotificationSendGuard sendGuard)
 {
     public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
     {
@@ -45,12 +46,11 @@ public sealed class OnUserRegisteredHandler(
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             db.Entry(log).State = EntityState.Detached;
-            log = await db.NotificationLogs
-                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
-            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
-            {
-                return;
-            }
+        }
+
+        if (!await sendGuard.TryClaimAsync(@event.EventId, ct))
+        {
+            return;
         }
 
         var message = new EmailMessage(
@@ -60,7 +60,6 @@ public sealed class OnUserRegisteredHandler(
             PlainTextBody: WelcomeEmailTemplate.PlainTextBody(@event.DisplayName));
 
         await emailSender.SendAsync(message, ct);
-        log.MarkSent();
-        await db.SaveChangesAsync(ct);
+        await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

@@ -40,6 +40,7 @@ public static class NotificationsModule
 
         services.AddScoped<IPersonalDataExporter, NotificationsPersonalDataExporter>();
         services.AddScoped<IPersonalDataEraser, NotificationsPersonalDataEraser>();
+        services.AddScoped<NotificationSendGuard>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<NotificationsDbContext>("notifications-db", tags: ["ready"]);
