@@ -7,8 +7,11 @@ using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
+using Wolverine.Attributes;
+
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
 
+[NonTransactional]
 public sealed class OnPasswordResetRequestedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,

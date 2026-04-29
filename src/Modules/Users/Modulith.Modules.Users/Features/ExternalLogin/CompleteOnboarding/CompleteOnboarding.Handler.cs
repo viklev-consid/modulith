@@ -69,6 +69,7 @@ public sealed class CompleteOnboardingHandler(
             // A concurrent request already inserted the ToS row and completed onboarding.
             // The unique constraint on (UserId, Version) fired, but the outcome is the same —
             // treat this as a successful idempotent no-op rather than a 500.
+            db.ChangeTracker.Clear();
             return Result.Success;
         }
 

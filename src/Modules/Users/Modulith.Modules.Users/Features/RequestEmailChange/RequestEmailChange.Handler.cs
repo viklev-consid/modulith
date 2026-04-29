@@ -69,6 +69,7 @@ public sealed class RequestEmailChangeHandler(
         {
             // A concurrent request from the same user hit the unique index on pending_email_changes.user_id.
             // The first request succeeded; silently return the same success shape.
+            db.ChangeTracker.Clear();
             return new RequestEmailChangeResponse();
         }
 

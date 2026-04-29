@@ -63,6 +63,8 @@ public sealed class ChangeUserRoleHandler(
             // The domain event was raised in memory but is discarded — Wolverine's outbox
             // write is part of the same transaction, so it was never committed.
             // Refresh-token revocation has not yet run, so no spurious logouts occur.
+            // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
+            db.ChangeTracker.Clear();
             return UsersErrors.ConcurrencyConflict;
         }
 

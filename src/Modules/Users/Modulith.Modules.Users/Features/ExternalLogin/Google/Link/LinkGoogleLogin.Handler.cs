@@ -64,6 +64,8 @@ public sealed class LinkGoogleLoginHandler(
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg &&
                                            string.Equals(pg.SqlState, "23505", StringComparison.Ordinal))
         {
+            // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
+            db.ChangeTracker.Clear();
             return string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal)
                 ? UsersErrors.ExternalLoginLinkedToOtherUser
                 : UsersErrors.ExternalLoginAlreadyLinked;

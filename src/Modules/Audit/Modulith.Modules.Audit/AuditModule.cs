@@ -13,7 +13,6 @@ using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 
 namespace Modulith.Modules.Audit;
 
@@ -26,7 +25,7 @@ public static class AuditModule
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
         services.AddPermissions(AuditPermissions.All);
 
-        services.AddDbContextWithWolverineIntegration<AuditDbContext>((sp, opts) =>
+        services.AddDbContext<AuditDbContext>((sp, opts) =>
         {
             opts.UseNpgsql(
                 configuration.GetConnectionString("db"),

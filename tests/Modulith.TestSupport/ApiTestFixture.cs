@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Respawn;
+using Respawn.Graph;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -28,7 +29,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         .Build();
 
     private Respawner? _respawner;
-    protected string ConnectionString => _postgres.GetConnectionString();
+    public string ConnectionString => _postgres.GetConnectionString();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -69,6 +70,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         await StartAdditionalContainersAsync();
 
         // Trigger host build (reads ConnectionString set above) then migrate.
+        // Wolverine auto-provisions its schema when its hosted service starts.
         using var scope = Services.CreateScope();
         await MigrateAsync(scope.ServiceProvider);
 
@@ -78,7 +80,12 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = GetSchemasToReset(),
+            SchemasToInclude = [.. GetSchemasToReset(), "wolverine"],
+            TablesToIgnore =
+            [
+                new Table("wolverine", "wolverine_nodes"),
+                new Table("wolverine", "wolverine_node_assignments"),
+            ],
         });
     }
 
@@ -99,9 +106,23 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
             return;
         }
 
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        await conn.OpenAsync();
-        await _respawner.ResetAsync(conn);
+        // Retry on PostgreSQL deadlock (40P01): the Wolverine DurabilityAgent may hold
+        // short-lived locks on the wolverine schema concurrently with Respawn's DELETE sweep.
+        // A brief wait lets the in-flight agent transaction complete.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await using var conn = new NpgsqlConnection(ConnectionString);
+            await conn.OpenAsync();
+            try
+            {
+                await _respawner.ResetAsync(conn);
+                return;
+            }
+            catch (Npgsql.PostgresException ex) when (string.Equals(ex.SqlState, "40P01", StringComparison.Ordinal) && attempt < 3)
+            {
+                await Task.Delay(150 * attempt);
+            }
+        }
     }
 
     public HttpClient CreateAnonymousClient() => CreateClient();

@@ -74,6 +74,7 @@ public sealed class ConfirmEmailChangeHandler(
         {
             // Between the pre-check in RequestEmailChange and this confirmation committing, someone else
             // claimed the target email. Return the same opaque error — the token is effectively spent.
+            db.ChangeTracker.Clear();
             return UsersErrors.InvalidOrExpiredToken;
         }
 

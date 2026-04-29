@@ -19,7 +19,6 @@ using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 
 namespace Modulith.Modules.Catalog;
 
@@ -38,7 +37,7 @@ public static class CatalogModule
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
         services.AddPermissions(CatalogPermissions.All);
 
-        services.AddDbContextWithWolverineIntegration<CatalogDbContext>((sp, opts) =>
+        services.AddDbContext<CatalogDbContext>((sp, opts) =>
         {
             opts.UseNpgsql(
                 configuration.GetConnectionString("db"),

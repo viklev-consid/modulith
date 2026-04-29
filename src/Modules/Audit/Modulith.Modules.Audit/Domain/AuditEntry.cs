@@ -13,7 +13,8 @@ public sealed class AuditEntry : Entity<AuditEntryId>
         string? resourceType,
         Guid? resourceId,
         string payload,
-        DateTimeOffset occurredAt) : base(id)
+        DateTimeOffset occurredAt,
+        Guid? idempotencyKey) : base(id)
     {
         EventType = eventType;
         ActorId = actorId;
@@ -21,6 +22,7 @@ public sealed class AuditEntry : Entity<AuditEntryId>
         ResourceId = resourceId;
         Payload = payload;
         OccurredAt = occurredAt;
+        IdempotencyKey = idempotencyKey;
     }
 
     public string EventType { get; private set; } = string.Empty;
@@ -29,6 +31,7 @@ public sealed class AuditEntry : Entity<AuditEntryId>
     public Guid? ResourceId { get; private set; }
     public string Payload { get; private set; } = string.Empty;
     public DateTimeOffset OccurredAt { get; private set; }
+    public Guid? IdempotencyKey { get; private set; }
 
     public static AuditEntry Create(
         string eventType,
@@ -36,7 +39,8 @@ public sealed class AuditEntry : Entity<AuditEntryId>
         string? resourceType,
         Guid? resourceId,
         string payload,
-        DateTimeOffset occurredAt)
+        DateTimeOffset occurredAt,
+        Guid? idempotencyKey = null)
         => new(
             new AuditEntryId(Guid.NewGuid()),
             eventType,
@@ -44,7 +48,8 @@ public sealed class AuditEntry : Entity<AuditEntryId>
             resourceType,
             resourceId,
             payload,
-            occurredAt);
+            occurredAt,
+            idempotencyKey);
 
     public void Anonymize(Guid userId, string redactedPayload)
     {

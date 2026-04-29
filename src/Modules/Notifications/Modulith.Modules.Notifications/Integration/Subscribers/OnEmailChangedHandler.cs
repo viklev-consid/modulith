@@ -7,12 +7,15 @@ using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
+using Wolverine.Attributes;
+
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
 
 /// <summary>
 /// Alerts the OLD email address after a confirmed email change — defence-in-depth
 /// against silent account takeover.
 /// </summary>
+[NonTransactional]
 public sealed class OnEmailChangedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,

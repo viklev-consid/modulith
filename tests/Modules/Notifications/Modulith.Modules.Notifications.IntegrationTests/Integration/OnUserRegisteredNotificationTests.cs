@@ -4,6 +4,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Notifications.Persistence;
+using Wolverine;
+using Wolverine.Tracking;
 
 namespace Modulith.Modules.Notifications.IntegrationTests.Integration;
 
@@ -21,40 +23,32 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
     {
         // Arrange
         var request = new { Email = "notifications-test@example.com", Password = "Password1!", DisplayName = "Notified User" };
+        HttpResponseMessage? registerResponse = null;
 
-        // Act
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        // Act — TrackActivity waits for all cascading messages (including Notifications handler) to finish
+        Func<IMessageContext, Task> act = async _ =>
+        {
+            registerResponse = await _client.PostAsJsonAsync("/v1/users/register", request);
+        };
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
 
-        var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.Equal(HttpStatusCode.Created, registerResponse!.StatusCode);
+        var body = await registerResponse.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
-        // Assert — poll until Wolverine outbox delivers UserRegisteredV1 and the notification
-        // log is written with DeliveryStatus=Sent (log first appears as Pending, so we wait for Sent).
-        Domain.NotificationLog? log = null;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        while (!cts.IsCancellationRequested)
-        {
-            using var scope = fixture.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
-            log = await db.NotificationLogs
-                .FirstOrDefaultAsync(
-                    l => l.UserId == userId && l.DeliveryStatus == Domain.NotificationDeliveryStatus.Sent,
-                    cts.Token);
-            if (log is not null)
-            {
-                break;
-            }
-
-            await Task.Delay(200, cts.Token);
-        }
+        // Assert — no polling needed
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        var log = await db.NotificationLogs
+            .FirstOrDefaultAsync(l => l.UserId == userId && l.DeliveryStatus == Domain.NotificationDeliveryStatus.Sent);
 
         Assert.NotNull(log);
         Assert.Equal("notifications-test@example.com", log.RecipientEmail);
         Assert.Equal(Domain.NotificationType.WelcomeEmail, log.NotificationType);
         Assert.Equal(Domain.NotificationDeliveryStatus.Sent, log.DeliveryStatus);
 
-        // Assert the fake sender captured the email
         var sentEmail = fixture.EmailSender.SentMessages
             .SingleOrDefault(m => string.Equals(m.To, "notifications-test@example.com", StringComparison.Ordinal));
         Assert.NotNull(sentEmail);
@@ -67,29 +61,17 @@ public sealed class OnUserRegisteredNotificationTests(NotificationsCrossModuleFi
     {
         // Wolverine retries can trigger the handler multiple times; the idempotency guard must prevent duplicate emails.
         var request = new { Email = "idempotency-test@example.com", Password = "Password1!", DisplayName = "Idempotent User" };
+        HttpResponseMessage? registerResponse = null;
 
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var userId = body!.RootElement.GetProperty("userId").GetGuid();
-
-        // Wait for the log to appear with DeliveryStatus=Sent, confirming the handler completed.
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        while (!cts.IsCancellationRequested)
+        Func<IMessageContext, Task> act = async _ =>
         {
-            using var scope = fixture.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
-            var exists = await db.NotificationLogs.AnyAsync(
-                l => l.UserId == userId && l.DeliveryStatus == Domain.NotificationDeliveryStatus.Sent,
-                cts.Token);
-            if (exists)
-            {
-                break;
-            }
+            registerResponse = await _client.PostAsJsonAsync("/v1/users/register", request);
+        };
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
 
-            await Task.Delay(200, cts.Token);
-        }
+        Assert.Equal(HttpStatusCode.Created, registerResponse!.StatusCode);
 
         var emailsToUser = fixture.EmailSender.SentMessages
             .Count(m => string.Equals(m.To, "idempotency-test@example.com", StringComparison.Ordinal));

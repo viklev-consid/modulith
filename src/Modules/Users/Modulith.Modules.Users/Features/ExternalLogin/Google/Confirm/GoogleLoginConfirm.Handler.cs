@@ -98,6 +98,8 @@ public sealed class GoogleLoginConfirmHandler(
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
         {
+            // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
+            db.ChangeTracker.Clear();
             return UsersErrors.ExternalLoginLinkedToOtherUser;
         }
 
@@ -149,6 +151,10 @@ public sealed class GoogleLoginConfirmHandler(
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg &&
                                            string.Equals(pg.SqlState, "23505", StringComparison.Ordinal))
         {
+            // Detach the failed provisioning graph before all return paths so AutoApplyTransactions'
+            // SaveChangesAsync doesn't retry the failed entities.
+            DetachFailedProvisioningAttempt(user, consent);
+
             if (string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal))
             {
                 return UsersErrors.ExternalLoginLinkedToOtherUser;

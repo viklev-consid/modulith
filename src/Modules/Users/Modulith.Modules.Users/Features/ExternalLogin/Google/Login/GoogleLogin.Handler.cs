@@ -42,11 +42,9 @@ public sealed class GoogleLoginHandler(
 
         if (maybeLinked)
         {
-            // Re-read with FOR UPDATE inside an explicit transaction to serialize with
-            // concurrent UnlinkGoogleLogin. If unlink wins the race, the row will be gone
-            // after we acquire the lock, and we fall through to the email-loop below.
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-
+            // Re-read with FOR UPDATE inside the Wolverine-managed transaction (AutoApplyTransactions)
+            // to serialize with concurrent UnlinkGoogleLogin. If unlink wins the race, the row will be
+            // gone after we acquire the lock, and we fall through to the email-loop below.
             var existingLogin = await db.ExternalLogins
                 .FromSqlInterpolated($"""
                     SELECT * FROM users.external_logins
@@ -69,7 +67,7 @@ public sealed class GoogleLoginHandler(
                 var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
                 await db.SaveChangesAsync(ct);
                 await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
-                await tx.CommitAsync(ct);
+                // AutoApplyTransactions commits the transaction after the handler returns.
 
                 UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
 
@@ -86,7 +84,6 @@ public sealed class GoogleLoginHandler(
             }
 
             // Unlink completed before we acquired the lock — fall through to the email loop.
-            // tx rolls back on dispose.
         }
 
         // Uniform email-loop: all other cases go through the pending record flow.
@@ -161,6 +158,8 @@ public sealed class GoogleLoginHandler(
         {
             // Race: a concurrent request won the insert for (provider, subject).
             // Treat as success — that request will publish the event and send the email.
+            // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
+            db.ChangeTracker.Clear();
             return new GoogleLoginResponse(IsPending: true);
         }
 

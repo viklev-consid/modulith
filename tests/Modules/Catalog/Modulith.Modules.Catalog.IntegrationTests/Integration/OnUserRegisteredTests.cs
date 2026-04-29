@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Catalog.Domain;
 using Modulith.Modules.Catalog.Persistence;
+using Wolverine.Tracking;
 
 namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
 
@@ -22,29 +23,24 @@ public sealed class OnUserRegisteredTests(CrossModuleApiFixture fixture) : IAsyn
     {
         // Arrange
         var request = new { Email = "cross-module@example.com", Password = "Password1!", DisplayName = "Cross Module" };
+        HttpResponseMessage? registerResponse = null;
 
-        // Act
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        // Act — TrackActivity waits for all cascading messages to finish before returning
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync((Func<Wolverine.IMessageContext, Task>)(async _ =>
+            {
+                registerResponse = await _client.PostAsJsonAsync("/v1/users/register", request);
+            }));
 
-        var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.Equal(HttpStatusCode.Created, registerResponse!.StatusCode);
+        var body = await registerResponse.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
-        // Assert — poll until the Wolverine outbox delivers UserRegisteredV1 and creates the Customer
-        Customer? customer = null;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        while (!cts.IsCancellationRequested)
-        {
-            using var scope = fixture.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-            customer = await db.Customers.FirstOrDefaultAsync(c => c.UserId == userId, cts.Token);
-            if (customer is not null)
-            {
-                break;
-            }
-
-            await Task.Delay(200, cts.Token);
-        }
+        // Assert — no polling needed; TrackActivity waited for the subscriber to complete
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        var customer = await db.Customers.FirstOrDefaultAsync(c => c.UserId == userId);
 
         Assert.NotNull(customer);
         Assert.Equal("cross-module@example.com", customer.Email);

@@ -10,6 +10,7 @@ using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
 using Modulith.Api.Infrastructure.Exceptions;
 using Modulith.Api.Infrastructure.FeatureFlags;
+using Modulith.Api.Infrastructure.Logging;
 using Modulith.Modules.Audit;
 using Modulith.Modules.Catalog;
 using Modulith.Modules.Notifications;
@@ -25,6 +26,7 @@ using Modulith.Shared.Kernel.Interfaces;
 using Modulith.Api.Infrastructure.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -271,6 +273,9 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
         await seeder.SeedAsync();
     }
 }
+
+var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+WolverineStartupLog.OutboxActive(startupLogger);
 
 await app.RunAsync();
 

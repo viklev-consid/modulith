@@ -4,6 +4,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Persistence;
+using Wolverine;
+using Wolverine.Tracking;
 
 namespace Modulith.Modules.Audit.IntegrationTests.Integration;
 
@@ -21,30 +23,26 @@ public sealed class OnUserRegisteredAuditTests(AuditCrossModuleFixture fixture) 
     {
         // Arrange
         var request = new { Email = "audit-test@example.com", Password = "Password1!", DisplayName = "Audit Test" };
+        HttpResponseMessage? registerResponse = null;
 
-        // Act
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        // Act — TrackActivity waits for all cascading messages to finish before returning
+        Func<IMessageContext, Task> act = async _ =>
+        {
+            registerResponse = await _client.PostAsJsonAsync("/v1/users/register", request);
+        };
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
 
-        var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.Equal(HttpStatusCode.Created, registerResponse!.StatusCode);
+        var body = await registerResponse.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
-        // Assert — poll until Wolverine outbox delivers UserRegisteredV1 and the audit entry is written
-        Domain.AuditEntry? entry = null;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        while (!cts.IsCancellationRequested)
-        {
-            using var scope = fixture.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-            entry = await db.AuditEntries
-                .FirstOrDefaultAsync(e => e.ActorId == userId && e.EventType == "user.registered", cts.Token);
-            if (entry is not null)
-            {
-                break;
-            }
-
-            await Task.Delay(200, cts.Token);
-        }
+        // Assert — no polling needed; TrackActivity waited for all subscribers to complete
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var entry = await db.AuditEntries
+            .FirstOrDefaultAsync(e => e.ActorId == userId && e.EventType == "user.registered");
 
         Assert.NotNull(entry);
         Assert.Equal("user.registered", entry.EventType);
@@ -58,27 +56,19 @@ public sealed class OnUserRegisteredAuditTests(AuditCrossModuleFixture fixture) 
     {
         // Arrange — register a user so there is an audit entry
         var registerRequest = new { Email = "audit-trail@example.com", Password = "Password1!", DisplayName = "Trail User" };
-        var registerResponse = await _client.PostAsJsonAsync("/v1/users/register", registerRequest);
-        Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+        HttpResponseMessage? registerResponse = null;
 
+        Func<IMessageContext, Task> act = async _ =>
+        {
+            registerResponse = await _client.PostAsJsonAsync("/v1/users/register", registerRequest);
+        };
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
+
+        Assert.Equal(HttpStatusCode.Created, registerResponse!.StatusCode);
         var body = await registerResponse.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
-
-        // Wait for the audit entry to be created
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        bool entryFound = false;
-        while (!cts.IsCancellationRequested && !entryFound)
-        {
-            using var scope = fixture.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-            entryFound = await db.AuditEntries.AnyAsync(
-                e => e.ActorId == userId, cts.Token);
-            if (!entryFound)
-            {
-                await Task.Delay(200, cts.Token);
-            }
-        }
-        Assert.True(entryFound, "Audit entry was not created within the timeout.");
 
         // Act — request the audit trail as the registered user
         using var authClient = fixture.CreateAuthenticatedClient(userId, "audit-trail@example.com", "Trail User");
