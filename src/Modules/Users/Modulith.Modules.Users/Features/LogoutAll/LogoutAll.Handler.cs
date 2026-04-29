@@ -26,7 +26,7 @@ public sealed class LogoutAllHandler(UsersDbContext db, IRefreshTokenRevoker tok
 
         await tokenRevoker.RevokeAllForUserAsync(userId, ct);
 
-        await bus.PublishAsync(new UserLoggedOutAllDevicesV1(cmd.UserId));
+        await bus.PublishAsync(new UserLoggedOutAllDevicesV1(cmd.UserId, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedOutAllDevicesV1)));
 
         return new LogoutAllResponse();

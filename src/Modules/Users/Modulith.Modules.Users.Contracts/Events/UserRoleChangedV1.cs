@@ -4,4 +4,5 @@ public sealed record UserRoleChangedV1(
     Guid UserId,
     string OldRole,
     string NewRole,
-    Guid ChangedBy);
+    Guid ChangedBy,
+    Guid EventId);

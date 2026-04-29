@@ -5,7 +5,6 @@ using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Kernel.Interfaces;
 using Npgsql;
-using Wolverine;
 using Wolverine.Attributes;
 
 namespace Modulith.Modules.Audit.Integration.Subscribers;
@@ -13,7 +12,7 @@ namespace Modulith.Modules.Audit.Integration.Subscribers;
 [NonTransactional]
 public sealed class OnUserRegisteredHandler(AuditDbContext db, IClock clock)
 {
-    public async Task Handle(UserRegisteredV1 @event, Envelope envelope, CancellationToken ct)
+    public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
     {
         using var activity = AuditTelemetry.ActivitySource.StartActivity(nameof(OnUserRegisteredHandler));
         AuditTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
@@ -26,7 +25,7 @@ public sealed class OnUserRegisteredHandler(AuditDbContext db, IClock clock)
             resourceId: @event.UserId,
             payload: payload,
             occurredAt: clock.UtcNow,
-            idempotencyKey: envelope.Id);
+            idempotencyKey: @event.EventId);
 
         db.AuditEntries.Add(entry);
 

@@ -104,7 +104,7 @@ public sealed class GoogleLoginConfirmHandler(
         }
 
         await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, user.Email.Value, pending.Provider.ToString(), pending.Subject, now, Guid.NewGuid()));
-        await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
+        await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(2, new KeyValuePair<string, object?>("event", "ExternalLoginLinkedV1+UserLoggedInV1"));
 
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
@@ -176,7 +176,7 @@ public sealed class GoogleLoginConfirmHandler(
         await bus.PublishAsync(new UserProvisionedFromExternalV1(
             user.Id.Value, pending.Provider.ToString(), pending.Subject,
             user.Email.Value, user.DisplayName, now, Guid.NewGuid()));
-        await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty));
+        await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(2, new KeyValuePair<string, object?>("event", "UserProvisionedFromExternalV1+UserLoggedInV1"));
 
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);

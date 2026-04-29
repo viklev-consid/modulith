@@ -77,7 +77,8 @@ public sealed class ChangeUserRoleHandler(
             cmd.TargetUserId,
             oldRoleName,
             newRole.Name,
-            cmd.ChangedBy));
+            cmd.ChangedBy,
+            Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRoleChangedV1)));
 
         return new ChangeUserRoleResponse(cmd.TargetUserId, newRole.Name);
