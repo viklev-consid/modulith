@@ -132,6 +132,7 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
                         && l.SendingLeaseToken == leaseToken)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(l => l.DeliveryStatus, NotificationDeliveryStatus.Sent)
+                .SetProperty(l => l.SentAt, clock.UtcNow)
                 .SetProperty(l => l.SendingLeaseToken, (Guid?)null), ct);
 
     private async Task<Guid?> AtomicClaimAsync(Guid idempotencyKey, CancellationToken ct)

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Notifications.Domain;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Shared.Kernel.Gdpr;
 using Modulith.Shared.Kernel.Interfaces;
@@ -10,7 +11,8 @@ public sealed class NotificationsPersonalDataExporter(NotificationsDbContext db)
     public async Task<PersonalDataExport> ExportAsync(UserRef user, CancellationToken ct)
     {
         var logs = await db.NotificationLogs
-            .Where(l => l.UserId == user.UserId)
+            .Where(l => l.UserId == user.UserId
+                        && l.DeliveryStatus == NotificationDeliveryStatus.Sent)
             .OrderBy(l => l.SentAt)
             .Select(l => new { l.NotificationType, l.Subject, l.SentAt })
             .ToListAsync(ct);

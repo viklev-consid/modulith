@@ -29,6 +29,10 @@ namespace Modulith.Modules.Notifications.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
                     b.Property<int>("DeliveryStatus")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -57,7 +61,7 @@ namespace Modulith.Modules.Notifications.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("sending_lease_token");
 
-                    b.Property<DateTimeOffset>("SentAt")
+                    b.Property<DateTimeOffset?>("SentAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sent_at");
 

@@ -27,8 +27,11 @@ internal sealed class NotificationLogConfiguration : IEntityTypeConfiguration<No
             .HasMaxLength(500)
             .IsRequired();
 
-        builder.Property(n => n.SentAt)
+        builder.Property(n => n.CreatedAt)
             .IsRequired();
+
+        builder.Property(n => n.SentAt)
+            .IsRequired(false);
 
         builder.Property(n => n.IdempotencyKey)
             .IsRequired();
