@@ -20,6 +20,7 @@ using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Logging;
 using Modulith.Shared.Infrastructure.Messaging;
+using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
@@ -225,16 +226,29 @@ builder.UseWolverine(opts =>
     opts.Durability.DeadLetterQueueExpiration = TimeSpan.FromDays(30);
 
     // ── Error-handling policies (explicit, evidence-based) ─────────────────────────────────
-    // IOException is the common root for transient network failures surfacing from the SMTP
-    // client (MailKit raises IOException / its SocketException subclass when TCP connections
-    // are refused or reset mid-stream). Three retry attempts with escalating cooldown allow
-    // short infrastructure blips to self-heal; after the third retry the envelope moves to
-    // wolverine.wolverine_dead_letters automatically.
+    // IOException covers transient network failures from non-SMTP handlers and other I/O
+    // paths. SMTP-specific exceptions are classified by SmtpEmailSender into
+    // RetryableSmtpException / TerminalSmtpException (see below) so this policy no longer
+    // fires for email delivery.
     opts.OnException<System.IO.IOException>()
         .RetryWithCooldown(
             TimeSpan.FromSeconds(5),
             TimeSpan.FromSeconds(30),
             TimeSpan.FromMinutes(2));
+
+    // Transient SMTP failures (4xx responses, protocol errors, connection drops, I/O errors).
+    // SmtpEmailSender wraps these as RetryableSmtpException; handlers reset the send claim
+    // to Pending before rethrowing so the retry can re-claim immediately.
+    opts.OnException<RetryableSmtpException>()
+        .RetryWithCooldown(
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromMinutes(2));
+
+    // Permanent SMTP failures (5xx responses). Retrying will not succeed; handlers mark the
+    // notification log as Failed before rethrowing. Move directly to the dead-letter queue.
+    opts.OnException<TerminalSmtpException>()
+        .MoveToErrorQueue();
 
     // InvalidOperationException in a message handler indicates a programming error or a
     // non-recoverable state violation (e.g. calling an EF Core operation on a disposed context,

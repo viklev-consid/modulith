@@ -65,9 +65,14 @@ public sealed class OnExternalLoginPendingHandler(
         {
             await emailSender.SendAsync(message, ct);
         }
-        catch (IOException)
+        catch (RetryableSmtpException)
         {
             await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            throw;
+        }
+        catch (TerminalSmtpException)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, ct);
             throw;
         }
         await sendGuard.MarkSentAsync(@event.EventId, ct);

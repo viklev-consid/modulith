@@ -11,14 +11,21 @@ namespace Modulith.Modules.Notifications.Integration.Subscribers;
 /// <para>
 /// Protocol: (1) handler inserts log as <see cref="NotificationDeliveryStatus.Pending"/>;
 /// (2) handler calls <see cref="TryClaimAsync"/> which atomically transitions
-/// <c>Pending → Sending</c>; (3) handler sends the email inside a
-/// <c>try/catch (IOException)</c> that calls <see cref="MarkReadyAsync"/> before rethrowing;
+/// <c>Pending → Sending</c>; (3) handler sends the email inside a try/catch that calls
+/// <see cref="MarkReadyAsync"/> for <c>RetryableSmtpException</c> or
+/// <see cref="MarkFailedAsync"/> for <c>TerminalSmtpException</c> before rethrowing;
 /// (4) handler calls <see cref="MarkSentAsync"/>.
 /// </para>
 /// <para>
-/// Transient recovery: when <see cref="MarkReadyAsync"/> is called after an <see cref="IOException"/>,
-/// the row is reset from <c>Sending → Pending</c> immediately so the Wolverine retry can
-/// re-claim without waiting for the stale-row threshold.
+/// Transient recovery: when <see cref="MarkReadyAsync"/> is called after a
+/// <c>RetryableSmtpException</c>, the row is reset from <c>Sending → Pending</c>
+/// immediately so the Wolverine retry can re-claim without waiting for the stale-row
+/// threshold.
+/// </para>
+/// <para>
+/// Terminal failure: when <see cref="MarkFailedAsync"/> is called after a
+/// <c>TerminalSmtpException</c>, the row transitions <c>Sending → Failed</c> and the
+/// Wolverine message moves to the dead-letter queue.
 /// </para>
 /// <para>
 /// Crash recovery: if the process terminates between steps 2 and 4 the row stays <c>Sending</c>.
@@ -74,10 +81,10 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
     /// back to <see cref="NotificationDeliveryStatus.Pending"/>, allowing the next Wolverine retry
     /// to re-claim and re-attempt delivery.
     /// <para>
-    /// Call this in a <c>catch (IOException)</c> block before rethrowing so that transient SMTP
-    /// failures do not leave the row permanently stuck in <c>Sending</c>. Without this call the
-    /// row would only recover after <see cref="StuckSendingThreshold"/> has elapsed, which is
-    /// longer than Wolverine's retry schedule.
+    /// Call this in a <c>catch (RetryableSmtpException)</c> block before rethrowing so that
+    /// transient SMTP failures do not leave the row permanently stuck in <c>Sending</c>. Without
+    /// this call the row would only recover after <see cref="StuckSendingThreshold"/> has elapsed,
+    /// which is longer than Wolverine's retry schedule.
     /// </para>
     /// </summary>
     public Task MarkReadyAsync(Guid idempotencyKey, CancellationToken ct) =>
@@ -88,7 +95,20 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
                 .SetProperty(l => l.DeliveryStatus, NotificationDeliveryStatus.Pending)
                 .SetProperty(l => l.SendingClaimedAt, (DateTimeOffset?)null), ct);
 
-    /// <summary>Transitions the log row from Sending to Sent.</summary>
+    /// <summary>
+/// Transitions the log row from <c>Sending</c> to <see cref="NotificationDeliveryStatus.Failed"/>,
+/// recording that a permanent SMTP error occurred.  The Wolverine message will be moved to
+/// the dead-letter queue by the caller rethrowing a <c>TerminalSmtpException</c>.
+/// </summary>
+public Task MarkFailedAsync(Guid idempotencyKey, CancellationToken ct) =>
+    db.NotificationLogs
+        .Where(l => l.IdempotencyKey == idempotencyKey
+                    && l.DeliveryStatus == NotificationDeliveryStatus.Sending)
+        .ExecuteUpdateAsync(s => s
+            .SetProperty(l => l.DeliveryStatus, NotificationDeliveryStatus.Failed)
+            .SetProperty(l => l.SendingClaimedAt, (DateTimeOffset?)null), ct);
+
+/// <summary>Transitions the log row from Sending to Sent.</summary>
     public Task MarkSentAsync(Guid idempotencyKey, CancellationToken ct) =>
         db.NotificationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey)
