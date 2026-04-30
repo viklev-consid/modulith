@@ -34,11 +34,11 @@ internal static class DeadLetterAdminEndpoints
                     ExceptionType = exceptionType
                 };
                 var results = await store.DeadLetters.QueryAsync(query, ct);
-                return Results.Ok(results);
+                return Results.Ok(DeadLetterSummaryResultsDto.From(results));
             })
             .WithName("ListDeadLetters")
             .WithSummary("Page through dead-lettered messages, optionally filtered by message type or exception type.")
-            .Produces<DeadLetterEnvelopeResults>()
+            .Produces<DeadLetterSummaryResultsDto>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
@@ -49,11 +49,11 @@ internal static class DeadLetterAdminEndpoints
                 CancellationToken ct) =>
             {
                 var envelope = await store.DeadLetters.DeadLetterEnvelopeByIdAsync(id);
-                return envelope is null ? Results.NotFound() : Results.Ok(envelope);
+                return envelope is null ? Results.NotFound() : Results.Ok(DeadLetterSummaryDto.From(envelope));
             })
             .WithName("GetDeadLetter")
             .WithSummary("Get a single dead-lettered message by envelope ID.")
-            .Produces<DeadLetterEnvelope>()
+            .Produces<DeadLetterSummaryDto>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
