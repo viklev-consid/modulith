@@ -53,6 +53,10 @@ namespace Modulith.Modules.Notifications.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sending_claimed_at");
 
+                    b.Property<Guid?>("SendingLeaseToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sending_lease_token");
+
                     b.Property<DateTimeOffset>("SentAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sent_at");

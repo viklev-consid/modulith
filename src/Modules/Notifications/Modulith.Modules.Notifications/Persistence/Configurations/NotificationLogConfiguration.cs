@@ -40,6 +40,9 @@ internal sealed class NotificationLogConfiguration : IEntityTypeConfiguration<No
         builder.Property(n => n.SendingClaimedAt)
             .IsRequired(false);
 
+        builder.Property(n => n.SendingLeaseToken)
+            .IsRequired(false);
+
         builder.HasIndex(n => n.UserId);
         builder.HasIndex(n => n.IdempotencyKey)
             .IsUnique();

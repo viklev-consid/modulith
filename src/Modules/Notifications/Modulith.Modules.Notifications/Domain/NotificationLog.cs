@@ -35,6 +35,12 @@ public sealed class NotificationLog : Entity<NotificationLogId>
     /// Null until the claim is first acquired. Used to detect stuck Sending rows.</summary>
     public DateTimeOffset? SendingClaimedAt { get; private set; }
 
+    /// <summary>Opaque token generated when the send claim is taken. Every transition
+    /// (<c>MarkReady</c>, <c>MarkSent</c>, <c>MarkFailed</c>) must supply the matching
+    /// token, ensuring that only the holder of the current claim can advance the row.
+    /// Cleared whenever the row leaves the <c>Sending</c> state.</summary>
+    public Guid? SendingLeaseToken { get; private set; }
+
     public void MarkSent() => DeliveryStatus = NotificationDeliveryStatus.Sent;
 
     public static NotificationLog Create(

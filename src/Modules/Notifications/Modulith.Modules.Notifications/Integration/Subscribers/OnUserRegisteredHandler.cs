@@ -48,7 +48,7 @@ public sealed class OnUserRegisteredHandler(
             db.Entry(log).State = EntityState.Detached;
         }
 
-        if (!await sendGuard.TryClaimAsync(@event.EventId, ct))
+        if (await sendGuard.TryClaimAsync(@event.EventId, ct) is not { } leaseToken)
         {
             return;
         }
@@ -65,14 +65,14 @@ public sealed class OnUserRegisteredHandler(
         }
         catch (RetryableSmtpException)
         {
-            await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            await sendGuard.MarkReadyAsync(@event.EventId, leaseToken, ct);
             throw;
         }
         catch (TerminalSmtpException)
         {
-            await sendGuard.MarkFailedAsync(@event.EventId, ct);
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
             throw;
         }
-        await sendGuard.MarkSentAsync(@event.EventId, ct);
+        await sendGuard.MarkSentAsync(@event.EventId, leaseToken, ct);
     }
 }
