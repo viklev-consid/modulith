@@ -33,7 +33,7 @@ This module delivers transactional notifications to users and keeps a log of wha
 ## Invariants
 
 1. Every handler is idempotent. Each `NotificationLog` row carries a unique `IdempotencyKey` (sourced from `@event.EventId`) backed by a DB-level unique constraint. On a duplicate event delivery the insert throws `DbUpdateException` with a unique-constraint violation; the handler detaches the entity and falls through to the claim step.
-2. `DeliveryStatus` uses a three-phase protocol to prevent duplicate sends. The sequence is: insert log as `Pending` → atomically transition `Pending → Sending` (`NotificationSendGuard.TryClaimAsync`) → send email → transition `Sending → Sent` (`NotificationSendGuard.MarkSentAsync`). If the process crashes between the claim and the `MarkSentAsync` call, the row stays `Sending`; `TryClaimAsync` will reset it to `Pending` and re-claim it after `StuckSendingThreshold` (5 minutes) has elapsed.
+2. `DeliveryStatus` uses a three-phase protocol to prevent duplicate sends. The sequence is: insert log as `Pending` → atomically transition `Pending → Sending` (`NotificationSendGuard.TryClaimAsync`) → send email → transition `Sending → Sent` (`NotificationSendGuard.MarkSentAsync`). **If `emailSender.SendAsync` throws `IOException`**, the handler catches it, calls `NotificationSendGuard.MarkReadyAsync` to reset the row back to `Pending`, then rethrows — allowing the Wolverine retry to re-claim immediately. If the process crashes between the claim and `MarkSentAsync`, the row stays `Sending`; `TryClaimAsync` will reset it to `Pending` and re-claim after `StuckSendingThreshold` (5 minutes) has elapsed (crash-recovery only).
 3. `IConsentRegistry` gates every notification type. The welcome email checks `ConsentKeys.WelcomeEmail`. Security notifications (`PasswordReset*`, `PasswordChanged`, `EmailChange*`, `ExternalLogin*`) are transactional — they bypass consent because they are security-critical.
 4. `PasswordResetRequestedV1`, `EmailChangeRequestedV1`, and `ExternalLoginPendingV1` carry a raw token — embed it in the email body link, never log it.
 
@@ -73,10 +73,20 @@ if (!await sendGuard.TryClaimAsync(@event.EventId, ct))
 }
 
 // 3. We hold the exclusive claim — send the email.
+//    Catch IOException to reset the claim before rethrowing, so the Wolverine retry can
+//    re-claim immediately without waiting for the 5-minute stale-row threshold.
 var message = new EmailMessage(To: @event.Email, Subject: FooTemplate.Subject,
     HtmlBody: FooTemplate.HtmlBody(...), PlainTextBody: FooTemplate.PlainTextBody(...));
 
-await emailSender.SendAsync(message, ct);
+try
+{
+    await emailSender.SendAsync(message, ct);
+}
+catch (IOException)
+{
+    await sendGuard.MarkReadyAsync(@event.EventId, ct);
+    throw;
+}
 
 // 4. Confirm delivery (Sending → Sent).
 await sendGuard.MarkSentAsync(@event.EventId, ct);
@@ -101,4 +111,4 @@ Key rules:
 - Raw tokens arrive in `PasswordResetRequestedV1.RawToken`, `EmailChangeRequestedV1.RawToken`, and `ExternalLoginPendingV1.RawToken`. Embed them in email body links; never log them. Serilog destructuring masks known token property names, but defense-in-depth means not calling the log statement at all.
 - The unique constraint on `NotificationLog.IdempotencyKey` makes duplicate-detection race-safe — catch `DbUpdateException.IsUniqueConstraintViolation()` rather than doing a pre-check with `AnyAsync`. But do NOT short-circuit on the constraint alone; always fall through to `TryClaimAsync`.
 - Adding a subscriber for a new event requires registering the handler in `NotificationsModule.AddNotificationsHandlers`; forgetting this means handlers are never discovered by Wolverine.
-- Rows stuck permanently in `Sending` (e.g. process killed before `MarkSentAsync`) are recovered automatically after 5 minutes by the next Wolverine retry. If Wolverine's retry schedule is exhausted before the threshold, the row will remain `Sending` and require manual intervention. Monitor for long-lived `Sending` rows in your observability stack.
+- Rows stuck in `Sending` due to a process crash are recovered automatically after 5 minutes by the `TryClaimAsync` stale-row path on the next Wolverine retry. This path is **crash recovery only** — transient `IOException` during `emailSender.SendAsync` is handled explicitly by calling `MarkReadyAsync` before rethrowing, which resets the row to `Pending` immediately so the Wolverine retry can re-claim without waiting. If you add a new notification handler, you must include the `try/catch (IOException) { await sendGuard.MarkReadyAsync(...); throw; }` block — omitting it will leave the row permanently stuck in `Sending` until the 5-minute threshold, which is longer than Wolverine's retry window.

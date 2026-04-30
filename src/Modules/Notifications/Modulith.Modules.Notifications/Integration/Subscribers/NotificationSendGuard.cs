@@ -11,11 +11,17 @@ namespace Modulith.Modules.Notifications.Integration.Subscribers;
 /// <para>
 /// Protocol: (1) handler inserts log as <see cref="NotificationDeliveryStatus.Pending"/>;
 /// (2) handler calls <see cref="TryClaimAsync"/> which atomically transitions
-/// <c>Pending → Sending</c>; (3) handler sends the email;
+/// <c>Pending → Sending</c>; (3) handler sends the email inside a
+/// <c>try/catch (IOException)</c> that calls <see cref="MarkReadyAsync"/> before rethrowing;
 /// (4) handler calls <see cref="MarkSentAsync"/>.
 /// </para>
 /// <para>
-/// Recovery: if the process crashes between steps 2 and 4 the row stays <c>Sending</c>.
+/// Transient recovery: when <see cref="MarkReadyAsync"/> is called after an <see cref="IOException"/>,
+/// the row is reset from <c>Sending → Pending</c> immediately so the Wolverine retry can
+/// re-claim without waiting for the stale-row threshold.
+/// </para>
+/// <para>
+/// Crash recovery: if the process terminates between steps 2 and 4 the row stays <c>Sending</c>.
 /// <see cref="TryClaimAsync"/> detects rows whose <see cref="NotificationLog.SendingClaimedAt"/>
 /// exceeds <see cref="StuckSendingThreshold"/> and resets them to <c>Pending</c> before
 /// re-claiming, so the next Wolverine retry can proceed.
@@ -62,6 +68,25 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
         claimed = await AtomicClaimAsync(idempotencyKey, ct);
         return claimed > 0;
     }
+
+    /// <summary>
+    /// Releases the send claim by resetting a <see cref="NotificationDeliveryStatus.Sending"/> row
+    /// back to <see cref="NotificationDeliveryStatus.Pending"/>, allowing the next Wolverine retry
+    /// to re-claim and re-attempt delivery.
+    /// <para>
+    /// Call this in a <c>catch (IOException)</c> block before rethrowing so that transient SMTP
+    /// failures do not leave the row permanently stuck in <c>Sending</c>. Without this call the
+    /// row would only recover after <see cref="StuckSendingThreshold"/> has elapsed, which is
+    /// longer than Wolverine's retry schedule.
+    /// </para>
+    /// </summary>
+    public Task MarkReadyAsync(Guid idempotencyKey, CancellationToken ct) =>
+        db.NotificationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey
+                        && l.DeliveryStatus == NotificationDeliveryStatus.Sending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(l => l.DeliveryStatus, NotificationDeliveryStatus.Pending)
+                .SetProperty(l => l.SendingClaimedAt, (DateTimeOffset?)null), ct);
 
     /// <summary>Transitions the log row from Sending to Sent.</summary>
     public Task MarkSentAsync(Guid idempotencyKey, CancellationToken ct) =>

@@ -59,7 +59,15 @@ public sealed class OnUserRegisteredHandler(
             HtmlBody: WelcomeEmailTemplate.HtmlBody(@event.DisplayName),
             PlainTextBody: WelcomeEmailTemplate.PlainTextBody(@event.DisplayName));
 
-        await emailSender.SendAsync(message, ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (IOException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            throw;
+        }
         await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

@@ -23,10 +23,12 @@ using Modulith.Shared.Infrastructure.Messaging;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
+using Modulith.Api.Infrastructure.DeadLetters;
 using Modulith.Api.Infrastructure.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
+using Wolverine.ErrorHandling;
 using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -100,6 +102,9 @@ builder.Services
 builder.Services.AddAuthorization(opts =>
 {
     opts.AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser());
+    // Admin policy — gates dead-letter management and other operator-facing endpoints.
+    // The "admin" role is assigned via PUT /v1/users/{id}/role and grants every permission.
+    opts.AddPolicy("Admin", policy => policy.RequireRole("admin"));
 });
 
 // 6. OpenAPI + Scalar
@@ -213,6 +218,32 @@ builder.UseWolverine(opts =>
     opts.Durability.OutboxStaleTime = TimeSpan.FromMinutes(5);
     opts.Durability.InboxStaleTime = TimeSpan.FromMinutes(10);
 
+    // Dead-letter retention: keep for 30 days, then Wolverine's background job purges
+    // automatically. 30 days balances investigative window against unbounded table growth.
+    // Adjust via ADR if a longer SLA is required.
+    opts.Durability.DeadLetterQueueExpirationEnabled = true;
+    opts.Durability.DeadLetterQueueExpiration = TimeSpan.FromDays(30);
+
+    // ── Error-handling policies (explicit, evidence-based) ─────────────────────────────────
+    // IOException is the common root for transient network failures surfacing from the SMTP
+    // client (MailKit raises IOException / its SocketException subclass when TCP connections
+    // are refused or reset mid-stream). Three retry attempts with escalating cooldown allow
+    // short infrastructure blips to self-heal; after the third retry the envelope moves to
+    // wolverine.wolverine_dead_letters automatically.
+    opts.OnException<System.IO.IOException>()
+        .RetryWithCooldown(
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromMinutes(2));
+
+    // InvalidOperationException in a message handler indicates a programming error or a
+    // non-recoverable state violation (e.g. calling an EF Core operation on a disposed context,
+    // or a domain invariant raised unexpectedly as an exception rather than a Result). Retrying
+    // is pointless and would only delay failure visibility. Move directly to the error queue so
+    // the failure is surfaced immediately for operational triage.
+    opts.OnException<InvalidOperationException>()
+        .MoveToErrorQueue();
+
     opts.Policies.AddMiddleware<FluentValidationMiddleware>(_ => true);
     opts.Policies.AddMiddleware<AuditMiddleware>(_ => true);
     opts.Policies.AddMiddleware<CacheInvalidationMiddleware>(_ => true);
@@ -262,6 +293,9 @@ app.MapUsersEndpoints();
 app.MapCatalogEndpoints();
 app.MapAuditEndpoints();
 app.MapNotificationsEndpoints();
+
+// 15. Admin — dead-letter management (Admin policy, all environments)
+app.MapDeadLetterAdminEndpoints();
 
 // 15. Dev seeders (idempotent)
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))

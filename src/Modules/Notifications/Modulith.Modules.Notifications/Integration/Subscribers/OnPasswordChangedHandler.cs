@@ -48,7 +48,15 @@ public sealed class OnPasswordChangedHandler(
             HtmlBody: PasswordChangedTemplate.HtmlBody,
             PlainTextBody: PasswordChangedTemplate.PlainTextBody);
 
-        await emailSender.SendAsync(message, ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (IOException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            throw;
+        }
         await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

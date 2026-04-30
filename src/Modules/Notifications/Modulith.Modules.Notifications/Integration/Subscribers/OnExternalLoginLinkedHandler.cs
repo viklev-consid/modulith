@@ -48,7 +48,15 @@ public sealed class OnExternalLoginLinkedHandler(
             HtmlBody: ExternalLoginLinkedTemplate.HtmlBody(@event.Provider),
             PlainTextBody: ExternalLoginLinkedTemplate.PlainTextBody(@event.Provider));
 
-        await emailSender.SendAsync(message, ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (IOException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            throw;
+        }
         await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

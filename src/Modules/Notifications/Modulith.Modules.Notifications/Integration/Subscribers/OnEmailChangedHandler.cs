@@ -53,7 +53,15 @@ public sealed class OnEmailChangedHandler(
             HtmlBody: EmailChangedTemplate.HtmlBody(@event.NewEmail),
             PlainTextBody: EmailChangedTemplate.PlainTextBody(@event.NewEmail));
 
-        await emailSender.SendAsync(message, ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (IOException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            throw;
+        }
         await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

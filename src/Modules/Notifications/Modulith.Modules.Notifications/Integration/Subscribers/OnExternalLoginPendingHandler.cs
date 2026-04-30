@@ -61,7 +61,15 @@ public sealed class OnExternalLoginPendingHandler(
             HtmlBody: htmlBody,
             PlainTextBody: plainBody);
 
-        await emailSender.SendAsync(message, ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (IOException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            throw;
+        }
         await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }

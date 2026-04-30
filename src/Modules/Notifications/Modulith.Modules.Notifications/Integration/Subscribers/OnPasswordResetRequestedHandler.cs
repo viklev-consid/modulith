@@ -50,7 +50,15 @@ public sealed class OnPasswordResetRequestedHandler(
             HtmlBody: PasswordResetRequestTemplate.HtmlBody(@event.RawToken),
             PlainTextBody: PasswordResetRequestTemplate.PlainTextBody(@event.RawToken));
 
-        await emailSender.SendAsync(message, ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (IOException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, ct);
+            throw;
+        }
         await sendGuard.MarkSentAsync(@event.EventId, ct);
     }
 }
