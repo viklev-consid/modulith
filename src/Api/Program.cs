@@ -236,7 +236,7 @@ builder.UseWolverine(opts =>
             TimeSpan.FromSeconds(30),
             TimeSpan.FromMinutes(2));
 
-    // Transient SMTP failures (4xx responses, protocol errors, connection drops, I/O errors).
+    // Transient SMTP failures: 4xx server responses, protocol errors, connection drops, I/O errors.
     // SmtpEmailSender wraps these as RetryableSmtpException; handlers reset the send claim
     // to Pending before rethrowing so the retry can re-claim immediately.
     opts.OnException<RetryableSmtpException>()
@@ -245,7 +245,10 @@ builder.UseWolverine(opts =>
             TimeSpan.FromSeconds(30),
             TimeSpan.FromMinutes(2));
 
-    // Permanent SMTP failures (5xx responses). Retrying will not succeed; handlers mark the
+    // Permanent SMTP failures: 5xx server responses, TLS handshake/certificate errors,
+    // authentication failures (wrong credentials, unsupported mechanism), and
+    // ServiceNotAuthenticatedException (server requires auth that was never established).
+    // All require configuration changes — retrying will not succeed. Handlers mark the
     // notification log as Failed before rethrowing. Move directly to the dead-letter queue.
     opts.OnException<TerminalSmtpException>()
         .MoveToErrorQueue();

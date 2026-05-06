@@ -30,15 +30,77 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
             ? SecureSocketOptions.SslOnConnect
             : SecureSocketOptions.None;
 
+        // --- Connect ---
+        // SslHandshakeException (bad cert, wrong protocol) and AuthenticationException (TLS auth
+        // failure) are configuration problems — retrying will not fix them.
+        // Network/protocol errors are transient and safe to retry.
         try
         {
             await client.ConnectAsync(_options.Host, _options.Port, secureSocketOptions, ct).ConfigureAwait(false);
+        }
+        catch (SslHandshakeException ex)
+        {
+            throw new TerminalSmtpException(
+                $"TLS handshake failed connecting to {_options.Host}:{_options.Port}: {ex.Message}", ex);
+        }
+        catch (AuthenticationException ex)
+        {
+            // Catches any remaining TLS authentication failure not covered by SslHandshakeException.
+            throw new TerminalSmtpException(
+                $"TLS authentication failed connecting to {_options.Host}:{_options.Port}: {ex.Message}", ex);
+        }
+        catch (SmtpCommandException ex) when ((int)ex.StatusCode >= 500)
+        {
+            throw new TerminalSmtpException(
+                $"SMTP server rejected connection permanently ({(int)ex.StatusCode}): {ex.Message}", ex);
+        }
+        catch (SmtpCommandException ex)
+        {
+            throw new RetryableSmtpException(
+                $"SMTP server returned a transient connect error ({(int)ex.StatusCode}): {ex.Message}", ex);
+        }
+        catch (SmtpProtocolException ex)
+        {
+            throw new RetryableSmtpException($"SMTP protocol error during connect: {ex.Message}", ex);
+        }
+        catch (IOException ex)
+        {
+            throw new RetryableSmtpException(
+                $"Network I/O error connecting to {_options.Host}:{_options.Port}: {ex.Message}", ex);
+        }
 
-            if (_options.Username is not null)
+        // --- Authenticate ---
+        // AuthenticationException means wrong credentials or no supported mechanism — terminal config
+        // problem. 5xx SmtpCommandException from the auth exchange is also permanent. 4xx is transient.
+        if (_options.Username is not null)
+        {
+            try
             {
                 await client.AuthenticateAsync(_options.Username, _options.Password ?? string.Empty, ct).ConfigureAwait(false);
             }
+            catch (AuthenticationException ex)
+            {
+                throw new TerminalSmtpException(
+                    $"SMTP authentication failed for '{_options.Username}': {ex.Message}", ex);
+            }
+            catch (SmtpCommandException ex) when ((int)ex.StatusCode >= 500)
+            {
+                throw new TerminalSmtpException(
+                    $"SMTP server rejected authentication permanently ({(int)ex.StatusCode}): {ex.Message}", ex);
+            }
+            catch (SmtpCommandException ex)
+            {
+                throw new RetryableSmtpException(
+                    $"SMTP server returned a transient authentication error ({(int)ex.StatusCode}): {ex.Message}", ex);
+            }
+        }
 
+        // --- Send ---
+        // ServiceNotAuthenticatedException here means the server requires auth that was never
+        // performed (no Username configured) or that the session has lost its auth state.
+        // Both require configuration changes — retrying is pointless.
+        try
+        {
             await client.SendAsync(mail, ct).ConfigureAwait(false);
             await client.DisconnectAsync(quit: true, ct).ConfigureAwait(false);
         }
@@ -60,15 +122,16 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         }
         catch (ServiceNotConnectedException ex)
         {
-            throw new RetryableSmtpException($"SMTP service not connected: {ex.Message}", ex);
+            throw new RetryableSmtpException($"SMTP connection lost before send: {ex.Message}", ex);
         }
         catch (ServiceNotAuthenticatedException ex)
         {
-            throw new RetryableSmtpException($"SMTP service not authenticated: {ex.Message}", ex);
+            throw new TerminalSmtpException(
+                $"SMTP send rejected: server requires authentication ({ex.Message})", ex);
         }
         catch (IOException ex)
         {
-            throw new RetryableSmtpException($"SMTP I/O error: {ex.Message}", ex);
+            throw new RetryableSmtpException($"SMTP I/O error during send: {ex.Message}", ex);
         }
     }
 }
