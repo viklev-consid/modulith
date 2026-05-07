@@ -130,6 +130,34 @@ Do not delete rows directly unless the HTTP endpoints are unavailable — use th
 
 ---
 
+## Alerting recommendations
+
+The DLQ is only useful if someone is watching it. Set up at least these two alerts:
+
+**Alert 1 — DLQ is growing (any type)**
+
+```sql
+SELECT COUNT(*) FROM wolverine.wolverine_dead_letters;
+```
+
+Trigger when count exceeds your SLA threshold (e.g., > 0 for critical paths, > 10 for bulk paths). The OpenTelemetry metrics emitted by the Notifications module (`modulith.notifications.emails.failed.terminal`, `modulith.notifications.send_guard.failed_recoveries`) can also drive this alert from your metrics platform without a direct DB query.
+
+**Alert 2 — Notification failure rate spike**
+
+Monitor `modulith.notifications.emails.failed.transient` vs `modulith.notifications.emails.sent`. A sustained ratio above ~10 % over a 5-minute window indicates SMTP degradation and the retry queue is filling up.
+
+**Alert 3 — DLQ approaching retention limit**
+
+Messages older than 25 days are approaching the 30-day automatic purge window. If an incident is still unresolved at that point, messages will be deleted permanently before they can be replayed.
+
+```sql
+SELECT COUNT(*), MAX(received_at)
+FROM wolverine.wolverine_dead_letters
+WHERE received_at < NOW() - INTERVAL '25 days';
+```
+
+---
+
 ## Operational checklist after an incident
 
 1. **List** dead letters via `GET /v1/admin/dead-letters` to understand the scope.

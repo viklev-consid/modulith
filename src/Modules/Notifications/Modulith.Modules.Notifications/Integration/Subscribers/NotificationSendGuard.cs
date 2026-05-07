@@ -42,6 +42,13 @@ namespace Modulith.Modules.Notifications.Integration.Subscribers;
 /// age-based reclaim were triggered the original sender's token would no longer match the
 /// newly-issued one, making its subsequent <see cref="MarkSentAsync"/> a safe no-op.
 /// </para>
+/// <para>
+/// DLQ replay recovery: if the process moved a message to the dead-letter queue (terminal
+/// SMTP failure, <c>Sending → Failed</c>), an admin can replay the envelope via the DLQ
+/// management endpoints after fixing the root cause. On replay <see cref="TryClaimAsync"/>
+/// detects the <c>Failed</c> row, resets it to <c>Pending</c>, and re-claims, enabling a
+/// fresh send attempt.
+/// </para>
 /// </summary>
 public sealed class NotificationSendGuard(NotificationsDbContext db, IClock clock)
 {
@@ -54,7 +61,7 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
     /// <returns>
     /// The opaque lease token if the caller holds the exclusive claim and should proceed to
     /// send the email; <c>null</c> if another attempt is in-flight or the notification was
-    /// already sent or failed. Pass the non-null token to every subsequent guard call.
+    /// already sent. Pass the non-null token to every subsequent guard call.
     /// </returns>
     public async Task<Guid?> TryClaimAsync(Guid idempotencyKey, CancellationToken ct)
     {
@@ -65,9 +72,10 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
             return leaseToken;
         }
 
-        // Row is Sending or Sent/Failed. Try to recover if it is a stale Sending row.
+        // Crash recovery: row stuck in Sending due to process crash.
+        // Reset to Pending after the stale threshold so the next attempt can re-claim.
         var staleThreshold = clock.UtcNow - StuckSendingThreshold;
-        var recovered = await db.NotificationLogs
+        var staleRecovered = await db.NotificationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey
                         && l.DeliveryStatus == NotificationDeliveryStatus.Sending
                         && l.SendingClaimedAt < staleThreshold)
@@ -76,14 +84,30 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
                 .SetProperty(l => l.SendingClaimedAt, (DateTimeOffset?)null)
                 .SetProperty(l => l.SendingLeaseToken, (Guid?)null), ct);
 
-        if (recovered == 0)
+        if (staleRecovered > 0)
         {
-            return null; // Not stale (still in-flight) or already Sent/Failed.
+            NotificationsTelemetry.SendGuardStaleRecoveries.Add(1);
+            return await AtomicClaimAsync(idempotencyKey, ct);
         }
 
-        // The row is now Pending again. Re-claim with a fresh token; another concurrent
-        // instance may have beaten us to it, in which case we return null and back off.
-        return await AtomicClaimAsync(idempotencyKey, ct);
+        // DLQ replay recovery: row is Failed because a terminal SMTP error occurred.
+        // An admin has replayed the envelope via the DLQ endpoint after fixing the root cause.
+        // Reset to Pending so this attempt can claim and try again.
+        var failedRecovered = await db.NotificationLogs
+            .Where(l => l.IdempotencyKey == idempotencyKey
+                        && l.DeliveryStatus == NotificationDeliveryStatus.Failed)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(l => l.DeliveryStatus, NotificationDeliveryStatus.Pending)
+                .SetProperty(l => l.SendingClaimedAt, (DateTimeOffset?)null)
+                .SetProperty(l => l.SendingLeaseToken, (Guid?)null), ct);
+
+        if (failedRecovered > 0)
+        {
+            NotificationsTelemetry.SendGuardFailedRecoveries.Add(1);
+            return await AtomicClaimAsync(idempotencyKey, ct);
+        }
+
+        return null; // Row is in-flight (Sending, recent) or already Sent.
     }
 
     /// <summary>
@@ -95,8 +119,9 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
     /// Call this in a <c>catch (RetryableSmtpException)</c> block before rethrowing.
     /// </para>
     /// </summary>
-    public Task MarkReadyAsync(Guid idempotencyKey, Guid leaseToken, CancellationToken ct) =>
-        db.NotificationLogs
+    public async Task MarkReadyAsync(Guid idempotencyKey, Guid leaseToken, CancellationToken ct)
+    {
+        var affected = await db.NotificationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey
                         && l.DeliveryStatus == NotificationDeliveryStatus.Sending
                         && l.SendingLeaseToken == leaseToken)
@@ -105,13 +130,20 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
                 .SetProperty(l => l.SendingClaimedAt, (DateTimeOffset?)null)
                 .SetProperty(l => l.SendingLeaseToken, (Guid?)null), ct);
 
+        if (affected > 0)
+        {
+            NotificationsTelemetry.EmailsFailedTransient.Add(1);
+        }
+    }
+
     /// <summary>
     /// Transitions <c>Sending → <see cref="NotificationDeliveryStatus.Failed"/></c>.
     /// Only applies when <paramref name="leaseToken"/> matches the stored token.
     /// Call this in a <c>catch (TerminalSmtpException)</c> block before rethrowing.
     /// </summary>
-    public Task MarkFailedAsync(Guid idempotencyKey, Guid leaseToken, CancellationToken ct) =>
-        db.NotificationLogs
+    public async Task MarkFailedAsync(Guid idempotencyKey, Guid leaseToken, CancellationToken ct)
+    {
+        var affected = await db.NotificationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey
                         && l.DeliveryStatus == NotificationDeliveryStatus.Sending
                         && l.SendingLeaseToken == leaseToken)
@@ -120,13 +152,20 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
                 .SetProperty(l => l.SendingClaimedAt, (DateTimeOffset?)null)
                 .SetProperty(l => l.SendingLeaseToken, (Guid?)null), ct);
 
+        if (affected > 0)
+        {
+            NotificationsTelemetry.EmailsFailedTerminal.Add(1);
+        }
+    }
+
     /// <summary>
     /// Transitions <c>Sending → <see cref="NotificationDeliveryStatus.Sent"/></c>.
     /// Only applies when <paramref name="leaseToken"/> matches the stored token, so a
     /// late sender whose claim was superseded by crash-recovery cannot mark the row Sent.
     /// </summary>
-    public Task MarkSentAsync(Guid idempotencyKey, Guid leaseToken, CancellationToken ct) =>
-        db.NotificationLogs
+    public async Task MarkSentAsync(Guid idempotencyKey, Guid leaseToken, CancellationToken ct)
+    {
+        var affected = await db.NotificationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey
                         && l.DeliveryStatus == NotificationDeliveryStatus.Sending
                         && l.SendingLeaseToken == leaseToken)
@@ -134,6 +173,12 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
                 .SetProperty(l => l.DeliveryStatus, NotificationDeliveryStatus.Sent)
                 .SetProperty(l => l.SentAt, clock.UtcNow)
                 .SetProperty(l => l.SendingLeaseToken, (Guid?)null), ct);
+
+        if (affected > 0)
+        {
+            NotificationsTelemetry.EmailsSent.Add(1);
+        }
+    }
 
     private async Task<Guid?> AtomicClaimAsync(Guid idempotencyKey, CancellationToken ct)
     {
@@ -145,6 +190,14 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
                 .SetProperty(l => l.DeliveryStatus, NotificationDeliveryStatus.Sending)
                 .SetProperty(l => l.SendingClaimedAt, clock.UtcNow)
                 .SetProperty(l => l.SendingLeaseToken, (Guid?)leaseToken), ct);
-        return claimed > 0 ? leaseToken : null;
+
+        if (claimed > 0)
+        {
+            NotificationsTelemetry.SendGuardClaims.Add(1);
+            return leaseToken;
+        }
+
+        return null;
+
     }
 }

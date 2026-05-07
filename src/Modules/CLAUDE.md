@@ -135,82 +135,20 @@ The three permitted patterns (see ADR-0005):
 
 Domain code (under `Domain/`) must not reference infrastructure. No EF Core, no ASP.NET, no Wolverine, no FluentValidation, no HybridCache, no FeatureManagement. Enforced by architectural tests.
 
-Aggregates:
-- Inherit `AggregateRoot<TId>` from `Shared.Kernel`.
-- Have a private constructor.
-- Expose a public static `Create(...)` returning `Result<TSelf>`.
-- Have no public setters.
-- Raise domain events via `RaiseEvent(...)`.
-- Expose state changes as methods returning `Result`.
-
-Value objects:
-- `sealed record` with validation in a static factory method.
-- Equality is by value (free with records).
-
-Strongly-typed IDs:
-- Derive from `TypedId<T>` or similar base in `Shared.Kernel`.
-- `UserId`, not `Guid`, in method signatures and entity properties.
-
-See ADR-0009 for the full reasoning.
+For aggregate, value object, and typed ID conventions, read any existing aggregate (e.g. `User`, `Product`) or see ADR-0009.
 
 ---
 
 ## Persistence guidance
 
-- One `DbContext` per module, in `Persistence/`.
-- `modelBuilder.HasDefaultSchema("<module>")` in `OnModelCreating`.
-- Entity configurations as separate classes in `Persistence/Configurations/` (one per aggregate).
 - Never declare foreign keys that cross schemas. Cross-module references are `Guid` columns with no FK.
-- Migrations go in `Persistence/Migrations/` and are scoped to this module's context.
-- Apply the `AuditableEntitySaveChangesInterceptor` (from `Shared.Infrastructure`) in `OnConfiguring`.
-
-See ADR-0023.
+- For DbContext setup, schema naming, and configuration conventions, read any existing module's `Persistence/` folder or see ADR-0023.
 
 ---
 
 ## Module registration
 
-Each module has a `<Module>Module.cs` with three extension methods:
-
-```csharp
-public static IServiceCollection Add<Module>Module(
-    this IServiceCollection services,
-    IConfiguration configuration,
-    IWebHostEnvironment environment)
-{
-    // Bind options
-    services.AddOptions<<Module>Options>()
-        .Bind(configuration.GetSection("Modules:<Module>"))
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
-
-    // Register DbContext
-    services.AddDbContext<<Module>DbContext>(...);
-
-    // Register validators from this assembly
-    services.AddValidatorsFromAssemblyContaining<<Module>DbContext>(
-        ServiceLifetime.Scoped, includeInternalTypes: true);
-
-    return services;
-}
-
-public static WolverineOptions Add<Module>Handlers(this WolverineOptions opts)
-{
-    // Explicit handler registration (Wolverine does not auto-scan across assemblies)
-    opts.Discovery.IncludeType<SomeHandler>();
-    return opts;
-}
-
-public static IEndpointRouteBuilder Map<Module>Endpoints(
-    this IEndpointRouteBuilder app)
-{
-    SomeEndpoint.Map(app);
-    // ...
-    return app;
-}
-```
-
-`Api/Program.cs` calls all three: `Add<Module>Module` in the services block, `Add<Module>Handlers` inside `UseWolverine(opts => ...)`, and `Map<Module>Endpoints` in the pipeline block.
+Each module has a `<Module>Module.cs` with three extension methods: `Add<Module>Module` (services + options + DbContext + validators), `Add<Module>Handlers` (Wolverine handler discovery), and `Map<Module>Endpoints` (endpoint wiring). `Api/Program.cs` calls all three. See any existing `*Module.cs` for the pattern.
 
 ---
 

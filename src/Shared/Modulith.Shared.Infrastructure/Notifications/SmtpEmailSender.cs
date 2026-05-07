@@ -99,10 +99,11 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         // ServiceNotAuthenticatedException here means the server requires auth that was never
         // performed (no Username configured) or that the session has lost its auth state.
         // Both require configuration changes — retrying is pointless.
+        // DisconnectAsync runs in a finally so the SMTP QUIT is sent even when SendAsync throws.
+        // Failures in DisconnectAsync are swallowed — the using statement disposes the socket.
         try
         {
             await client.SendAsync(mail, ct).ConfigureAwait(false);
-            await client.DisconnectAsync(quit: true, ct).ConfigureAwait(false);
         }
         catch (SmtpCommandException ex) when ((int)ex.StatusCode >= 500)
         {
@@ -132,6 +133,11 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         catch (IOException ex)
         {
             throw new RetryableSmtpException($"SMTP I/O error during send: {ex.Message}", ex);
+        }
+        finally
+        {
+            try { await client.DisconnectAsync(quit: true, CancellationToken.None).ConfigureAwait(false); }
+            catch { /* socket cleanup handled by using statement */ }
         }
     }
 }

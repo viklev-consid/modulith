@@ -26,14 +26,13 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
     public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
-    /// Verifies the end-to-end recovery path introduced by <c>MarkReadyAsync</c>.
+    /// Verifies the end-to-end recovery path driven by <c>MarkReadyAsync</c>.
     /// <para>
-    /// <c>FlakyEmailSender</c> is configured with zero clock advance: the stale-row recovery
-    /// path in <c>TryClaimAsync</c> cannot fire on the Wolverine retry because the row has only
-    /// been Sending for a fraction of a second, well below the 5-minute threshold.
-    /// Without <c>MarkReadyAsync</c> the retry would see a non-stale Sending row and return
-    /// <c>false</c>, silently skipping the send. With it, the row is reset to Pending
-    /// immediately in the <c>catch (IOException)</c> block so the retry re-claims and succeeds.
+    /// <c>FlakyEmailSender</c> throws <see cref="RetryableSmtpException"/> on the first call.
+    /// The handler's <c>catch (RetryableSmtpException)</c> block calls
+    /// <c>NotificationSendGuard.MarkReadyAsync</c>, which resets <c>Sending → Pending</c>
+    /// immediately so the Wolverine retry can re-claim without waiting for the 5-minute
+    /// stale-row threshold.
     /// </para>
     /// </summary>
     [Fact]
@@ -41,9 +40,8 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
     {
         var request = new { Email = "recovery-test@example.com", Password = "Password1!", DisplayName = "Recovery Test" };
 
-        // Act — TrackActivity waits for all cascading messages to settle, including the retry.
         // DoNotAssertOnExceptionsDetected is required because TrackActivity records the
-        // intermediate IOException even though the message ultimately succeeds.
+        // intermediate RetryableSmtpException even though the message ultimately succeeds.
         Func<IMessageContext, Task> act = async _ =>
         {
             var response = await _client.PostAsJsonAsync("/v1/users/register", request);
@@ -54,11 +52,11 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
             .Timeout(TimeSpan.FromSeconds(30))
             .ExecuteAndWaitAsync(act);
 
-        // Email delivered exactly once on the successful retry
+        // Email delivered exactly once on the successful retry.
         Assert.Single(fixture.FlakyEmail.SentMessages);
         Assert.Equal(2, fixture.FlakyEmail.TotalAttempts);
 
-        // Notification log must be Sent (not stuck in Sending)
+        // Notification log must be Sent (not stuck in Sending).
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
         var log = await db.NotificationLogs
@@ -74,7 +72,7 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
     [Fact]
     public async Task MarkReadyAsync_AfterClaim_ResetsRowToPendingAndAllowsReClaim()
     {
-        // Arrange — insert a Pending notification log directly
+        // Arrange — insert a Pending notification log directly.
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
         var clock = scope.ServiceProvider.GetRequiredService<IClock>();
@@ -87,9 +85,9 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
         db.NotificationLogs.Add(log);
         await db.SaveChangesAsync();
 
-        // Act 1 — claim the send slot (Pending → Sending)
-        var claimed = await guard.TryClaimAsync(idempotencyKey, CancellationToken.None);
-        Assert.True(claimed, "First TryClaimAsync must succeed on a Pending row");
+        // Act 1 — claim the send slot (Pending → Sending).
+        var firstToken = await guard.TryClaimAsync(idempotencyKey, CancellationToken.None);
+        Assert.NotNull(firstToken);
 
         var afterClaim = await db.NotificationLogs
             .AsNoTracking()
@@ -97,8 +95,8 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
         Assert.Equal(NotificationDeliveryStatus.Sending, afterClaim.DeliveryStatus);
         Assert.NotNull(afterClaim.SendingClaimedAt);
 
-        // Act 2 — MarkReadyAsync resets back to Pending (simulates the catch-IOException path)
-        await guard.MarkReadyAsync(idempotencyKey, CancellationToken.None);
+        // Act 2 — MarkReadyAsync resets back to Pending (simulates the catch-RetryableSmtpException path).
+        await guard.MarkReadyAsync(idempotencyKey, firstToken.Value, CancellationToken.None);
 
         var afterReset = await db.NotificationLogs
             .AsNoTracking()
@@ -106,13 +104,60 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
         Assert.Equal(NotificationDeliveryStatus.Pending, afterReset.DeliveryStatus);
         Assert.Null(afterReset.SendingClaimedAt);
 
-        // Act 3 — second TryClaimAsync must succeed because the row is Pending again
-        var reClaimed = await guard.TryClaimAsync(idempotencyKey, CancellationToken.None);
-        Assert.True(reClaimed, "TryClaimAsync must succeed after MarkReadyAsync resets the row");
+        // Act 3 — second TryClaimAsync must succeed because the row is Pending again.
+        var secondToken = await guard.TryClaimAsync(idempotencyKey, CancellationToken.None);
+        Assert.NotNull(secondToken);
 
         var afterReClaim = await db.NotificationLogs
             .AsNoTracking()
             .SingleAsync(l => l.IdempotencyKey == idempotencyKey);
         Assert.Equal(NotificationDeliveryStatus.Sending, afterReClaim.DeliveryStatus);
+    }
+
+    /// <summary>
+    /// Verifies the DLQ replay recovery path: <c>TryClaimAsync</c> on a <c>Failed</c> row
+    /// resets it to <c>Pending</c> and re-claims, allowing a fresh send attempt.
+    /// <para>
+    /// Without this path, replaying a dead-lettered notification envelope via the DLQ admin
+    /// endpoints would be a silent no-op — the handler would see the <c>Failed</c> row, skip
+    /// the claim, and return without sending.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task TryClaimAsync_OnFailedRow_ResetsToPendingAndClaims_SupportingDlqReplay()
+    {
+        // Arrange — insert a Pending log, claim it, then mark it Failed (simulates terminal SMTP error).
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+        var guard = scope.ServiceProvider.GetRequiredService<NotificationSendGuard>();
+
+        var idempotencyKey = Guid.NewGuid();
+        var log = NotificationLog.Create(
+            Guid.NewGuid(), "dlq-replay@example.com", NotificationType.WelcomeEmail,
+            "Subject", clock.UtcNow, idempotencyKey);
+        db.NotificationLogs.Add(log);
+        await db.SaveChangesAsync();
+
+        var firstToken = await guard.TryClaimAsync(idempotencyKey, CancellationToken.None);
+        Assert.NotNull(firstToken);
+        await guard.MarkFailedAsync(idempotencyKey, firstToken.Value, CancellationToken.None);
+
+        var afterFailed = await db.NotificationLogs
+            .AsNoTracking()
+            .SingleAsync(l => l.IdempotencyKey == idempotencyKey);
+        Assert.Equal(NotificationDeliveryStatus.Failed, afterFailed.DeliveryStatus);
+
+        // Act — TryClaimAsync on a Failed row (simulates DLQ replay after root-cause fix).
+        var replayToken = await guard.TryClaimAsync(idempotencyKey, CancellationToken.None);
+
+        // Assert — guard recovers the Failed row and issues a fresh claim.
+        Assert.NotNull(replayToken);
+        var afterReplay = await db.NotificationLogs
+            .AsNoTracking()
+            .SingleAsync(l => l.IdempotencyKey == idempotencyKey);
+        Assert.Equal(NotificationDeliveryStatus.Sending, afterReplay.DeliveryStatus);
+        Assert.NotNull(afterReplay.SendingLeaseToken);
+        Assert.Equal(replayToken.Value, afterReplay.SendingLeaseToken.Value);
     }
 }

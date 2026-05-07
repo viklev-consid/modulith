@@ -16,10 +16,12 @@ public sealed class NotificationsRecoveryCollection : ICollectionFixture<Notific
 
 /// <summary>
 /// Fixture for Wolverine transient-recovery tests.
-/// Injects a <see cref="FlakyEmailSender"/> with <c>clockAdvance = TimeSpan.Zero</c> — no clock
-/// manipulation. This proves that <c>NotificationSendGuard.MarkReadyAsync</c> (called by handlers
-/// in the <c>catch (IOException)</c> block) is what enables transient recovery, independently of
-/// the stale-row path that requires the 5-minute threshold.
+/// Injects a <see cref="FlakyEmailSender"/> with <c>throwRetryable: true</c> and
+/// <c>clockAdvance = TimeSpan.Zero</c>. The sender throws <see cref="RetryableSmtpException"/>
+/// on the first call, which the handler catches and uses to call
+/// <c>NotificationSendGuard.MarkReadyAsync</c>, resetting the row to Pending immediately.
+/// No clock manipulation is needed — the stale-row path is deliberately excluded to prove that
+/// <c>MarkReadyAsync</c> alone drives recovery.
 /// </summary>
 public sealed class NotificationsRecoveryFixture : ApiTestFixture
 {
@@ -28,10 +30,9 @@ public sealed class NotificationsRecoveryFixture : ApiTestFixture
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
-        // Zero clock advance: the stale-row path in TryClaimAsync cannot fire because
-        // the Sending row will not be older than StuckSendingThreshold (5 min) on the
-        // immediate Wolverine retry. Recovery is entirely driven by MarkReadyAsync.
-        FlakyEmail = new FlakyEmailSender(Clock, TimeSpan.Zero);
+        // Throw RetryableSmtpException so the handler's catch block fires and calls
+        // MarkReadyAsync. No clock advance needed — the stale-row path is excluded.
+        FlakyEmail = new FlakyEmailSender(Clock, TimeSpan.Zero, throwRetryable: true);
         services.AddSingleton<IClock>(Clock);
         services.AddSingleton<IEmailSender>(FlakyEmail);
     }

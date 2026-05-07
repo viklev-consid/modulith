@@ -239,6 +239,11 @@ builder.UseWolverine(opts =>
     // Transient SMTP failures: 4xx server responses, protocol errors, connection drops, I/O errors.
     // SmtpEmailSender wraps these as RetryableSmtpException; handlers reset the send claim
     // to Pending before rethrowing so the retry can re-claim immediately.
+    //
+    // Future improvement: add a circuit breaker for RetryableSmtpException by routing
+    // notification messages to a dedicated local queue and calling CircuitBreaker() on it.
+    // This prevents all in-flight notifications from burning through retries independently
+    // when the SMTP server is known-down. Requires a queue-routing change; track as a task.
     opts.OnException<RetryableSmtpException>()
         .RetryWithCooldown(
             TimeSpan.FromSeconds(5),
