@@ -65,6 +65,7 @@ This produces:
 - `src/Modules/Inventory/Modulith.Modules.Inventory.Contracts/` with an `Events/` folder
 - Correct project references, csproj metadata, and namespace conventions
 - `InventoryModule.cs` with `AddInventoryModule`, `AddInventoryHandlers` (Wolverine), and `MapInventoryEndpoints` extensions
+- `InventoryModuleInstaller.cs` implementing `IModuleInstaller` for API autodiscovery
 - `InventoryDbContext.cs` with the `inventory` schema
 - `InventoryRoutes.cs` with route prefix constants
 - `InventoryErrors.cs` stub for ErrorOr error definitions
@@ -73,7 +74,7 @@ Test projects, `CLAUDE.md`, `InventoryOptions.cs`, and domain/feature subfolders
 
 After scaffolding:
 
-1. Register the module in `Api/Program.cs` (`AddInventoryModule`, `AddInventoryHandlers`, `MapInventoryEndpoints`).
+1. Confirm `InventoryModuleInstaller` was created. The API auto-discovers module installers from referenced `Modulith.Modules.*` assemblies.
 2. Add `InventoryOptions` and bind from `Modules:Inventory` if the module has configuration.
 
 If you add the module manually (without the template), confirm all of the above are present before committing. The architectural tests will catch missing pieces, but not all of them.
@@ -148,7 +149,7 @@ For aggregate, value object, and typed ID conventions, read any existing aggrega
 
 ## Module registration
 
-Each module has a `<Module>Module.cs` with three extension methods: `Add<Module>Module` (services + options + DbContext + validators), `Add<Module>Handlers` (Wolverine handler discovery), and `Map<Module>Endpoints` (endpoint wiring). `Api/Program.cs` calls all three. See any existing `*Module.cs` for the pattern.
+Each module has a `<Module>Module.cs` with three extension methods: `Add<Module>Module` (services + options + DbContext + validators), `Add<Module>Handlers` (Wolverine handler discovery), and `Map<Module>Endpoints` (endpoint wiring). Each module also has a `<Module>ModuleInstaller` implementing `IModuleInstaller`; the API auto-discovers installers and calls those three methods through the installer. See any existing `*Module.cs` and `*ModuleInstaller.cs` for the pattern.
 
 ---
 

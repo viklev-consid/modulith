@@ -1,10 +1,6 @@
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
-using Modulith.Modules.Audit.Contracts.Authorization;
-using Modulith.Modules.Catalog.Contracts.Authorization;
-using Modulith.Modules.Notifications.Contracts.Authorization;
-using Modulith.Modules.Users.Contracts.Authorization;
 using Modulith.Modules.Users.Domain;
 using Modulith.Shared.Infrastructure.Identity;
 
@@ -16,22 +12,12 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class RbacArchitectureTests
 {
-    private static readonly Assembly[] allContractsAssemblies =
-    [
-        typeof(UsersPermissions).Assembly,
-        typeof(CatalogPermissions).Assembly,
-        typeof(AuditPermissions).Assembly,
-        typeof(NotificationsPermissions).Assembly,
-    ];
+    private static readonly IReadOnlyList<Assembly> allContractsAssemblies =
+        ModuleAssemblyCatalog.ContractsAssemblies;
 
     // All module assemblies that contain Endpoint types.
-    private static readonly Assembly[] allModuleAssemblies =
-    [
-        typeof(User).Assembly,
-        typeof(Modulith.Modules.Catalog.Domain.Product).Assembly,
-        typeof(Modulith.Modules.Audit.Domain.AuditEntry).Assembly,
-        typeof(Modulith.Modules.Notifications.Domain.NotificationLog).Assembly,
-    ];
+    private static readonly IReadOnlyList<Assembly> allModuleAssemblies =
+        ModuleAssemblyCatalog.ModuleAssemblies;
 
     private static readonly Regex permissionFormat =
         new(@"^[a-z][a-z0-9_-]*\.[a-z][a-z0-9_-]*\.[a-z][a-z0-9_-]*$",

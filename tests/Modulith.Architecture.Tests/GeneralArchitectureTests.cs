@@ -1,11 +1,4 @@
 using System.Reflection;
-using Modulith.Modules.Audit.Contracts.Queries;
-using Modulith.Modules.Audit.Domain;
-using Modulith.Modules.Catalog.Contracts.Events;
-using Modulith.Modules.Catalog.Domain;
-using Modulith.Modules.Notifications.Domain;
-using Modulith.Modules.Users.Contracts.Events;
-using Modulith.Modules.Users.Domain;
 using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Architecture.Tests;
@@ -18,20 +11,11 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class GeneralArchitectureTests
 {
-    private static readonly Assembly[] allModuleAssemblies =
-    [
-        typeof(User).Assembly,
-        typeof(Product).Assembly,
-        typeof(AuditEntry).Assembly,
-        typeof(NotificationLog).Assembly,
-    ];
+    private static readonly IReadOnlyList<Assembly> allModuleAssemblies =
+        ModuleAssemblyCatalog.ModuleAssemblies;
 
-    private static readonly Assembly[] allContractsAssemblies =
-    [
-        typeof(UserRegisteredV1).Assembly,
-        typeof(ProductCreatedV1).Assembly,
-        typeof(GetAuditTrailQuery).Assembly,
-    ];
+    private static readonly IReadOnlyList<Assembly> allContractsAssemblies =
+        ModuleAssemblyCatalog.ContractsAssemblies;
 
     [Fact]
     public void IConfiguration_MustOnlyBeInjectedInModuleRegistrationTypes()
