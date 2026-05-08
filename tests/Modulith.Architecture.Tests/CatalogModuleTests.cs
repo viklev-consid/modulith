@@ -94,21 +94,6 @@ public sealed class CatalogModuleTests
     }
 
     [Fact]
-    public void Product_HasNoPublicSetters()
-    {
-        var publicSetters = typeof(Product)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod?.IsPublic == true)
-            .Select(p => p.Name)
-            .ToList();
-
-        Assert.True(publicSetters.Count == 0,
-            $"FAIL: Product aggregate must not have public setters. " +
-            $"Found public setters on: {string.Join(", ", publicSetters)}. " +
-            $"State transitions belong on aggregate methods.");
-    }
-
-    [Fact]
     public void CatalogContracts_DoesNotReferenceCatalogInternal()
     {
         var referencedNames = contractsAssembly

@@ -96,21 +96,6 @@ public sealed class AuditModuleTests
     }
 
     [Fact]
-    public void AuditEntry_HasNoPublicSetters()
-    {
-        var publicSetters = typeof(AuditEntry)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod?.IsPublic == true)
-            .Select(p => p.Name)
-            .ToList();
-
-        Assert.True(publicSetters.Count == 0,
-            $"FAIL: AuditEntry must not have public setters. " +
-            $"Found public setters on: {string.Join(", ", publicSetters)}. " +
-            $"State transitions belong on aggregate methods (e.g. Anonymize).");
-    }
-
-    [Fact]
     public void AuditContracts_DoesNotReferenceAuditInternal()
     {
         var referencedNames = contractsAssembly

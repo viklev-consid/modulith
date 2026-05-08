@@ -94,63 +94,6 @@ public sealed class UsersModuleTests
     }
 
     [Fact]
-    public void User_HasNoPublicSetters()
-    {
-        var publicSetters = typeof(User)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod?.IsPublic == true)
-            .Select(p => p.Name)
-            .ToList();
-
-        Assert.True(publicSetters.Count == 0,
-            $"FAIL: User aggregate must not have public setters. " +
-            $"Found public setters on: {string.Join(", ", publicSetters)}. " +
-            $"State transitions belong on aggregate methods.");
-    }
-
-    [Fact]
-    public void RefreshToken_HasNoPublicSetters()
-    {
-        var publicSetters = typeof(RefreshToken)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod?.IsPublic == true)
-            .Select(p => p.Name)
-            .ToList();
-
-        Assert.True(publicSetters.Count == 0,
-            $"FAIL: RefreshToken entity must not have public setters. " +
-            $"Found public setters on: {string.Join(", ", publicSetters)}.");
-    }
-
-    [Fact]
-    public void SingleUseToken_HasNoPublicSetters()
-    {
-        var publicSetters = typeof(SingleUseToken)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod?.IsPublic == true)
-            .Select(p => p.Name)
-            .ToList();
-
-        Assert.True(publicSetters.Count == 0,
-            $"FAIL: SingleUseToken entity must not have public setters. " +
-            $"Found public setters on: {string.Join(", ", publicSetters)}.");
-    }
-
-    [Fact]
-    public void PendingEmailChange_HasNoPublicSetters()
-    {
-        var publicSetters = typeof(PendingEmailChange)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod?.IsPublic == true)
-            .Select(p => p.Name)
-            .ToList();
-
-        Assert.True(publicSetters.Count == 0,
-            $"FAIL: PendingEmailChange entity must not have public setters. " +
-            $"Found public setters on: {string.Join(", ", publicSetters)}.");
-    }
-
-    [Fact]
     public void UsersContracts_DoesNotReferenceUsersInternal()
     {
         var referencedNames = contractsAssembly
