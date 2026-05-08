@@ -143,11 +143,11 @@ In an integration test, use Wolverine's `TrackActivity` to assert the end-to-end
 public async Task ChangingEmail_NotifiesNotificationsModule()
 {
     // Arrange
-    var user = await fixture.SeedAsync(UserMother.Active());
-    var client = fixture.AuthenticatedClient().AsUser(user).Build();
+    var user = await CreateUserAsync(fixture);
+    var client = fixture.CreateAuthenticatedClient(user.Id.Value, user.Email.Value, user.DisplayName);
 
     // Act — use TrackActivity to wait for all cascading messages
-    var session = await fixture.Host.TrackActivity()
+    var session = await fixture.ApplicationHost.TrackActivity()
         .Timeout(TimeSpan.FromSeconds(10))
         .ExecuteAndWaitAsync(async () =>
         {
@@ -165,8 +165,9 @@ public async Task ChangingEmail_NotifiesNotificationsModule()
         .ShouldBeTrue();
 
     // Subscriber executed its handler
-    var prefs = await fixture.QueryDb<NotificationsDbContext>(db =>
-        db.UserPreferences.FindAsync(user.Id.Value));
+    using var scope = fixture.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+    var prefs = await db.UserPreferences.FindAsync(user.Id.Value);
     prefs!.Email.ShouldBe("new@example.com");
 }
 ```

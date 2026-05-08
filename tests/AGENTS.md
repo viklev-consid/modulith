@@ -1,4 +1,4 @@
-# CLAUDE.md — Tests
+# AGENTS.md - Tests
 
 This directory holds all tests. Four layers, each with strict scope. See [`docs/testing-strategy.md`](../docs/testing-strategy.md) for the full treatment; this is the operating manual.
 
@@ -19,7 +19,7 @@ This directory holds all tests. Four layers, each with strict scope. See [`docs/
 
 ### Unit tests
 
-- Aggregate invariants: constructing with bad state → `ErrorOr<T>` failure such as `Error.Validation(...)`.
+- Aggregate invariants: constructing with bad state -> `ErrorOr<T>` failure such as `Error.Validation(...)`.
 - State transitions: method calls produce expected state + events.
 - Value object validation and equality.
 - Domain service logic (pure, no I/O).
@@ -27,7 +27,7 @@ This directory holds all tests. Four layers, each with strict scope. See [`docs/
 **Never:**
 - Mocks (rich domain has no dependencies to mock).
 - DbContext, HttpClient, or any I/O.
-- Handler tests (handlers orchestrate I/O — integration tests).
+- Handler tests (handlers orchestrate I/O - integration tests).
 
 ### Architectural tests
 
@@ -65,11 +65,11 @@ Failure messages are custom-written to be actionable. When one fails, read it li
 
 `tests/Modulith.TestSupport` is shared infrastructure. Every module test project references it. Contents:
 
-- `ApiTestFixture` — base WebApplicationFactory + Testcontainers lifecycle.
-- `CreateAnonymousClient()` / `CreateAuthenticatedClient(...)` — JWT-backed `HttpClient` helpers.
-- `CreateAuthenticatedClientWithToken(...)` — uses a token issued by the real auth flow.
-- `Fakes/` — fake and flaky email senders for module fixtures.
-- `TestClock` — controllable `IClock` implementation.
+- `ApiTestFixture` - base WebApplicationFactory + Testcontainers lifecycle.
+- `CreateAnonymousClient()` / `CreateAuthenticatedClient(...)` - JWT-backed `HttpClient` helpers.
+- `CreateAuthenticatedClientWithToken(...)` - uses a token issued by the real auth flow.
+- `Fakes/` - fake and flaky email senders for module fixtures.
+- `TestClock` - controllable `IClock` implementation.
 
 **Do not duplicate infrastructure across modules.** If you find yourself writing a fixture that looks like another module's, move the shared part to TestSupport.
 
@@ -123,10 +123,10 @@ Rules of thumb:
 
 Tests are tagged via `[Trait("Category", "X")]`:
 
-- `Unit` — pure domain tests
-- `Architecture` — architectural tests
-- `Integration` — per-module integration tests
-- `Smoke` — full-stack smoke tests
+- `Unit` - pure domain tests
+- `Architecture` - architectural tests
+- `Integration` - per-module integration tests
+- `Smoke` - full-stack smoke tests
 
 CI filters on these for tier separation.
 
@@ -164,7 +164,7 @@ Not for:
 - **Integration layer: fake external HTTP at the transport boundary.** Add WireMock.Net or a similar fixture in the module that needs it.
 - **Integration layer: TestClock for time when you need to control it.**
 
-`Moq` or `NSubstitute` are not forbidden outright — occasionally a handler has a genuine external dependency with no HTTP surface. But reach for real infrastructure first.
+`Moq` or `NSubstitute` are not forbidden outright - occasionally a handler has a genuine external dependency with no HTTP surface. But reach for real infrastructure first.
 
 ---
 
@@ -182,7 +182,7 @@ Not for:
 ## What to do when tests fail
 
 1. Read the failure message. xUnit's assertion output is usually enough.
-2. For architectural tests, read the failure literally — it names the fix.
+2. For architectural tests, read the failure literally - it names the fix.
 3. For integration tests that pass locally and fail in CI: check test isolation (leaked state), time sensitivity, or port conflicts.
 4. For flaky tests: flakiness is a bug. Don't rerun and move on. Investigate.
 

@@ -22,7 +22,7 @@ For a general-purpose template, the common case is: an application that may or m
 
 Do not use ASP.NET Identity. Instead:
 
-1. **Authentication is JWT bearer.** The API validates tokens via `Microsoft.AspNetCore.Authentication.JwtBearer`. Symmetric signing key for dev (auto-generated and persisted to user-secrets); asymmetric (RSA/ECDSA) recommended for prod.
+1. **Authentication is JWT bearer.** The API validates tokens via `Microsoft.AspNetCore.Authentication.JwtBearer`. The template uses a symmetric `Jwt:SigningKey` supplied through configuration; in development this normally comes from user-secrets, and in production it comes from the configured secret store.
 2. **The Users module owns a rich `User` aggregate.** With a strongly-typed `UserId`, value objects for `Email`, `HashedPassword`, etc., and methods like `ChangeEmail(...)` that enforce invariants and raise domain events.
 3. **Role/permission data is the Users module's responsibility.** A simple `Role` entity and `UserRole` join is enough. Authorization policies in the API layer map roles to policies.
 4. **Password hashing via BCrypt.Net-Next** (or Argon2id if the team prefers). The `User` aggregate owns password verification and change logic.
@@ -50,7 +50,7 @@ The Users module in the template ships with:
 
 - `User` aggregate with `Email`, `HashedPassword`, `Role`s
 - Slices for `Register`, `Login`, `ChangeEmail`, `ChangePassword`, `RequestPasswordReset`, `ResetPassword`
-- `Login` slice issues JWTs via an `ITokenIssuer` seam (`ISigningKeyProvider` is the injectable for key source)
+- `Login` and registration slices issue JWTs via `IJwtGenerator`, which reads shared `JwtOptions`
 - User change history via the Audit module
 - Does NOT ship with: 2FA, email confirmation (hook documented), external login integration, breach-password checks
 

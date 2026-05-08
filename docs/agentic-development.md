@@ -61,7 +61,7 @@ These generate the exact file set with correct namespaces and placeholder regist
 - **Warnings are errors.** No warnings, so agents don't waste cycles deciding what to fix.
 - **`ValidateOnStart()` on all Options.** Misconfiguration fails at boot with a clear message, not on first request with an obscure NRE.
 - **Architectural tests run in the fast tier.** Boundary mistakes fail within a minute of running tests, not at PR review time.
-- **Test failure messages are human-readable.** Shouldly's default diffs plus custom messages where needed.
+- **Test failure messages are human-readable.** xUnit assertion output plus custom messages where needed.
 
 ### Glossary of terms
 
@@ -139,7 +139,7 @@ Sub-agents are specialized agent definitions under `.claude/agents/`. Each has a
 | Sub-agent | Responsibility | Out of scope |
 |---|---|---|
 | `domain-modeler` | Domain entities, value objects, aggregates, domain events + unit tests | Persistence, handlers, endpoints, DI |
-| `integration-tester` | Integration tests using Testcontainers, Wolverine TrackActivity, WireMock.Net | Unit tests, arch tests, production code changes |
+| `integration-tester` | Integration tests using Testcontainers, Wolverine TrackActivity, and module-specific external fakes when needed | Unit tests, arch tests, production code changes |
 | `migration-writer` | EF Core migrations for a single module; summarizes generated SQL | Applying migrations, domain or config changes |
 | `adr-drafter` | ADR drafts in chat for human review and commit | Writing any file, editing existing ADRs |
 

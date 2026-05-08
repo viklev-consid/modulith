@@ -46,9 +46,10 @@ The base `ApiTestFixture` handles:
 - Starting a Postgres Testcontainer.
 - Running migrations once.
 - Building a `WebApplicationFactory<Program>`.
-- Exposing `AuthenticatedClient()` for JWT-backed HTTP calls.
-- Exposing `QueryDb<TContext>(...)` for verification queries.
-- Exposing `Tracker` / `TrackActivity(...)` for Wolverine message assertions.
+- Exposing `CreateAnonymousClient()` and `CreateAuthenticatedClient(...)` for HTTP calls.
+- Exposing `CreateAuthenticatedClientWithToken(...)` for tokens issued by the real auth flow.
+- Exposing `Services` for scoped DbContext verification queries.
+- Exposing `ApplicationHost` so tests can call Wolverine's `TrackActivity()` for message assertions.
 - Respawn-based cleanup between tests.
 
 ---
@@ -64,9 +65,8 @@ public sealed class PlaceOrderTests(OrdersApiFixture fixture)
     public async Task PlacingValidOrder_ReturnsCreatedAndPersistsOrder()
     {
         // Arrange
-        var customer = await fixture.SeedAsync(UserMother.Active());
-        var product = await fixture.SeedAsync<CatalogDbContext>(ProductMother.InStock(sku: "SKU-1"));
-        var client = fixture.AuthenticatedClient().AsUser(customer).Build();
+        var userId = Guid.NewGuid();
+        var client = fixture.CreateAuthenticatedClient(userId, "alice@example.com", "Alice");
 
         var request = new PlaceOrderRequest(
             Items: [new PlaceOrderRequest.Item("SKU-1", Quantity: 2)]);
@@ -81,14 +81,12 @@ public sealed class PlaceOrderTests(OrdersApiFixture fixture)
         body.OrderId.ShouldNotBe(Guid.Empty);
 
         // Assert — persistence
-        var order = await fixture.QueryDb<OrdersDbContext>(db =>
-            db.Orders.SingleOrDefaultAsync(o => o.Id == new OrderId(body.OrderId)));
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+        var order = await db.Orders.SingleOrDefaultAsync(o => o.Id == new OrderId(body.OrderId));
         order.ShouldNotBeNull();
         order.Status.ShouldBe(OrderStatus.Placed);
         order.Lines.Count.ShouldBe(1);
-
-        // Assert — events (if relevant)
-        fixture.Tracker.Published<OrderPlacedV1>().ShouldContain(e => e.OrderId == body.OrderId);
     }
 }
 ```
@@ -99,21 +97,22 @@ public sealed class PlaceOrderTests(OrdersApiFixture fixture)
 
 ### Arrange
 
-Use object mothers from `TestSupport.TestDataBuilders`. They produce valid aggregates and persist them via `fixture.SeedAsync(...)`. This exercises your real factory methods — stale mothers fail fast.
+Prefer arranging data through the module's public API. When a scenario really needs direct setup, create a scoped DbContext from `fixture.Services` and use the aggregate factory methods so invariants are still exercised.
 
 Build the authenticated client:
 
 ```csharp
-var client = fixture.AuthenticatedClient()
-    .AsUser("alice")            // or AsUser(userAggregate)
-    .WithRoles("Admin")          // optional
-    .Build();
+var client = fixture.CreateAuthenticatedClient(
+    Guid.NewGuid(),
+    "alice@example.com",
+    "Alice",
+    role: "admin");
 ```
 
 Unauthenticated requests:
 
 ```csharp
-var client = fixture.AnonymousClient();
+var client = fixture.CreateAnonymousClient();
 ```
 
 ### Act
@@ -123,7 +122,7 @@ Call the endpoint via the client. Prefer strongly-typed bodies (`PostAsJsonAsync
 For flows that publish cross-module events, use `TrackActivity`:
 
 ```csharp
-var session = await fixture.Host.TrackActivity()
+var session = await fixture.ApplicationHost.TrackActivity()
     .Timeout(TimeSpan.FromSeconds(10))
     .ExecuteAndWaitAsync(async () =>
     {
@@ -139,8 +138,8 @@ var session = await fixture.Host.TrackActivity()
 Three categories of assertions:
 
 1. **HTTP response.** Status code, body shape, headers.
-2. **Persistence state.** Read back from the DbContext via `QueryDb<TContext>(...)`.
-3. **Side-effect messages.** `fixture.Tracker.Published<T>()` or `session.Executed.SingleMessage<T>()`.
+2. **Persistence state.** Read back from the DbContext through a scoped service provider.
+3. **Side-effect messages.** Use the `TrackActivity()` session returned from `fixture.ApplicationHost`.
 
 Keep assertions tight to the scenario. A happy-path test asserting five different persistence details is a smell.
 
@@ -148,7 +147,7 @@ Keep assertions tight to the scenario. A happy-path test asserting five differen
 
 ## Snapshot testing contracts
 
-For responses and events that are part of a public contract, snapshot with Verify:
+The template does not currently include a snapshot library. If a response or event is important enough to review as a contract artifact, add a snapshot package deliberately and keep the fixture setup local to that test project:
 
 ```csharp
 [Fact]
@@ -160,7 +159,7 @@ public async Task PlaceOrderResponse_MatchesSnapshot()
 }
 ```
 
-The first run creates `PlaceOrderResponse_MatchesSnapshot.verified.json`. Subsequent runs fail if the shape changes, prompting a review-and-accept. Volatile fields (timestamps, IDs) are scrubbed via shared Verify settings in `TestSupport`.
+For Verify, the first run creates `PlaceOrderResponse_MatchesSnapshot.verified.json`. Subsequent runs fail if the shape changes, prompting a review-and-accept. Scrub volatile fields such as timestamps and IDs in the test project that owns the snapshots.
 
 ---
 
@@ -171,7 +170,7 @@ The first run creates `PlaceOrderResponse_MatchesSnapshot.verified.json`. Subseq
 [Trait("Category", "Integration")]
 public async Task PlacingOrderWithNoItems_ReturnsValidationProblem()
 {
-    var client = fixture.AuthenticatedClient().AsUser("alice").Build();
+    var client = fixture.CreateAuthenticatedClient(Guid.NewGuid(), "alice@example.com", "Alice");
     var request = new PlaceOrderRequest(Items: []);
 
     var response = await client.PostAsJsonAsync("/v1/orders", request);
@@ -194,8 +193,8 @@ The `ValidationProblemDetails` shape is standard (`errors: { field: [messages] }
 [Trait("Category", "Integration")]
 public async Task CancellingShippedOrder_ReturnsConflictWithErrorCode()
 {
-    var order = await fixture.SeedAsync(OrderMother.Shipped());
-    var client = fixture.AuthenticatedClient().AsUser("alice").Build();
+    var client = fixture.CreateAuthenticatedClient(Guid.NewGuid(), "alice@example.com", "Alice");
+    var order = await CreateShippedOrderAsync(fixture);
 
     var response = await client.PostAsJsonAsync(
         $"/v1/orders/{order.Id.Value}/cancel",
@@ -214,14 +213,14 @@ Clients pattern-match on `errorCode`, not on `title` or `detail`.
 
 ## Mocking external HTTP
 
-WireMock.Net, configured via `TestSupport.WireMockFixture`:
+WireMock.Net is the preferred tool for external HTTP. The shared `TestSupport` project does not currently ship a `WireMockFixture`; add a module-specific fixture when a module needs one:
 
 ```csharp
 [Fact]
 [Trait("Category", "Integration")]
 public async Task PlacingOrder_CallsPaymentProvider()
 {
-    fixture.WireMock
+    wireMock
         .Given(Request.Create().WithPath("/payments/charge").UsingPost())
         .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(new { id = "ch_123" }));
 
@@ -229,13 +228,13 @@ public async Task PlacingOrder_CallsPaymentProvider()
 }
 ```
 
-The fixture configures the application to point at the WireMock URL via `IOptions` override.
+The module fixture should configure the application to point at the WireMock URL via an `IOptions` override.
 
 ---
 
 ## Controlling time
 
-Use `TestClock` from `TestSupport`, which implements `IClock` from `Shared.Kernel`:
+Use `TestClock` from `TestSupport`, which implements `IClock` from `Shared.Kernel`. Register and expose it from the module fixture that needs deterministic time:
 
 ```csharp
 fixture.Clock.Set(new DateTimeOffset(2025, 1, 15, 12, 0, 0, TimeSpan.Zero));
@@ -249,10 +248,10 @@ Never use `DateTime.UtcNow` in handlers — always inject `IClock`. Makes time-s
 
 ## Common mistakes
 
-- **Using a raw `HttpClient` instead of the authenticated builder.** Tests look simpler but break when auth requirements change.
+- **Crafting JWTs inline instead of using fixture helpers.** Tests look simpler but break when auth requirements change.
 - **Asserting on `title` or `detail` of ProblemDetails.** Human-readable text; use `errorCode`.
 - **Sleeping instead of `TrackActivity`.** Flaky tests. `TrackActivity` is always the right answer for Wolverine flows.
-- **Seeding by writing raw entities.** Use object mothers — they go through factory methods and catch domain invariant drift.
+- **Seeding by bypassing aggregate factories.** Use public APIs or factory methods so tests catch domain invariant drift.
 - **Not marking `[Trait("Category", "Integration")]`.** Test runs in the fast tier and makes it slow.
 - **Sharing state between tests.** Respawn wipes between tests; shared state manifests as order-dependent failures.
 - **Testing ASP.NET's routing.** `"When I POST to /v1/orders, I hit the PlaceOrder endpoint"` is not a test. Test what happens next.

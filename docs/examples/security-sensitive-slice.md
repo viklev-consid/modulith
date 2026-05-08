@@ -179,7 +179,7 @@ The endpoint short-circuits validation failure as 200, not 422. If validation re
 [Trait("Category", "Integration")]
 public async Task ForgotPassword_ReturnsSameResponseForKnownAndUnknownEmail()
 {
-    await fixture.SeedAsync(UserMother.WithEmail("known@example.com"));
+    await RegisterUserAsync(client, email: "known@example.com");
 
     var r1 = await client.PostAsJsonAsync("/v1/users/password/forgot",
         new ForgotPasswordRequest("known@example.com"));
@@ -198,12 +198,13 @@ public async Task ForgotPassword_ReturnsSameResponseForKnownAndUnknownEmail()
 [Trait("Category", "Integration")]
 public async Task ForgotPassword_TokenNotStoredInPlaintext()
 {
-    var user = await fixture.SeedAsync(UserMother.Active());
+    var user = await CreateUserAsync(fixture);
     await client.PostAsJsonAsync("/v1/users/password/forgot",
         new ForgotPasswordRequest(user.Email));
 
-    var token = await fixture.QueryDb<UsersDbContext>(db =>
-        db.SingleUseTokens.FirstOrDefaultAsync(t => t.UserId == user.Id.Value));
+    using var scope = fixture.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+    var token = await db.SingleUseTokens.FirstOrDefaultAsync(t => t.UserId == user.Id.Value);
 
     token.ShouldNotBeNull();
     // Token hash stored as bytes, not the raw string

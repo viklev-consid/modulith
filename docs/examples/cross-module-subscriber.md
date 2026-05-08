@@ -116,7 +116,7 @@ Each subscriber handles exactly one event type. Keep them small — if handling 
 [Trait("Category", "Integration")]
 public async Task RegisteringUser_SendsWelcomeEmail()
 {
-    var session = await fixture.Host.TrackActivity()
+    var session = await fixture.ApplicationHost.TrackActivity()
         .Timeout(TimeSpan.FromSeconds(10))
         .ExecuteAndWaitAsync(async () =>
         {
@@ -127,8 +127,9 @@ public async Task RegisteringUser_SendsWelcomeEmail()
     session.Executed.SingleMessage<UserRegisteredV1>().ShouldNotBeNull();
 
     // The NotificationLog was written
-    var log = await fixture.QueryDb<NotificationsDbContext>(db =>
-        db.NotificationLogs.FirstOrDefaultAsync(l => l.NotificationType == NotificationType.WelcomeEmail));
+    using var scope = fixture.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+    var log = await db.NotificationLogs.FirstOrDefaultAsync(l => l.NotificationType == NotificationType.WelcomeEmail);
     log.ShouldNotBeNull();
 }
 ```

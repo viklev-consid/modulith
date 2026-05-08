@@ -210,7 +210,7 @@ public async Task DeliveringSameMessageTwice_InvokesHandlerOnce()
 public async Task PostingWithSameIdempotencyKey_ReturnsCachedResponse()
 {
     var key = Guid.NewGuid().ToString();
-    var client = fixture.AuthenticatedClient().AsUser("alice").Build();
+    var client = fixture.CreateAuthenticatedClient(Guid.NewGuid(), "alice@example.com", "Alice");
     client.DefaultRequestHeaders.Add("Idempotency-Key", key);
 
     var r1 = await client.PostAsJsonAsync("/v1/orders", validRequest);
@@ -220,7 +220,9 @@ public async Task PostingWithSameIdempotencyKey_ReturnsCachedResponse()
     r2.StatusCode.ShouldBe(HttpStatusCode.Created);
     (await r1.Content.ReadAsStringAsync()).ShouldBe(await r2.Content.ReadAsStringAsync());
 
-    (await fixture.QueryDb<OrdersDbContext>(db => db.Orders.CountAsync())).ShouldBe(1);
+    using var scope = fixture.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+    (await db.Orders.CountAsync()).ShouldBe(1);
 }
 ```
 

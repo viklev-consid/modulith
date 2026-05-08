@@ -94,7 +94,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Notification.** A message sent to a user via email, SMS, or push. Orchestrated by the Notifications module, which owns templates, user preferences, and a delivery log.
 
-**Object Mother.** A test helper that creates valid, domain-specific objects with realistic defaults (`UserMother.Active()`, `OrderMother.PlacedWithItems(3)`). Lives in `TestSupport.TestDataBuilders/` and is preferred over manually seeding raw entities in tests.
+**Object Mother.** A test helper that creates valid, domain-specific objects with realistic defaults (`UserMother.Active()`, `OrderMother.PlacedWithItems(3)`). The template does not currently ship a shared object-mother folder; add module-specific builders when repeated setup starts to obscure the test.
 
 **Observability.** Logs, metrics, and traces that let you understand what the system is doing. Powered by OpenTelemetry, surfaced in the Aspire dashboard locally.
 
@@ -138,11 +138,11 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Slice.** A feature folder inside a module. Contains all files for a single feature: `Request`, `Response`, `Command`/`Query`, `Handler`, `Validator`, `Endpoint`. Co-located to reduce the cost of change.
 
-**Smoke Test.** A test that spins up the full Aspire stack and exercises a real endpoint end-to-end. Small number, runs in release CI. Uses `Aspire.Hosting.Testing`.
+**Smoke Test.** A test that exercises the full API pipeline end-to-end through `WebApplicationFactory`, backed by real containers such as Postgres and Mailpit. Small number, runs in release CI.
 
 **Testcontainers.** A library for spinning up ephemeral Docker containers during tests. Used for real Postgres (and Redis, if needed) in integration tests. No in-memory EF, no SQLite stand-in.
 
-**TestSupport.** A test project containing shared fixtures and helpers such as `ApiTestFixture`, `AuthenticatedClientBuilder`, object mothers, Verify settings, test clocks, and HTTP stubs. Referenced by all module test projects.
+**TestSupport.** A test project containing shared fixtures and helpers such as `ApiTestFixture`, anonymous/authenticated `HttpClient` helpers, fake email senders, and `TestClock`. Referenced by all module test projects.
 
 **Terms Acceptance.** An immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`). Created by the `CompleteOnboarding` slice, which writes a single ToS row keyed to the current `UsersOptions.TermsOfServiceVersion`. Keyed by `(UserId, Version)` with a unique constraint — re-submitting `CompleteOnboarding` when a row for the current version already exists is a no-op. Distinct from *Consent*, which gates optional processing (e.g. `marketing-emails`); terms acceptance is required for account activation.
 

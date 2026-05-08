@@ -149,7 +149,7 @@ public sealed class SliceConventionTests
 
         Assert.True(violations.Count == 0,
             "FAIL: Aggregate and Entity types must not have public constructors. " +
-            "Use a static factory method (e.g. 'public static Result<T> Create(...)') for construction. " +
+            "Use a static factory method (e.g. 'public static ErrorOr<T> Create(...)') for construction. " +
             "The EF Core parameterless constructor must be private. " +
             "See ADR-0009 (Rich Domain Model). " +
             $"Offending types: {string.Join(", ", violations)}");

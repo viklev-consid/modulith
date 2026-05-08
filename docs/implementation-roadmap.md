@@ -41,7 +41,7 @@ Create at the repo root:
 - `Directory.Build.props` — shared MSBuild properties (ADR-0016)
 - `.editorconfig` — style and analyzer severities
 - `.globalconfig` — analyzer severities that can't be in `.editorconfig`
-- `.gitignore` — standard .NET ignore + `appsettings.Local.json`
+- `.gitignore` — standard .NET ignore patterns
 - `global.json` — pin the SDK version
 
 `Directory.Build.props` should include:
@@ -400,7 +400,7 @@ For example: when a user is created, the Catalog module records them as a custom
 [Fact]
 public async Task RegisteringUser_CreatesCatalogCustomer()
 {
-    var session = await fixture.Host.TrackActivity()
+    var session = await fixture.ApplicationHost.TrackActivity()
         .ExecuteAndWaitAsync(async () =>
         {
             await client.PostAsJsonAsync("/v1/users/register", ...);
@@ -408,8 +408,9 @@ public async Task RegisteringUser_CreatesCatalogCustomer()
 
     session.Executed.SingleMessage<UserRegisteredV1>().ShouldNotBeNull();
 
-    var customer = await fixture.QueryDb<CatalogDbContext>(db =>
-        db.Customers.FirstOrDefaultAsync(...));
+    using var scope = fixture.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+    var customer = await db.Customers.FirstOrDefaultAsync(...);
     customer.ShouldNotBeNull();
 }
 ```

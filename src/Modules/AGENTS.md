@@ -1,8 +1,8 @@
-# CLAUDE.md — Modules
+# AGENTS.md - Modules
 
 This directory holds all business modules. Each module is a vertical slice of business capability with its own domain, persistence, endpoints, and public contract.
 
-For the repo-wide operating manual, see [`/CLAUDE.md`](../../CLAUDE.md).
+For the repo-wide operating manual, see [`/AGENTS.md`](../../AGENTS.md).
 
 ---
 
@@ -12,28 +12,28 @@ Every module is two projects:
 
 ```
 <Module>/
-├── Modulith.Modules.<Module>/                # Internal project
-│   ├── Domain/                               # Aggregates, value objects, internal events
-│   ├── Features/                             # Vertical slices
-│   │   └── <FeatureName>/
-│   │       ├── <Feature>.Request.cs
-│   │       ├── <Feature>.Response.cs
-│   │       ├── <Feature>.Command.cs  (or .Query.cs)
-│   │       ├── <Feature>.Handler.cs
-│   │       ├── <Feature>.Validator.cs
-│   │       └── <Feature>.Endpoint.cs
-│   ├── Integration/                          # Handlers for OTHER modules' public events
-│   ├── Persistence/
-│   │   ├── <Module>DbContext.cs
-│   │   ├── Configurations/
-│   │   └── Migrations/
-│   ├── Seeding/                              # IModuleSeeder implementations
-│   └── <Module>Module.cs                     # Registration extensions
-└── Modulith.Modules.<Module>.Contracts/      # Public project
-    ├── Commands/                             # If other modules can command this one
-    ├── Queries/                              # If other modules can query this one
-    ├── Events/                               # Integration events published by this module
-    └── Dtos/                                 # Shared types used in the above
++-- Modulith.Modules.<Module>/                # Internal project
+|   +-- Domain/                               # Aggregates, value objects, internal events
+|   +-- Features/                             # Vertical slices
+|   |   +-- <FeatureName>/
+|   |       +-- <Feature>.Request.cs
+|   |       +-- <Feature>.Response.cs
+|   |       +-- <Feature>.Command.cs  (or .Query.cs)
+|   |       +-- <Feature>.Handler.cs
+|   |       +-- <Feature>.Validator.cs
+|   |       +-- <Feature>.Endpoint.cs
+|   +-- Integration/                          # Handlers for OTHER modules' public events
+|   +-- Persistence/
+|   |   +-- <Module>DbContext.cs
+|   |   +-- Configurations/
+|   |   +-- Migrations/
+|   +-- Seeding/                              # IModuleSeeder implementations
+|   +-- <Module>Module.cs                     # Registration extensions
++-- Modulith.Modules.<Module>.Contracts/      # Public project
+    +-- Commands/                             # If other modules can command this one
+    +-- Queries/                              # If other modules can query this one
+    +-- Events/                               # Integration events published by this module
+    +-- Dtos/                                 # Shared types used in the above
 ```
 
 See [`docs/architecture.md`](../../docs/architecture.md) for full detail.
@@ -42,12 +42,12 @@ See [`docs/architecture.md`](../../docs/architecture.md) for full detail.
 
 ## Non-negotiables
 
-1. **Two projects per module.** Internal and `.Contracts`. Both exist even if `.Contracts` is empty at first — it will be populated.
+1. **Two projects per module.** Internal and `.Contracts`. Both exist even if `.Contracts` is empty at first - it will be populated.
 2. **The internal project references the `.Contracts` project, not vice versa.**
 3. **Other modules reference only the `.Contracts` project.** Never the internal project.
 4. **The DbContext is module-scoped.** Own schema, own migration history, own migrations folder.
 5. **Integration events are `record`s with a version suffix.** `OrderPlacedV1`, not `OrderPlaced`.
-6. **Internal domain events are separate from integration events.** Even when they carry the same data — ADR-0006 explains why.
+6. **Internal domain events are separate from integration events.** Even when they carry the same data - ADR-0006 explains why.
 
 ---
 
@@ -70,7 +70,7 @@ This produces:
 - `InventoryRoutes.cs` with route prefix constants
 - `InventoryErrors.cs` stub for ErrorOr error definitions
 
-Test projects, `CLAUDE.md`, `InventoryOptions.cs`, and domain/feature subfolders must be added manually after scaffolding.
+Test projects, `AGENTS.md`, `InventoryOptions.cs`, and domain/feature subfolders must be added manually after scaffolding.
 
 After scaffolding:
 
@@ -95,7 +95,7 @@ After scaffolding:
 
 1. Fill in the `Request` and `Response` properties.
 2. Fill in the `Command` (usually mirrors the Request with typed IDs).
-3. Implement the `Handler` — load aggregates, invoke methods, return `ErrorOr<T>` or `ErrorOr<Success>`.
+3. Implement the `Handler` - load aggregates, invoke methods, return `ErrorOr<T>` or `ErrorOr<Success>`.
 4. Add `Validator` rules.
 5. Wire the `Endpoint` registration in the module's `MapXxxEndpoints` extension.
 6. Flesh out the integration test.
@@ -113,7 +113,7 @@ The three permitted patterns (see ADR-0005):
 - Module B references `Orders.Contracts`, writes a handler in `Integration/`.
 - Wolverine's outbox delivers the event.
 
-> **Handler visibility:** All Wolverine handler classes — feature handlers and integration subscribers alike — must be `public`. An `internal` handler compiles but causes `ArgumentOutOfRangeException: Handler types must be public` at startup. If a dependency type is `internal`, make that type `public` rather than making the handler `internal`.
+> **Handler visibility:** All Wolverine handler classes - feature handlers and integration subscribers alike - must be `public`. An `internal` handler compiles but causes `ArgumentOutOfRangeException: Handler types must be public` at startup. If a dependency type is `internal`, make that type `public` rather than making the handler `internal`.
 
 **Queries:**
 - Module A exposes `GetUserByIdQuery` in `Users.Contracts.Queries`.
@@ -122,7 +122,7 @@ The three permitted patterns (see ADR-0005):
 **Commands (rare):**
 - Module A exposes `DeactivateUserCommand` in `Users.Contracts.Commands`.
 - Module B sends via `IMessageBus.InvokeAsync<ErrorOr<Success>>(command)` for no-payload commands, or `ErrorOr<TResponse>` when a response DTO is returned.
-- Usually a sign the boundary is wrong — prefer events.
+- Usually a sign the boundary is wrong - prefer events.
 
 **Never:**
 - Reference another module's internal project.
@@ -155,8 +155,8 @@ Each module has a `<Module>Module.cs` with three extension methods: `Add<Module>
 
 ## Things you should not touch
 
-- The base `ModuleDbContext` in `Shared.Infrastructure` — it applies global conventions. Changes affect every module.
-- `ICurrentUser` and its implementation — used by auditing and authorization.
-- The shared `DomainEvent`, `AggregateRoot`, and base kernel primitives in `Shared.Kernel` — changes ripple everywhere. Expected failures use the `ErrorOr` package.
+- The base `ModuleDbContext` in `Shared.Infrastructure` - it applies global conventions. Changes affect every module.
+- `ICurrentUser` and its implementation - used by auditing and authorization.
+- The shared `DomainEvent`, `AggregateRoot`, and base kernel primitives in `Shared.Kernel` - changes ripple everywhere. Expected failures use the `ErrorOr` package.
 
 If you need to change these, ask.

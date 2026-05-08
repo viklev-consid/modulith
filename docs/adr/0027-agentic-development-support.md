@@ -83,7 +83,7 @@ Reduces the cost of judgment calls under context limits.
 - Warnings are errors (no noise to filter).
 - `ValidateOnStart` — misconfigurations fail at boot with clear messages.
 - Architectural tests in the fast tier (boundary mistakes fail within a minute).
-- Shouldly's readable failure messages (ADR-0022).
+- xUnit assertion output plus targeted custom messages (ADR-0022).
 
 ### 8. Glossary and examples
 

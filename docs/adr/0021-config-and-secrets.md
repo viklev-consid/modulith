@@ -48,13 +48,12 @@ services
 ```
 appsettings.json              # committed, defaults and non-secret config
 appsettings.{Env}.json        # committed, environment overrides
-appsettings.Local.json        # GITIGNORED, developer overrides for non-secret values
 User Secrets                  # dev secrets (dotnet user-secrets)
 Environment variables         # deployment overrides
-External secret store         # prod secrets (Key Vault, Secrets Manager, Vault, K8s)
+External secret store         # prod secrets when explicitly wired (Key Vault, Secrets Manager, Vault, K8s)
 ```
 
-Later sources override earlier. The template's `Program.cs` wires this stack explicitly and includes a commented stub for the external secret provider.
+Later sources override earlier. The template relies on ASP.NET Core's default providers for JSON files, user secrets in development, and environment variables. External secret stores are added by the adopting application.
 
 ### Module-owned config sections
 
@@ -79,21 +78,21 @@ Aspire prompts for values in dev (and persists to user-secrets); production pull
 ### Secrets specifically
 
 - **Dev**: User Secrets. `UserSecretsId` in `Api.csproj`. Standard `dotnet user-secrets set Key Value` commands documented in README.
-- **Prod**: external provider. Templates does not prescribe — Azure Key Vault, AWS Secrets Manager, HashiCorp Vault, Kubernetes mounted files all work via `IConfiguration` providers. `CONFIG.md` documents the wiring for each.
+- **Prod**: external provider. The template does not prescribe or pre-wire one — Azure Key Vault, AWS Secrets Manager, HashiCorp Vault, Kubernetes mounted files all work via `IConfiguration` providers once the application registers the provider.
 - **Never**: hard-coded secrets, secrets in `appsettings.json`, encrypted-blob-in-code with key-in-code patterns.
 
 ### JWT signing keys
 
-- **Dev**: symmetric key, auto-generated on first run, persisted to user-secrets.
-- **Prod**: asymmetric (RSA or ECDSA) recommended — documented. Allows multiple verifiers without sharing signing authority.
-- **Rotation**: not implemented. An `ISigningKeyProvider` seam exists; rotation implementations are documented as extension points.
+- **Dev**: symmetric key supplied through configuration, normally user-secrets. It must be at least 32 characters.
+- **Prod**: symmetric key supplied through the configured secret provider. Asymmetric RSA/ECDSA signing is a recommended extension for teams that need it, but it is not implemented in the template.
+- **Rotation**: not implemented. Add a signing-key abstraction before implementing current/previous key rotation.
 
 ### What NOT to do (anti-patterns)
 
 - Don't encrypt `appsettings.json` fields and ship decryption keys in code.
 - Don't use `DataProtection` API for arbitrary secrets — it's for ASP.NET-internal things (cookies, antiforgery), not general-purpose secret storage.
 - Don't write secrets to logs. Serilog destructuring (ADR-0010) handles classified properties; also add `[Secret]` to Options sensitive properties as a belt-and-braces measure.
-- Don't commit `appsettings.Local.json`. It must be in `.gitignore`.
+- Don't commit local-only settings or secrets. `appsettings.Local.json` is ignored by git, but it is not loaded unless the app explicitly adds that provider.
 
 ## Consequences
 

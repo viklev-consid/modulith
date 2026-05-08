@@ -530,15 +530,15 @@ Representative integration tests:
 [Fact]
 public async Task ForgotPasswordThenReset_AllowsLoginWithNewPassword()
 {
-    var user = await fixture.SeedAsync(UserMother.WithPassword("old-password"));
+    var user = await RegisterUserAsync(client, "old-password");
 
     // Step 1: request reset
     await client.PostAsJsonAsync("/v1/users/password/forgot",
         new ForgotPasswordRequest(user.Email.Value));
 
-    // Capture the token from the published event
-    var token = fixture.Tracker.Published<PasswordResetRequestedV1>()
-        .Single().RawToken;
+    // Capture the token from the notification/log record or the TrackActivity session,
+    // depending on the fixture support for this flow.
+    var token = await ReadPasswordResetTokenAsync(fixture, user.Id);
 
     // Step 2: reset
     var resetResp = await client.PostAsJsonAsync("/v1/users/password/reset",
@@ -563,7 +563,7 @@ public async Task ForgotPasswordThenReset_AllowsLoginWithNewPassword()
 [Fact]
 public async Task ForgotPassword_ReturnsSameResponseForUnknownEmail()
 {
-    await fixture.SeedAsync(UserMother.WithEmail("known@example.com"));
+    await RegisterUserAsync(client, "Password1!", email: "known@example.com");
 
     var r1 = await client.PostAsJsonAsync("/v1/users/password/forgot",
         new ForgotPasswordRequest("known@example.com"));
@@ -583,7 +583,7 @@ public async Task ForgotPassword_ReturnsSameResponseForUnknownEmail()
 [Fact]
 public async Task UsingRevokedRefreshToken_RevokesEntireChain()
 {
-    var user = await fixture.SeedAsync(UserMother.Active());
+    var user = await RegisterUserAsync(client, "Password1!");
     var login = await Login(user);
     var firstRefresh = login.RefreshToken;
 
@@ -608,7 +608,7 @@ public async Task UsingRevokedRefreshToken_RevokesEntireChain()
 [Fact]
 public async Task PasswordReset_RevokesAllRefreshTokens()
 {
-    var user = await fixture.SeedAsync(UserMother.Active());
+    var user = await RegisterUserAsync(client, "Password1!");
     var session1 = await Login(user);
     var session2 = await Login(user);
 

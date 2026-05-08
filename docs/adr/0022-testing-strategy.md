@@ -20,7 +20,7 @@ Four test layers with strict scope boundaries. See `docs/testing-strategy.md` fo
 ### Layer 1: Unit tests
 
 - **Scope**: Domain only — aggregates, value objects, domain services.
-- **Dependencies**: BCL + Shouldly. No mocks, no database, no ASP.NET.
+- **Dependencies**: BCL + xUnit assertions. No mocks, no database, no ASP.NET.
 - **Location**: `tests/Modules/<Module>/Modulith.Modules.<Module>.UnitTests`.
 - **Speed**: Milliseconds total for the layer.
 
@@ -38,7 +38,7 @@ Enforces ADR-0005, 0009, 0015, 0021, 0019. Failure messages are custom-written t
 ### Layer 3: Integration tests
 
 - **Scope**: One module's slices end-to-end — HTTP → handler → DB → outbox.
-- **Dependencies**: `WebApplicationFactory<Program>`, Testcontainers (real Postgres), Shouldly, Verify, Bogus, WireMock.Net.
+- **Dependencies**: `WebApplicationFactory<Program>`, Testcontainers (real Postgres), xUnit assertions, Respawn.
 - **Location**: `tests/Modules/<Module>/Modulith.Modules.<Module>.IntegrationTests`.
 - **Speed**: Seconds per test, amortized across fixtures. Whole-suite target: under 5 minutes.
 
@@ -48,8 +48,8 @@ Database-per-test-class, Respawn between tests within the class. Class-level par
 
 ### Layer 4: Smoke tests
 
-- **Scope**: Full Aspire stack, real HTTP.
-- **Dependencies**: `Aspire.Hosting.Testing`.
+- **Scope**: Full API pipeline via `WebApplicationFactory`, real Postgres, and real Mailpit container.
+- **Dependencies**: `WebApplicationFactory<Program>`, Testcontainers, `HttpClient`.
 - **Location**: `tests/Modulith.SmokeTests`.
 - **Speed**: Tens of seconds. 3-5 tests total.
 
@@ -60,10 +60,9 @@ Only runs in release CI, not on every PR.
 A single `tests/Modulith.TestSupport` project with:
 
 - `ApiTestFixture` base (WebApplicationFactory + Testcontainers)
-- `AuthenticatedClientBuilder` (JWT-backed HttpClient builder)
-- Test data builders / object mothers
-- Shared Verify settings
-- WireMock helpers
+- anonymous and authenticated `HttpClient` helpers
+- token helper for using JWTs issued by the real auth flow
+- fake email senders
 - `TestClock` for controllable time
 
 ### Library choices
@@ -71,17 +70,17 @@ A single `tests/Modulith.TestSupport` project with:
 | Concern | Library | Rationale |
 |---|---|---|
 | Test framework | xUnit v3 | Modern fixture lifecycle, parallel semantics |
-| Assertions | Shouldly | Readable, stable API, no license concerns |
-| Snapshots | Verify | For contract shapes, OpenAPI, events |
-| Fakes | Bogus | Simple; object mothers for domain |
+| Assertions | xUnit | Current tests use built-in `Assert` APIs |
+| Snapshots | Verify | Optional; not currently referenced by test projects |
+| Fakes | Bogus | Optional; not currently referenced by test projects |
 | DB | Testcontainers (Postgres) | Real behavior, no surprises |
 | Arch tests | NetArchTest | Readable syntax; rules ARE documentation |
-| HTTP mocking | WireMock.Net | For external API calls |
+| HTTP mocking | WireMock.Net | Optional; add module fixture support where needed |
 
 **Not used:**
 - AutoFixture — fights private setters in rich domain.
 - Moq/NSubstitute — minimal need; unit layer has no mocks, integration uses real infra.
-- FluentAssertions — license changes in v8 made it a maintenance risk.
+- FluentAssertions / Shouldly — not currently included; add an assertion library only if xUnit assertions stop carrying their weight.
 - SpecFlow/Reqnroll — BDD overhead without the benefit for this use case.
 - Stryker — specialized tool; not a default.
 
@@ -115,7 +114,7 @@ These are framework tautologies. Test our behavior *on top of* the framework.
 
 - Four projects per module in the solution (module + contracts + unit tests + integration tests). Accepted.
 - Testcontainers requires Docker running locally. Documented in README.
-- Snapshot tests (Verify) require maintenance when contracts change — intentional, but a habit to form.
+- Snapshot tests require adding and maintaining a snapshot library when contracts change — intentional if adopted, but not currently part of the baseline.
 
 ## Related
 
