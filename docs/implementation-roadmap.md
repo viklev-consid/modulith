@@ -1555,6 +1555,192 @@ Deliberately out of scope for Phase 14:
 
 ---
 
+## Phase 15: Durable Wolverine outbox + messaging hardening
+
+**Goal:** Make the existing Wolverine-based event flow actually durable: persist local messages and scheduled work in PostgreSQL, enroll module `DbContext` types in the transactional outbox, harden subscribers for at-least-once delivery, and prove crash/restart recovery in tests.
+
+Reference docs:
+
+- [`adr/0003-wolverine-for-messaging.md`](adr/0003-wolverine-for-messaging.md)
+- [`adr/0023-per-module-dbcontext.md`](adr/0023-per-module-dbcontext.md)
+- [`how-to/cross-module-events.md`](how-to/cross-module-events.md)
+- [`how-to/add-idempotency.md`](how-to/add-idempotency.md)
+- [`testing-strategy.md`](testing-strategy.md)
+
+Design summary (full reasoning in ADR-0003, phase-specific decisions captured here):
+
+- **One Wolverine message store per application.** All modules already share one PostgreSQL database; Wolverine durability uses that same database with a dedicated application-level schema (for example `wolverine`).
+- **Module schemas stay isolated.** `users`, `catalog`, `audit`, and `notifications` keep owning their own business tables. Wolverine envelope/node tables do not get spread across module schemas.
+- **Durability is explicit.** `PublishAsync(...)` and scheduled local messages only become durable after PostgreSQL-backed message persistence and EF Core transaction middleware are configured at the composition root.
+- **DbContexts participate in the outbox.** Module `DbContext` registrations are upgraded to Wolverine-aware EF Core integration so outgoing envelopes are enlisted in the same database transaction as the entity changes.
+- **Dev/test bootstrap is automatic.** Local development and test fixtures provision Wolverine storage automatically. Production provisioning is explicit and repeatable rather than ad hoc on first message.
+- **Subscriber idempotency is part of the infrastructure story.** Producer durability gives at-least-once delivery. Consumers still need safe reprocessing semantics.
+- **This phase upgrades infrastructure only.** Missing business flows such as `UserErasureRequestedV1`, single-session logout audit events, or refresh audit events stay out of scope here. Those follow once the messaging substrate is actually durable.
+
+### 15.1 Composition root and package additions
+
+Add Wolverine's PostgreSQL persistence package to central package management and make the composition root own the durability configuration.
+
+At the API host (`src/Api/Program.cs`):
+
+```csharp
+builder.UseWolverine(opts =>
+{
+    opts.PersistMessagesWithPostgresql(
+        builder.Configuration.GetConnectionString("db")!,
+        "wolverine");
+
+    opts.UseEntityFrameworkCoreTransactions();
+
+    opts.Policies.AutoApplyTransactions();
+    opts.Policies.UseDurableLocalQueues();
+
+    // Optional defense in depth once the store exists.
+    opts.Durability.OutboxStaleTime = TimeSpan.FromMinutes(5);
+    opts.Durability.InboxStaleTime = TimeSpan.FromMinutes(10);
+
+    // Existing middleware and handler discovery remain.
+});
+```
+
+Notes:
+
+- Reuse the existing `ConnectionStrings:db`; do not introduce a second database just for messaging.
+- Keep the current local-queue transport model. This phase does **not** add RabbitMQ, Azure Service Bus, or another broker.
+- `OutboxStaleTime` / `InboxStaleTime` are optional hardening switches. Enable them only after the backing schema is in place.
+
+### 15.2 Module `DbContext` integration
+
+Upgrade each module registration from plain `AddDbContext` to Wolverine-aware EF Core registration so the active `DbContext` can be enrolled in the outbox transaction:
+
+- `UsersDbContext`
+- `CatalogDbContext`
+- `AuditDbContext`
+- `NotificationsDbContext`
+
+Preferred path:
+
+- Use `AddDbContextWithWolverineIntegration<TDbContext>(...)` in each module's `Add<Module>Module(...)` method.
+- Keep each module's schema name and migration-history table unchanged.
+- Accept the `DbContextOptions` lifetime change that Wolverine uses for EF Core optimization.
+
+Fallback path if any module cannot move to the helper cleanly:
+
+- Explicitly map Wolverine envelope storage and enroll the chosen `DbContext` in the outbox manually.
+
+Constraint to keep in mind:
+
+- Wolverine still uses **one** main message store for the application. The modules may keep multiple `DbContext` types because they all point at the same physical PostgreSQL database.
+
+### 15.3 Schema provisioning strategy
+
+Wolverine storage is not part of the module EF migration chains. Treat it as application infrastructure.
+
+Development and test:
+
+- Enable Wolverine-managed EF Core schema provisioning at startup so the envelope/node tables exist automatically.
+- Make fixture startup build Wolverine storage before the first test runs.
+
+Production:
+
+- Provision the `wolverine` schema and tables explicitly as part of deployment or startup bootstrap.
+- Do **not** rely on the first live message to discover missing infrastructure.
+- Document the operator path in a deployment note or how-to; the team should know how to rebuild or inspect Wolverine storage without touching module migrations.
+
+### 15.4 Test harness upgrade
+
+Upgrade the shared fixture layer so tests validate durable messaging, not just in-process asynchronous delivery.
+
+Changes to `tests/Modulith.TestSupport/ApiTestFixture.cs` and derived fixtures:
+
+- Initialize Wolverine storage alongside the module `Database.MigrateAsync()` calls.
+- Reset Wolverine storage between tests, or include the Wolverine schema in the reset path in addition to `users`, `catalog`, `audit`, and `notifications`.
+- Add helper methods for `TrackActivity()`-based assertions so cross-module tests stop polling the database when Wolverine can signal flow completion.
+
+Add dedicated durability integration coverage:
+
+- **Restart recovery test.** Persist a state change that publishes an event, stop the host before downstream side effects complete, restart, assert the subscriber effect eventually appears.
+- **Scheduled-message recovery test.** Ensure the `SweepExpiredTokens` scheduled message survives a restart and still executes.
+- **Duplicate-delivery test.** Re-deliver the same message and assert consumers either no-op safely or deduplicate.
+
+### 15.5 Subscriber idempotency baseline
+
+Use this phase to establish one documented repository-wide strategy for consumer idempotency.
+
+Rules:
+
+- Prefer naturally idempotent, state-based subscriber behavior when possible.
+- Use unique constraints plus duplicate-key handling for projection-style consumers.
+- Use a `processed_messages` table or equivalent middleware when re-delivery would append duplicate records or trigger an irreversible side effect.
+- Do **not** assume the producer outbox makes subscribers idempotent. It does not.
+
+Notifications is the canonical example already in-tree:
+
+- `NotificationLog.IdempotencyKey`
+- unique constraint backing it
+- delivery-status recheck on duplicate delivery
+
+Keep that pattern as the reference implementation for side-effecting subscribers.
+
+### 15.6 Current subscribers to harden now
+
+Apply the idempotency baseline to the subscribers that exist today.
+
+Immediate changes:
+
+- **Catalog `OnUserRegisteredHandler`**: keep the unique `UserId` constraint and treat duplicate insert attempts as a no-op instead of a generic failure.
+- **Audit subscribers**: add a processed-message dedup mechanism so duplicate deliveries do not create duplicate `AuditEntry` rows.
+- **Notifications subscribers**: preserve the current `NotificationLog` pattern and extend it uniformly to every notification-emitting subscriber.
+
+This phase does **not** require changing every public event contract to carry a new event identifier. Where contracts already contain an `EventId`, use it. Where they do not, dedup can be based on the message envelope identity at the handler/middleware layer.
+
+### 15.7 Operations and observability
+
+Expose the messaging substrate as first-class operational infrastructure.
+
+Add:
+
+- Startup logging that confirms Wolverine storage is reachable and initialized.
+- Metrics and tracing around durable outgoing messages, retries, and dead-letter movement where Wolverine exposes them.
+- A short runbook entry describing how to inspect stale inbox/outbox rows and how to rebuild Wolverine storage safely in non-production environments.
+
+### 15.8 Documentation updates
+
+Update docs to match the new runtime reality:
+
+- `docs/how-to/cross-module-events.md` — clarify that cross-module events now use persisted Wolverine envelopes rather than just in-process async dispatch.
+- `docs/how-to/add-idempotency.md` — add the repo-standard processed-message / unique-constraint patterns for subscribers.
+- `docs/testing-strategy.md` — prefer `TrackActivity()` over polling loops for message cascades when feasible.
+- `docs/architecture.md` — note the dedicated Wolverine schema as app-level infrastructure.
+- Root/module `CLAUDE.md` guidance — add the footgun that Wolverine durability is real only when the message store is configured; do not edit Wolverine tables manually.
+
+### 15.9 Verify
+
+- `dotnet test` passes across unit, architecture, integration, and smoke layers.
+- The new durability integration tests pass:
+  - persisted outgoing message survives restart and is delivered after restart
+  - scheduled sweep message survives restart
+  - duplicate delivery does not create duplicate Catalog or Audit side effects
+- `dotnet run --project src/AppHost` manual verification:
+  - register a user, observe the publisher write succeed
+  - restart the API before downstream work completes
+  - downstream side effects still complete after restart
+- Database inspection shows Wolverine storage tables in the dedicated schema.
+- Existing Users, Catalog, Audit, and Notifications flows keep working with no behavioral regressions.
+
+**Commit.** Message: "chore: enable durable Wolverine outbox infrastructure".
+
+### 15.10 Non-goals
+
+Deliberately out of scope for Phase 15:
+
+- Introducing an external broker (RabbitMQ, Azure Service Bus, Kafka, etc.).
+- Adding new business contracts such as `UserErasureRequestedV1`, `UserLoggedOutV1`, or refresh-audit events.
+- Introducing saga/orchestrator infrastructure.
+- Reworking endpoint/business flows beyond the subscriber/idempotency hardening needed to make current messaging safe.
+
+---
+
 ## What "done" looks like
 
 At the end of this roadmap:
@@ -1563,6 +1749,7 @@ At the end of this roadmap:
 - All tests pass: unit, architectural, integration, smoke.
 - Scalar at `/scalar/v1` shows versioned, documented endpoints.
 - Register → login → do things → erase account all work end-to-end.
+- Cross-module event delivery and scheduled maintenance messages survive process restarts through Wolverine's durable storage.
 - Cross-module event flow observable in the Aspire dashboard (traces connect).
 - `dotnet new modulith-module` and `dotnet new modulith-slice` produce correct scaffolds.
 - CI runs three tiers reliably.

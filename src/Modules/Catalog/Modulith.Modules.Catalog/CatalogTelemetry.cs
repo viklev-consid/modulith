@@ -6,7 +6,7 @@ namespace Modulith.Modules.Catalog;
 
 /// <summary>
 /// OpenTelemetry instrumentation primitives for the Catalog module.
-/// ActivitySource for distributed tracing; Meter/counters for metrics.
+/// ActivitySource for distributed tracing; meter/counters for metrics.
 /// </summary>
 internal static class CatalogTelemetry
 {
@@ -15,25 +15,25 @@ internal static class CatalogTelemetry
 
     internal static readonly ActivitySource ActivitySource = new(SourceName, "1.0.0");
 
-    private static readonly Meter Meter = new(MeterName, "1.0.0");
+    private static readonly Meter meter = new(MeterName, "1.0.0");
 
     internal static readonly Counter<long> CommandsHandled =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.catalog.commands.handled",
             description: "Total commands successfully handled by the Catalog module.");
 
     internal static readonly Counter<long> CommandsFailed =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.catalog.commands.failed",
             description: "Total command failures in the Catalog module.");
 
     internal static readonly Counter<long> EventsPublished =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.catalog.events.published",
             description: "Total integration events published by the Catalog module.");
 
     internal static readonly Counter<long> EventsProcessed =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.catalog.events.processed",
             description: "Total integration events processed by the Catalog module.");
 

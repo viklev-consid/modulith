@@ -7,8 +7,8 @@ namespace Modulith.Modules.Users.UnitTests.Domain;
 [Trait("Category", "Unit")]
 public sealed class ExternalLoginTests
 {
-    private static Email ValidEmail => Email.Create("alice@example.com").Value;
-    private const string ValidSubject = "google-subject-12345";
+    private static Email validEmail => Email.Create("alice@example.com").Value;
+    private const string validSubject = "google-subject-12345";
 
     // ── PendingExternalLogin ─────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, rawValue) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var rawBytes = System.Text.Encoding.UTF8.GetBytes(rawValue);
@@ -31,7 +31,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, rawValue) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var expectedHash = PendingExternalLogin.HashRawValue(rawValue);
@@ -46,7 +46,7 @@ public sealed class ExternalLoginTests
         var lifetime = TimeSpan.FromMinutes(15);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, lifetime, clock);
 
         Assert.Equal(now.Add(lifetime), pending.ExpiresAt);
@@ -59,7 +59,7 @@ public sealed class ExternalLoginTests
         var longUa = new string('x', 600);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: longUa, TimeSpan.FromMinutes(15), clock);
 
         Assert.True(pending.UserAgent!.Length <= 512);
@@ -71,7 +71,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var originalHash = pending.TokenHash.ToArray();
@@ -87,7 +87,7 @@ public sealed class ExternalLoginTests
         var lifetime = TimeSpan.FromMinutes(15);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, lifetime, clock);
 
         // Advance past expiry so the record is expired.
@@ -106,7 +106,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var newRaw = pending.Refresh(TimeSpan.FromMinutes(15), clock, "alice@example.com");
@@ -120,7 +120,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         Assert.True(pending.IsValid(clock));
@@ -132,7 +132,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         clock.Advance(TimeSpan.FromMinutes(16));
@@ -145,7 +145,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var result = pending.Consume(clock);
@@ -160,7 +160,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         clock.Advance(TimeSpan.FromMinutes(16));
@@ -175,7 +175,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         pending.Consume(clock);
@@ -190,7 +190,7 @@ public sealed class ExternalLoginTests
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
         var (pending, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google, ValidSubject, "alice@example.com", "Alice",
+            ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         pending.Consume(clock);
@@ -204,7 +204,7 @@ public sealed class ExternalLoginTests
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
-        var result = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock);
+        var result = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock);
 
         Assert.False(result.IsError);
         Assert.Null(result.Value.PasswordHash);
@@ -215,7 +215,7 @@ public sealed class ExternalLoginTests
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
-        var result = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock);
+        var result = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock);
 
         Assert.False(result.IsError);
         Assert.False(result.Value.HasCompletedOnboarding);
@@ -226,7 +226,7 @@ public sealed class ExternalLoginTests
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
-        var result = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock);
+        var result = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock);
 
         Assert.Single(result.Value.DomainEvents);
         Assert.IsType<UserProvisionedFromExternal>(result.Value.DomainEvents.First());
@@ -237,7 +237,7 @@ public sealed class ExternalLoginTests
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
-        var result = User.CreateExternal(ValidEmail, "", ExternalLoginProvider.Google, ValidSubject, clock);
+        var result = User.CreateExternal(validEmail, "", ExternalLoginProvider.Google, validSubject, clock);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Validation, result.FirstError.Type);
@@ -248,7 +248,7 @@ public sealed class ExternalLoginTests
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
-        var result = User.CreateExternal(ValidEmail, new string('x', 101), ExternalLoginProvider.Google, ValidSubject, clock);
+        var result = User.CreateExternal(validEmail, new string('x', 101), ExternalLoginProvider.Google, validSubject, clock);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Validation, result.FirstError.Type);
@@ -259,7 +259,7 @@ public sealed class ExternalLoginTests
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
 
-        var result = User.CreateExternal(ValidEmail, "  Alice  ", ExternalLoginProvider.Google, ValidSubject, clock);
+        var result = User.CreateExternal(validEmail, "  Alice  ", ExternalLoginProvider.Google, validSubject, clock);
 
         Assert.False(result.IsError);
         Assert.Equal("Alice", result.Value.DisplayName);
@@ -270,10 +270,10 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_LinkExternalLogin_Succeeds_WhenNotAlreadyLinked()
     {
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
         user.ClearDomainEvents();
 
-        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
 
         Assert.False(result.IsError);
         Assert.Single(user.ExternalLogins);
@@ -282,10 +282,10 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_LinkExternalLogin_RaisesExternalLoginLinkedEvent()
     {
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
         user.ClearDomainEvents();
 
-        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
 
         Assert.Single(user.DomainEvents);
         Assert.IsType<ExternalLoginLinked>(user.DomainEvents.First());
@@ -294,11 +294,11 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_LinkExternalLogin_FailsWhenProviderAlreadyLinked_SameSubject()
     {
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
-        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Conflict, result.FirstError.Type);
@@ -309,8 +309,8 @@ public sealed class ExternalLoginTests
     {
         // Guard is provider-level, not subject-level. A second Google account is rejected
         // even when its subject differs from the one already linked.
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
         var result = user.LinkExternalLogin(ExternalLoginProvider.Google, "google-subject-99999", DateTimeOffset.UtcNow);
@@ -324,8 +324,8 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_UnlinkExternalLogin_SucceedsWhenPasswordExists()
     {
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
         var result = user.UnlinkExternalLogin(ExternalLoginProvider.Google);
@@ -345,8 +345,8 @@ public sealed class ExternalLoginTests
         // What we CAN assert is that the attempted setup (two Google logins) is itself
         // rejected — confirming the invariant that prevents the backdoor scenario.
         var clock = new FixedClock(DateTimeOffset.UtcNow);
-        var user = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock).Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, clock.UtcNow);
+        var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, clock.UtcNow);
 
         var secondLink = user.LinkExternalLogin(ExternalLoginProvider.Google, "other-subject", clock.UtcNow);
 
@@ -358,8 +358,8 @@ public sealed class ExternalLoginTests
     public void User_UnlinkExternalLogin_FailsWhenWouldLeaveNoCredential()
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
-        var user = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock).Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, clock.UtcNow);
+        var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, clock.UtcNow);
         user.ClearDomainEvents();
 
         var result = user.UnlinkExternalLogin(ExternalLoginProvider.Google);
@@ -371,7 +371,7 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_UnlinkExternalLogin_FailsWhenProviderNotLinked()
     {
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
 
         var result = user.UnlinkExternalLogin(ExternalLoginProvider.Google);
 
@@ -382,8 +382,8 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_UnlinkExternalLogin_RaisesExternalLoginUnlinkedEvent()
     {
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, ValidSubject, DateTimeOffset.UtcNow);
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
         user.UnlinkExternalLogin(ExternalLoginProvider.Google);
@@ -398,7 +398,7 @@ public sealed class ExternalLoginTests
     public void User_SetInitialPassword_SucceedsWhenNoPasswordSet()
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
-        var user = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock).Value;
+        var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
 
         var result = user.SetInitialPassword(new PasswordHash("$2a$12$hash"));
 
@@ -409,7 +409,7 @@ public sealed class ExternalLoginTests
     [Fact]
     public void User_SetInitialPassword_FailsWhenPasswordAlreadySet()
     {
-        var user = User.CreateWithPassword(ValidEmail, new PasswordHash("$2a$12$existing"), "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$existing"), "Alice").Value;
 
         var result = user.SetInitialPassword(new PasswordHash("$2a$12$new"));
 
@@ -423,7 +423,7 @@ public sealed class ExternalLoginTests
     public void User_CompleteOnboarding_SetsHasCompletedOnboardingToTrue()
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
-        var user = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock).Value;
+        var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
 
         user.CompleteOnboarding();
 
@@ -434,7 +434,7 @@ public sealed class ExternalLoginTests
     public void User_CompleteOnboarding_RaisesUserOnboardingCompletedEvent()
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
-        var user = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock).Value;
+        var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
         user.ClearDomainEvents();
 
         user.CompleteOnboarding();
@@ -447,7 +447,7 @@ public sealed class ExternalLoginTests
     public void User_CompleteOnboarding_IsIdempotent()
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
-        var user = User.CreateExternal(ValidEmail, "Alice", ExternalLoginProvider.Google, ValidSubject, clock).Value;
+        var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
 
         user.CompleteOnboarding();
         user.ClearDomainEvents();
@@ -460,7 +460,7 @@ public sealed class ExternalLoginTests
 
 file sealed class FixedClock(DateTimeOffset now) : IClock
 {
-    private DateTimeOffset _now = now;
-    public DateTimeOffset UtcNow => _now;
-    public void Advance(TimeSpan duration) => _now += duration;
+    private DateTimeOffset now = now;
+    public DateTimeOffset UtcNow => now;
+    public void Advance(TimeSpan duration) => now += duration;
 }

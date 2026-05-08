@@ -12,7 +12,7 @@ internal sealed class GoogleIdTokenVerifier(
     IMemoryCache cache,
     IOptions<GoogleAuthOptions> options) : IGoogleIdTokenVerifier
 {
-    private static readonly JsonWebTokenHandler TokenHandler = new() { SetDefaultTimesOnTokenCreation = false };
+    private static readonly JsonWebTokenHandler tokenHandler = new() { SetDefaultTimesOnTokenCreation = false };
 
     public async Task<ErrorOr<GoogleIdentity>> VerifyAsync(string idToken, CancellationToken ct = default)
     {
@@ -61,7 +61,7 @@ internal sealed class GoogleIdTokenVerifier(
     }
 
     private static Task<TokenValidationResult> ValidateAsync(string idToken, GoogleAuthOptions opts, IEnumerable<SecurityKey> keys) =>
-        TokenHandler.ValidateTokenAsync(idToken, new TokenValidationParameters
+        tokenHandler.ValidateTokenAsync(idToken, new TokenValidationParameters
         {
             ValidIssuers = ["accounts.google.com", "https://accounts.google.com"],
             ValidAudience = opts.ClientId,

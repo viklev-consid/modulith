@@ -8,8 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
+using Modulith.Api.Infrastructure.DeadLetters;
 using Modulith.Api.Infrastructure.Exceptions;
 using Modulith.Api.Infrastructure.FeatureFlags;
+using Modulith.Api.Infrastructure.Logging;
+using Modulith.Api.Infrastructure.OpenApi;
 using Modulith.Modules.Audit;
 using Modulith.Modules.Catalog;
 using Modulith.Modules.Notifications;
@@ -19,12 +22,15 @@ using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Logging;
 using Modulith.Shared.Infrastructure.Messaging;
+using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
-using Modulith.Api.Infrastructure.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
+using Wolverine.ErrorHandling;
+using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,6 +103,9 @@ builder.Services
 builder.Services.AddAuthorization(opts =>
 {
     opts.AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser());
+    // Admin policy — gates dead-letter management and other operator-facing endpoints.
+    // The "admin" role is assigned via PUT /v1/users/{id}/role and grants every permission.
+    opts.AddPolicy("Admin", policy => policy.RequireRole("admin"));
 });
 
 // 6. OpenAPI + Scalar
@@ -200,8 +209,62 @@ builder.Services
 // 12. Wolverine — messaging, outbox, background jobs
 builder.UseWolverine(opts =>
 {
+    opts.PersistMessagesWithPostgresql(
+        builder.Configuration.GetConnectionString("db")!,
+        "wolverine");
+
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
+
+    opts.Durability.OutboxStaleTime = TimeSpan.FromMinutes(5);
+    opts.Durability.InboxStaleTime = TimeSpan.FromMinutes(10);
+
+    // Dead-letter retention: keep for 30 days, then Wolverine's background job purges
+    // automatically. 30 days balances investigative window against unbounded table growth.
+    // Adjust via ADR if a longer SLA is required.
+    opts.Durability.DeadLetterQueueExpirationEnabled = true;
+    opts.Durability.DeadLetterQueueExpiration = TimeSpan.FromDays(30);
+
+    // ── Error-handling policies (explicit, evidence-based) ─────────────────────────────────
+    // IOException covers transient network failures from non-SMTP handlers and other I/O
+    // paths. SMTP-specific exceptions are classified by SmtpEmailSender into
+    // RetryableSmtpException / TerminalSmtpException (see below) so this policy no longer
+    // fires for email delivery.
+    opts.OnException<System.IO.IOException>()
+        .RetryWithCooldown(
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromMinutes(2));
+
+    // Transient SMTP failures: 4xx server responses, protocol errors, connection drops, I/O errors.
+    // SmtpEmailSender wraps these as RetryableSmtpException; handlers reset the send claim
+    // to Pending before rethrowing so the retry can re-claim immediately.
+    //
+    // Future improvement: add a circuit breaker for RetryableSmtpException by routing
+    // notification messages to a dedicated local queue and calling CircuitBreaker() on it.
+    // This prevents all in-flight notifications from burning through retries independently
+    // when the SMTP server is known-down. Requires a queue-routing change; track as a task.
+    opts.OnException<RetryableSmtpException>()
+        .RetryWithCooldown(
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromMinutes(2));
+
+    // Permanent SMTP failures: 5xx server responses, TLS handshake/certificate errors,
+    // authentication failures (wrong credentials, unsupported mechanism), and
+    // ServiceNotAuthenticatedException (server requires auth that was never established).
+    // All require configuration changes — retrying will not succeed. Handlers mark the
+    // notification log as Failed before rethrowing. Move directly to the dead-letter queue.
+    opts.OnException<TerminalSmtpException>()
+        .MoveToErrorQueue();
+
+    // InvalidOperationException in a message handler indicates a programming error or a
+    // non-recoverable state violation (e.g. calling an EF Core operation on a disposed context,
+    // or a domain invariant raised unexpectedly as an exception rather than a Result). Retrying
+    // is pointless and would only delay failure visibility. Move directly to the error queue so
+    // the failure is surfaced immediately for operational triage.
+    opts.OnException<InvalidOperationException>()
+        .MoveToErrorQueue();
 
     opts.Policies.AddMiddleware<FluentValidationMiddleware>(_ => true);
     opts.Policies.AddMiddleware<AuditMiddleware>(_ => true);
@@ -253,6 +316,9 @@ app.MapCatalogEndpoints();
 app.MapAuditEndpoints();
 app.MapNotificationsEndpoints();
 
+// 15. Admin — dead-letter management (Admin policy, all environments)
+app.MapDeadLetterAdminEndpoints();
+
 // 15. Dev seeders (idempotent)
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
 {
@@ -263,6 +329,9 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
         await seeder.SeedAsync();
     }
 }
+
+var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+WolverineStartupLog.OutboxActive(startupLogger);
 
 await app.RunAsync();
 

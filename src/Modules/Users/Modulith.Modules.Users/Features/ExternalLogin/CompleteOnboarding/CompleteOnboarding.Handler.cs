@@ -24,27 +24,56 @@ public sealed class CompleteOnboardingHandler(
     private async Task<ErrorOr<Success>> HandleCoreAsync(CompleteOnboardingCommand cmd, CancellationToken ct)
     {
         var opts = options.Value;
+        var userId = new UserId(cmd.UserId);
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == new UserId(cmd.UserId), ct);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null)
         {
             return UsersErrors.UserNotFound;
         }
-
-        var now = clock.UtcNow;
 
         if (!cmd.AcceptTerms)
         {
             return UsersErrors.TermsNotAccepted;
         }
 
+        var now = clock.UtcNow;
         var tosKey = $"tos:{opts.TermsOfServiceVersion}";
+
+        // Step 1: Save the ToS acceptance in isolation so that a concurrent unique-key
+        // collision on (user_id, version) cannot roll back the consent or onboarding
+        // writes that follow.
         var alreadyAccepted = await db.TermsAcceptances
             .AnyAsync(t => t.UserId == user.Id && t.Version == tosKey, ct);
 
+        var trackerCleared = false;
         if (!alreadyAccepted)
         {
             db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, tosKey, now, cmd.IpAddress, cmd.UserAgent));
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+            {
+                // A concurrent request won the race on terms_acceptances (user_id, version).
+                // The row is present — clear the poisoned tracked entity and continue so
+                // that the consent and onboarding writes below are not discarded.
+                db.ChangeTracker.Clear();
+                trackerCleared = true;
+            }
+        }
+
+        // Step 2: If the tracker was cleared above, re-fetch the user so EF can
+        // track the HasCompletedOnboarding mutation. The concurrent winner may have
+        // already completed onboarding; CompleteOnboarding() is idempotent.
+        if (trackerCleared)
+        {
+            user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null)
+            {
+                return UsersErrors.UserNotFound;
+            }
         }
 
         if (cmd.AcceptMarketingEmails)
@@ -60,17 +89,7 @@ public sealed class CompleteOnboardingHandler(
             return onboardingResult.Errors;
         }
 
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
-        {
-            // A concurrent request already inserted the ToS row and completed onboarding.
-            // The unique constraint on (UserId, Version) fired, but the outcome is the same —
-            // treat this as a successful idempotent no-op rather than a 500.
-            return Result.Success;
-        }
+        await db.SaveChangesAsync(ct);
 
         if (!wasAlreadyCompleted)
         {

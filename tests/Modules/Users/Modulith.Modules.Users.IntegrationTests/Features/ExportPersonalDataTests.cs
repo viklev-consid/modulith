@@ -15,7 +15,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class ExportPersonalDataTests(GdprApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anonymous = fixture.CreateAnonymousClient();
+    private readonly HttpClient anonymous = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -23,7 +23,7 @@ public sealed class ExportPersonalDataTests(GdprApiFixture fixture) : IAsyncLife
     [Fact]
     public async Task ExportPersonalData_Authenticated_ReturnsExports()
     {
-        var registerResp = await (await _anonymous.PostAsJsonAsync("/v1/users/register",
+        var registerResp = await (await anonymous.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice")))
             .Content.ReadFromJsonAsync<RegisterResponse>();
 
@@ -45,7 +45,7 @@ public sealed class ExportPersonalDataTests(GdprApiFixture fixture) : IAsyncLife
     [Fact]
     public async Task ExportPersonalData_Unauthenticated_Returns401()
     {
-        var response = await _anonymous.GetAsync("/v1/users/me/personal-data");
+        var response = await anonymous.GetAsync("/v1/users/me/personal-data");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

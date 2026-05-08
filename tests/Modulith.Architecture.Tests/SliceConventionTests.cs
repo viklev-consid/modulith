@@ -15,7 +15,7 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class SliceConventionTests
 {
-    private static readonly Assembly[] AllModuleAssemblies =
+    private static readonly Assembly[] allModuleAssemblies =
     [
         typeof(User).Assembly,
         typeof(Product).Assembly,
@@ -29,7 +29,7 @@ public sealed class SliceConventionTests
         // Handler types that are feature-slice handlers must live under a *.Features.* namespace.
         // Integration subscribers (Integration/) and background job handlers (Jobs/) are excluded —
         // they are not feature slices and legitimately live elsewhere.
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Name.EndsWith("Handler", StringComparison.Ordinal))
             .Where(t => t.Namespace?.Contains(".Integration.") != true)
@@ -48,7 +48,7 @@ public sealed class SliceConventionTests
     [Fact]
     public void Validators_MustResideInFeaturesNamespace()
     {
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Name.EndsWith("Validator", StringComparison.Ordinal))
             .Where(t => t.Namespace?.Contains(".Features.") != true)
@@ -64,7 +64,7 @@ public sealed class SliceConventionTests
     [Fact]
     public void Endpoints_MustResideInFeaturesNamespace()
     {
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Name.EndsWith("Endpoint", StringComparison.Ordinal))
             .Where(t => t.Namespace?.Contains(".Features.") != true)
@@ -80,7 +80,7 @@ public sealed class SliceConventionTests
     [Fact]
     public void Commands_MustBeSealedRecords()
     {
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Name.EndsWith("Command", StringComparison.Ordinal))
             .Where(t => !t.IsSealed || !IsRecord(t))
@@ -96,7 +96,7 @@ public sealed class SliceConventionTests
     [Fact]
     public void Queries_MustBeSealedRecords()
     {
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Name.EndsWith("Query", StringComparison.Ordinal))
             .Where(t => !t.IsSealed || !IsRecord(t))
@@ -111,7 +111,7 @@ public sealed class SliceConventionTests
     [Fact]
     public void Requests_MustBeSealedRecords()
     {
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Name.EndsWith("Request", StringComparison.Ordinal))
             .Where(t => !t.IsSealed || !IsRecord(t))
@@ -126,7 +126,7 @@ public sealed class SliceConventionTests
     [Fact]
     public void Responses_MustBeSealedRecords()
     {
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Name.EndsWith("Response", StringComparison.Ordinal))
             .Where(t => !t.IsSealed || !IsRecord(t))
@@ -147,7 +147,7 @@ public sealed class SliceConventionTests
         var aggregateRootBase = typeof(AggregateRoot<>);
         var entityBase = typeof(Entity<>);
 
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetTypes())
             .Where(t => t.IsClass && !t.IsAbstract)
             .Where(t => InheritsFromGenericBase(t, aggregateRootBase)

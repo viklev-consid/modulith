@@ -4,7 +4,7 @@ namespace Modulith.Modules.Users.Domain;
 
 public sealed class Consent : Entity<ConsentId>
 {
-    private const int MaxUserAgentLength = 512;
+    private const int maxUserAgentLength = 512;
 
     private Consent() : base(new ConsentId(Guid.Empty)) { }
 
@@ -50,7 +50,7 @@ public sealed class Consent : Entity<ConsentId>
         string? grantedUserAgent = null,
         string? policyVersion = null)
     {
-        var ua = grantedUserAgent?.Length > MaxUserAgentLength ? grantedUserAgent[..MaxUserAgentLength] : grantedUserAgent;
+        var ua = grantedUserAgent?.Length > maxUserAgentLength ? grantedUserAgent[..maxUserAgentLength] : grantedUserAgent;
         return new(new ConsentId(Guid.NewGuid()), userId, consentKey, granted: true, recordedAt, grantedFromIp, ua, policyVersion);
     }
 

@@ -8,7 +8,7 @@ namespace Modulith.Shared.Infrastructure.Logging;
 
 public sealed class PersonalDataDestructuringPolicy : IDestructuringPolicy
 {
-    private static readonly HashSet<string> SensitiveNamePatterns =
+    private static readonly HashSet<string> sensitiveNamePatterns =
         new(StringComparer.OrdinalIgnoreCase)
         {
             "password", "token", "secret", "key", "credential", "apikey", "accesskey",
@@ -38,7 +38,7 @@ public sealed class PersonalDataDestructuringPolicy : IDestructuringPolicy
         {
             var isSensitive = prop.IsDefined(typeof(SensitivePersonalDataAttribute), inherit: true);
             var isPersonal = prop.IsDefined(typeof(PersonalDataAttribute), inherit: true);
-            var isNameSensitive = SensitiveNamePatterns.Any(
+            var isNameSensitive = sensitiveNamePatterns.Any(
                 p => prop.Name.Contains(p, StringComparison.OrdinalIgnoreCase));
 
             LogEventPropertyValue logValue;

@@ -10,12 +10,12 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class NotificationsModuleTests
 {
-    private static readonly Assembly NotificationsAssembly = typeof(NotificationLog).Assembly;
+    private static readonly Assembly notificationsAssembly = typeof(NotificationLog).Assembly;
 
     [Fact]
     public void NotificationsDomain_HasNoEfCoreReferences()
     {
-        var result = Types.InAssembly(NotificationsAssembly)
+        var result = Types.InAssembly(notificationsAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.EntityFrameworkCore")
             .GetResult();
@@ -29,7 +29,7 @@ public sealed class NotificationsModuleTests
     [Fact]
     public void NotificationsDomain_HasNoAspNetCoreReferences()
     {
-        var result = Types.InAssembly(NotificationsAssembly)
+        var result = Types.InAssembly(notificationsAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.AspNetCore")
             .GetResult();
@@ -42,7 +42,7 @@ public sealed class NotificationsModuleTests
     [Fact]
     public void NotificationsDomain_HasNoWolverineReferences()
     {
-        var result = Types.InAssembly(NotificationsAssembly)
+        var result = Types.InAssembly(notificationsAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Wolverine")
             .GetResult();
@@ -55,7 +55,7 @@ public sealed class NotificationsModuleTests
     [Fact]
     public void NotificationsDomain_HasNoFluentValidationReferences()
     {
-        var result = Types.InAssembly(NotificationsAssembly)
+        var result = Types.InAssembly(notificationsAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("FluentValidation")
             .GetResult();
@@ -69,7 +69,7 @@ public sealed class NotificationsModuleTests
     [Fact]
     public void NotificationsDomain_HasNoFeatureManagementReferences()
     {
-        var result = Types.InAssembly(NotificationsAssembly)
+        var result = Types.InAssembly(notificationsAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.FeatureManagement")
             .GetResult();
@@ -83,7 +83,7 @@ public sealed class NotificationsModuleTests
     [Fact]
     public void NotificationsDomain_HasNoCachingReferences()
     {
-        var result = Types.InAssembly(NotificationsAssembly)
+        var result = Types.InAssembly(notificationsAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.Extensions.Caching")
             .GetResult();
@@ -111,7 +111,7 @@ public sealed class NotificationsModuleTests
     [Fact]
     public void NotificationsModule_DoesNotReferenceUsersInternalProject()
     {
-        var referencedNames = NotificationsAssembly
+        var referencedNames = notificationsAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();
@@ -125,7 +125,7 @@ public sealed class NotificationsModuleTests
     [Fact]
     public void NotificationsModule_DoesNotReferenceCatalogInternalProject()
     {
-        var referencedNames = NotificationsAssembly
+        var referencedNames = notificationsAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();

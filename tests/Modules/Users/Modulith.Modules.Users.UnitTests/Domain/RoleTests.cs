@@ -65,13 +65,13 @@ public sealed class RoleTests
 [Trait("Category", "Unit")]
 public sealed class UserChangeRoleTests
 {
-    private static Email ValidEmail => Email.Create("alice@example.com").Value;
-    private static PasswordHash ValidHash => new("$2a$12$hashed");
+    private static Email validEmail => Email.Create("alice@example.com").Value;
+    private static PasswordHash validHash => new("$2a$12$hashed");
 
     [Fact]
     public void ChangeRole_ToNewRole_Succeeds()
     {
-        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, validHash, "Alice").Value;
         var changerId = user.Id;
 
         var result = user.ChangeRole(Role.Admin, changerId);
@@ -83,7 +83,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void ChangeRole_ToNewRole_RaisesUserRoleChangedEvent()
     {
-        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, validHash, "Alice").Value;
         user.ClearDomainEvents();
         var changerId = user.Id;
 
@@ -98,7 +98,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void ChangeRole_ToSameRole_ReturnsConflict()
     {
-        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, validHash, "Alice").Value;
         var changerId = user.Id;
 
         var result = user.ChangeRole(Role.User, changerId);
@@ -110,7 +110,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void Create_DefaultRole_IsUser()
     {
-        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, validHash, "Alice").Value;
 
         Assert.Equal(Role.User, user.Role);
     }
@@ -118,7 +118,7 @@ public sealed class UserChangeRoleTests
     [Fact]
     public void Create_WithAdminRole_HasAdminRole()
     {
-        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice", Role.Admin).Value;
+        var user = User.CreateWithPassword(validEmail, validHash, "Alice", Role.Admin).Value;
 
         Assert.Equal(Role.Admin, user.Role);
     }

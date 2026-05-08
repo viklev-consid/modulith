@@ -63,6 +63,7 @@ public sealed class RegisterHandler(
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // A concurrent registration claimed the same email between our pre-check and commit.
+            db.ChangeTracker.Clear();
             return UsersErrors.EmailAlreadyRegistered;
         }
 

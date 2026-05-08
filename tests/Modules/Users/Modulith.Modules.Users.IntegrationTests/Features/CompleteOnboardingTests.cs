@@ -17,7 +17,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anon = fixture.CreateAnonymousClient();
+    private readonly HttpClient anon = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -136,7 +136,7 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
     [Fact]
     public async Task CompleteOnboarding_WhenUnauthenticated_Returns401()
     {
-        var response = await _anon.PostAsJsonAsync("/v1/users/me/onboarding",
+        var response = await anon.PostAsJsonAsync("/v1/users/me/onboarding",
             new { acceptTerms = true, acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -145,9 +145,9 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
     [Fact]
     public async Task CompleteOnboarding_AlsoWorksForPasswordUsers()
     {
-        await _anon.PostAsJsonAsync("/v1/users/register",
+        await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("pwduser@example.com", "Password1!", "Alice"));
-        var login = await _anon.PostAsJsonAsync("/v1/users/login",
+        var login = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("pwduser@example.com", "Password1!"));
         var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(loginBody);

@@ -2,16 +2,16 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OpenTelemetry;
 using Modulith.Modules.Audit.Authorization;
+using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Modules.Audit.Features.GetAuditTrail;
 using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
 using Modulith.Modules.Audit.Persistence;
-using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using OpenTelemetry;
 using Wolverine;
 
 namespace Modulith.Modules.Audit;
@@ -34,7 +34,8 @@ public static class AuditModule
         });
 
         services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, AuditPersonalDataEraser>();
+        services.AddScoped<AuditPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<AuditPersonalDataEraser>());
 
         services.AddSingleton<IResourcePolicy<AuditTrailResource>, AuditTrailPolicy>();
 
@@ -54,6 +55,7 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
         opts.Discovery.IncludeType<OnUserEmailChangedHandler>();
         opts.Discovery.IncludeType<OnUserLoggedInHandler>();
+        opts.Discovery.IncludeType<OnUserLoggedOutHandler>();
         opts.Discovery.IncludeType<OnUserLoggedOutAllDevicesHandler>();
         opts.Discovery.IncludeType<OnPasswordResetHandler>();
         opts.Discovery.IncludeType<OnPasswordChangedHandler>();
@@ -65,6 +67,8 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
         opts.Discovery.IncludeType<OnUserOnboardingCompletedHandler>();
         opts.Discovery.IncludeType<OnUserProvisionedFromExternalHandler>();
+        opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
+        opts.Discovery.IncludeType<OnRefreshTokenReuseDetectedHandler>();
         return opts;
     }
 

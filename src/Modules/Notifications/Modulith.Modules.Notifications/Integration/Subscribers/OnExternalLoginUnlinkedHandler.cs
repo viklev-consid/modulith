@@ -7,12 +7,16 @@ using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
+using Wolverine.Attributes;
+
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
 
+[NonTransactional]
 public sealed class OnExternalLoginUnlinkedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
-    IClock clock)
+    IClock clock,
+    NotificationSendGuard sendGuard)
 {
     public async Task Handle(ExternalLoginUnlinkedV1 @event, CancellationToken ct)
     {
@@ -31,12 +35,11 @@ public sealed class OnExternalLoginUnlinkedHandler(
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             db.Entry(log).State = EntityState.Detached;
-            log = await db.NotificationLogs
-                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
-            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
-            {
-                return;
-            }
+        }
+
+        if (await sendGuard.TryClaimAsync(@event.EventId, ct) is not { } leaseToken)
+        {
+            return;
         }
 
         var message = new EmailMessage(
@@ -45,8 +48,20 @@ public sealed class OnExternalLoginUnlinkedHandler(
             HtmlBody: ExternalLoginUnlinkedTemplate.HtmlBody(@event.Provider),
             PlainTextBody: ExternalLoginUnlinkedTemplate.PlainTextBody(@event.Provider));
 
-        await emailSender.SendAsync(message, ct);
-        log.MarkSent();
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (RetryableSmtpException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, leaseToken, ct);
+            throw;
+        }
+        catch (TerminalSmtpException)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            throw;
+        }
+        await sendGuard.MarkSentAsync(@event.EventId, leaseToken, ct);
     }
 }

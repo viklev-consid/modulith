@@ -27,8 +27,11 @@ internal sealed class NotificationLogConfiguration : IEntityTypeConfiguration<No
             .HasMaxLength(500)
             .IsRequired();
 
-        builder.Property(n => n.SentAt)
+        builder.Property(n => n.CreatedAt)
             .IsRequired();
+
+        builder.Property(n => n.SentAt)
+            .IsRequired(false);
 
         builder.Property(n => n.IdempotencyKey)
             .IsRequired();
@@ -36,6 +39,12 @@ internal sealed class NotificationLogConfiguration : IEntityTypeConfiguration<No
         builder.Property(n => n.DeliveryStatus)
             .IsRequired()
             .HasDefaultValue(NotificationDeliveryStatus.Pending);
+
+        builder.Property(n => n.SendingClaimedAt)
+            .IsRequired(false);
+
+        builder.Property(n => n.SendingLeaseToken)
+            .IsRequired(false);
 
         builder.HasIndex(n => n.UserId);
         builder.HasIndex(n => n.IdempotencyKey)

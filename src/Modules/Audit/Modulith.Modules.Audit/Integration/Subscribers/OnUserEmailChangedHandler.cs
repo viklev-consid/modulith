@@ -1,11 +1,15 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Audit.Domain;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Contracts.Events;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using Wolverine.Attributes;
 
 namespace Modulith.Modules.Audit.Integration.Subscribers;
 
+[NonTransactional]
 public sealed class OnUserEmailChangedHandler(AuditDbContext db, IClock clock)
 {
     public async Task Handle(UserEmailChangedV1 @event, CancellationToken ct)
@@ -20,9 +24,18 @@ public sealed class OnUserEmailChangedHandler(AuditDbContext db, IClock clock)
             resourceType: "User",
             resourceId: @event.UserId,
             payload: payload,
-            occurredAt: clock.UtcNow);
+            occurredAt: clock.UtcNow,
+            idempotencyKey: @event.EventId);
 
         db.AuditEntries.Add(entry);
-        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            // Idempotency: duplicate delivery — audit entry already recorded, nothing to do.
+        }
     }
 }

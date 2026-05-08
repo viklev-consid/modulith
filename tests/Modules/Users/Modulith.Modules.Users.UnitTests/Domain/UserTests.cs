@@ -6,23 +6,23 @@ namespace Modulith.Modules.Users.UnitTests.Domain;
 [Trait("Category", "Unit")]
 public sealed class UserTests
 {
-    private static Email ValidEmail => Email.Create("alice@example.com").Value;
-    private static PasswordHash ValidHash => new("$2a$12$hashed");
+    private static Email validEmail => Email.Create("alice@example.com").Value;
+    private static PasswordHash validHash => new("$2a$12$hashed");
 
     [Fact]
     public void Create_WithValidArguments_ReturnsUser()
     {
-        var result = User.CreateWithPassword(ValidEmail, ValidHash, "Alice");
+        var result = User.CreateWithPassword(validEmail, validHash, "Alice");
 
         Assert.False(result.IsError);
-        Assert.Equal(ValidEmail, result.Value.Email);
+        Assert.Equal(validEmail, result.Value.Email);
         Assert.Equal("Alice", result.Value.DisplayName);
     }
 
     [Fact]
     public void Create_RaisesUserRegisteredEvent()
     {
-        var result = User.CreateWithPassword(ValidEmail, ValidHash, "Alice");
+        var result = User.CreateWithPassword(validEmail, validHash, "Alice");
 
         Assert.Single(result.Value.DomainEvents);
         Assert.IsType<UserRegistered>(result.Value.DomainEvents.First());
@@ -31,7 +31,7 @@ public sealed class UserTests
     [Fact]
     public void Create_WithEmptyDisplayName_ReturnsValidationError()
     {
-        var result = User.CreateWithPassword(ValidEmail, ValidHash, "");
+        var result = User.CreateWithPassword(validEmail, validHash, "");
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Validation, result.FirstError.Type);
@@ -40,7 +40,7 @@ public sealed class UserTests
     [Fact]
     public void Create_WithTooLongDisplayName_ReturnsValidationError()
     {
-        var result = User.CreateWithPassword(ValidEmail, ValidHash, new string('x', 101));
+        var result = User.CreateWithPassword(validEmail, validHash, new string('x', 101));
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Validation, result.FirstError.Type);
@@ -49,7 +49,7 @@ public sealed class UserTests
     [Fact]
     public void Create_TrimsDisplayName()
     {
-        var result = User.CreateWithPassword(ValidEmail, ValidHash, "  Alice  ");
+        var result = User.CreateWithPassword(validEmail, validHash, "  Alice  ");
 
         Assert.False(result.IsError);
         Assert.Equal("Alice", result.Value.DisplayName);
@@ -58,7 +58,7 @@ public sealed class UserTests
     [Fact]
     public void ChangeEmail_ToDifferentEmail_Succeeds()
     {
-        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, validHash, "Alice").Value;
         user.ClearDomainEvents();
         var newEmail = Email.Create("alice-new@example.com").Value;
 
@@ -73,9 +73,9 @@ public sealed class UserTests
     [Fact]
     public void ChangeEmail_ToSameEmail_ReturnsConflict()
     {
-        var user = User.CreateWithPassword(ValidEmail, ValidHash, "Alice").Value;
+        var user = User.CreateWithPassword(validEmail, validHash, "Alice").Value;
 
-        var result = user.ChangeEmail(ValidEmail);
+        var result = user.ChangeEmail(validEmail);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Conflict, result.FirstError.Type);

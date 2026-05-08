@@ -17,7 +17,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anon = fixture.CreateAnonymousClient();
+    private readonly HttpClient anon = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -61,7 +61,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         await auth.PostAsJsonAsync("/v1/users/me/password/initial",
             new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
-        var loginResp = await _anon.PostAsJsonAsync("/v1/users/login",
+        var loginResp = await anon.PostAsJsonAsync("/v1/users/login",
             new { email, password = "NewPassword1!" });
 
         Assert.Equal(HttpStatusCode.OK, loginResp.StatusCode);
@@ -126,7 +126,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
     [Fact]
     public async Task SetInitialPassword_WhenUnauthenticated_Returns401()
     {
-        var response = await _anon.PostAsJsonAsync("/v1/users/me/password/initial",
+        var response = await anon.PostAsJsonAsync("/v1/users/me/password/initial",
             new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -167,7 +167,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
 
         // Session 1 — confirm flow creates the user and issues real tokens
         var rawToken1 = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
-        var confirm1Resp = await _anon.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var confirm1Resp = await anon.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken1));
         var session1 = await confirm1Resp.Content.ReadFromJsonAsync<GoogleLoginConfirmResponse>();
         Assert.NotNull(session1);
@@ -177,7 +177,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
         // user returns 409. Use the GoogleLogin fast path instead: (Google, subject) already
         // linked → 200 + tokens immediately, no pending-login round-trip needed.
         fixture.GoogleVerifier.SetIdentity(subject, email);
-        var login2Resp = await _anon.PostAsJsonAsync("/v1/users/auth/google/login",
+        var login2Resp = await anon.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("fake-google-token"));
         Assert.Equal(HttpStatusCode.OK, login2Resp.StatusCode);
         var session2 = await login2Resp.Content.ReadFromJsonAsync<GoogleLoginResponse>();
@@ -190,12 +190,12 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
             new { password = "NewPassword1!", googleIdToken = "fake-google-token" });
 
         // session1 refresh token (the requesting session) must also be revoked — no stolen-token persistence.
-        var rt1Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+        var rt1Refresh = await anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(session1.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, rt1Refresh.StatusCode);
 
         // session2 refresh token (other session) must be revoked.
-        var rt2Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+        var rt2Refresh = await anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(session2.RefreshToken!));
         Assert.Equal(HttpStatusCode.Unauthorized, rt2Refresh.StatusCode);
     }

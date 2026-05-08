@@ -18,7 +18,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anon = fixture.CreateAnonymousClient();
+    private readonly HttpClient anon = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -123,7 +123,7 @@ public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsy
     [Fact]
     public async Task UnlinkGoogleLogin_WhenUnauthenticated_Returns401()
     {
-        var response = await _anon.DeleteAsync("/v1/users/me/auth/google/unlink");
+        var response = await anon.DeleteAsync("/v1/users/me/auth/google/unlink");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -159,12 +159,12 @@ public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsy
 
     private async Task<(Guid UserId, string AccessToken)> RegisterAndLoginAsync(string email)
     {
-        var reg = await _anon.PostAsJsonAsync("/v1/users/register",
+        var reg = await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
         var regBody = await reg.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(regBody);
 
-        var login = await _anon.PostAsJsonAsync("/v1/users/login",
+        var login = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest(email, "Password1!"));
         var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(loginBody);

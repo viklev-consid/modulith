@@ -2,15 +2,15 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OpenTelemetry;
+using Modulith.Modules.Notifications.Contracts.Authorization;
 using Modulith.Modules.Notifications.Gdpr;
 using Modulith.Modules.Notifications.Integration.Subscribers;
 using Modulith.Modules.Notifications.Persistence;
-using Modulith.Modules.Notifications.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using OpenTelemetry;
 using Wolverine;
 
 namespace Modulith.Modules.Notifications;
@@ -39,7 +39,9 @@ public static class NotificationsModule
         });
 
         services.AddScoped<IPersonalDataExporter, NotificationsPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, NotificationsPersonalDataEraser>();
+        services.AddScoped<NotificationsPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<NotificationsPersonalDataEraser>());
+        services.AddScoped<NotificationSendGuard>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<NotificationsDbContext>("notifications-db", tags: ["ready"]);
@@ -64,6 +66,7 @@ public static class NotificationsModule
         opts.Discovery.IncludeType<OnExternalLoginPendingHandler>();
         opts.Discovery.IncludeType<OnExternalLoginLinkedHandler>();
         opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
+        opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         return opts;
     }
 

@@ -49,7 +49,8 @@ public sealed class LoginHandler(
         await bus.PublishAsync(new UserLoggedInV1(
             user.Id.Value,
             user.Email.Value,
-            cmd.IpAddress ?? string.Empty));
+            cmd.IpAddress ?? string.Empty,
+            Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserLoggedInV1)));
 
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);

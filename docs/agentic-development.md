@@ -12,19 +12,17 @@ Agents perform best when the codebase *biases them toward the right action* unde
 
 ## Mechanisms
 
-The mechanisms below fall into two categories: *passive* guidance that shapes agent behaviour through context and structure, and *active* enforcement that prevents mistakes at the moment they would be made. The passive mechanisms are described in this section; the active harness is described in [Active enforcement: the `.claude/` harness](#active-enforcement-the-claude-harness) below.
+The mechanisms below fall into two categories: *passive* guidance that shapes agent behaviour through context and structure, and *active* enforcement that prevents mistakes at the moment they would be made. The passive mechanisms are described in this section; the active harness is described in [Active enforcement: agent harnesses](#active-enforcement-agent-harnesses) below.
 
-### Scoped `CLAUDE.md` files
+### Scoped agent guidance files
 
 Agent guidance is organized hierarchically:
 
-- [`/CLAUDE.md`](../CLAUDE.md) — repo-wide operating manual. Invariants, workflow, common commands, footguns, capability boundaries.
-- [`/src/Modules/CLAUDE.md`](../src/Modules/CLAUDE.md) — module-wide conventions. The shape of a module, how to add one, cross-module rules.
-- `/src/Modules/<Module>/CLAUDE.md` — per-module specifics, added when the module exists. Domain vocabulary, business rules, known quirks.
-- [`/tests/CLAUDE.md`](../tests/CLAUDE.md) — test patterns, fixture usage, what belongs in each layer.
-- [`/docs/adr/CLAUDE.md`](adr/CLAUDE.md) — ADR format and how to write a new one.
+- [`/AGENTS.md`](../AGENTS.md) — primary repo-wide operating manual. Invariants, workflow, common commands, footguns, capability boundaries.
+- Scoped `AGENTS.md` files — subtree-specific guidance where present.
+- [`/CLAUDE.md`](../CLAUDE.md) and scoped `CLAUDE.md` files — compatibility guidance for Claude-oriented workflows.
 
-Agents pick these up based on working directory. Read the root one first, then the most specific one for your current task.
+Agents pick these up based on working directory. Read the root guidance first, then the most specific one for your current task.
 
 ### Architecture Decision Records
 
@@ -36,11 +34,11 @@ The `docs/adr/` directory contains one ADR per major decision. Each ADR explains
 
 ADRs are the primary way to answer "why is it like this?" They are append-only in normal operation — superseding an ADR means writing a new one that references the old.
 
-Agents: when you see a rule in `CLAUDE.md`, the corresponding ADR explains why. Before arguing with a rule, read the ADR.
+Agents: when you see a rule in `AGENTS.md` or scoped guidance, the corresponding ADR explains why. Before arguing with a rule, read the ADR.
 
 ### Architectural tests as executable documentation
 
-The rules in `CLAUDE.md` are not on the honor system — they are enforced by `tests/Modulith.Architecture.Tests`. When you violate a rule, the failing test tells you *what* rule and *how* to fix it.
+The rules in agent guidance files are not on the honor system — they are enforced by `tests/Modulith.Architecture.Tests`. When you violate a rule, the failing test tells you *what* rule and *how* to fix it.
 
 The failure messages are written for agents. They are specific: type names, target namespaces, suggested actions. Read them literally.
 
@@ -84,13 +82,15 @@ These generate the exact file set with correct namespaces and placeholder regist
 
 ---
 
-## Active enforcement: the `.claude/` harness
+## Active enforcement: agent harnesses
 
-The mechanisms above are passive — they provide context and structure that bias agents toward correct behaviour. The `.claude/` harness is active: it enforces rules at the point they would be violated, surfaces failures immediately within the conversation, and provides scoped workflows that prevent whole classes of mistake before they reach code review.
+The mechanisms above are passive — they provide context and structure that bias agents toward correct behaviour. Active harnesses enforce rules at the point they would be violated, surface failures immediately within the conversation, and provide scoped workflows that prevent whole classes of mistake before they reach code review.
+
+In this repository, the concrete active harness currently lives under `.claude/` for Claude Code workflows.
 
 ### Hooks
 
-Hooks are shell scripts wired to Claude Code lifecycle events. They run automatically — no invocation required.
+Hooks are shell scripts wired to agent lifecycle events in the active harness. They run automatically — no invocation required.
 
 **`session-context.sh` — SessionStart**
 
@@ -105,7 +105,7 @@ Runs before every file write. Blocks:
 - Domain files with forbidden `using` directives (EF Core, ASP.NET Core, Wolverine, Serilog, etc.)
 - Files in one module that reference another module's non-Contracts namespaces
 
-The domain purity and cross-module checks enforce invariants 2 and 1 from `CLAUDE.md` *before* the file is written, not after a test run.
+The domain purity and cross-module checks enforce invariants 2 and 1 from `AGENTS.md` *before* the file is written, not after a test run.
 
 **`post-edit-dotnet.sh` — PostToolUse**
 
@@ -167,7 +167,7 @@ If a task requires touching these, stop and ask.
 
 ## When to ask vs. proceed
 
-Reproduced from `CLAUDE.md` for emphasis:
+Reproduced from `AGENTS.md` for emphasis:
 
 **Ask first if:**
 - The change requires a new top-level dependency.
@@ -195,11 +195,12 @@ If you're new to the codebase (human or agent):
 1. [`README.md`](../README.md) — what this is and how agents fit in
 2. [`docs/architecture.md`](architecture.md) — the big picture
 3. [`docs/glossary.md`](glossary.md) — the terms
-4. [`CLAUDE.md`](../CLAUDE.md) — the operating manual
-5. [`docs/adr/0001-modular-monolith.md`](adr/0001-modular-monolith.md) and on — the reasoning
-6. A concrete module — pick Users or Catalog. Read it end-to-end, including tests.
-7. [`docs/how-to/add-a-slice.md`](how-to/add-a-slice.md) — when you're ready to add something
-8. [`.claude/`](../.claude/) — review the hooks, commands, and sub-agent definitions to understand what runs automatically and when
+4. [`AGENTS.md`](../AGENTS.md) — the primary operating manual
+5. [`CLAUDE.md`](../CLAUDE.md) — Claude-oriented compatibility guidance
+6. [`docs/adr/0001-modular-monolith.md`](adr/0001-modular-monolith.md) and on — the reasoning
+7. A concrete module — pick Users or Catalog. Read it end-to-end, including tests.
+8. [`docs/how-to/add-a-slice.md`](how-to/add-a-slice.md) — when you're ready to add something
+9. [`.claude/`](../.claude/) — review the harness hooks, commands, and sub-agent definitions to understand what runs automatically and when
 
 ---
 

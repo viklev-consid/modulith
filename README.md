@@ -39,7 +39,7 @@ Those same properties also make the codebase easier for AI agents to work in. Cl
 - **Per-module OpenTelemetry activity sources** with full handler instrumentation
 - **GDPR primitives**: data classification attributes, exporter/eraser contracts, consent tracking
 - **Testing**: xUnit v3, Shouldly, Verify, Bogus, Testcontainers, NetArchTest, WireMock.Net
-- **Agent-ready**: layered `CLAUDE.md` files, comprehensive ADRs, `dotnet new` item templates, Claude Code hooks/commands/sub-agents, and repo-local skills under `.claude/skills/`
+- **Agent-ready**: layered agent guidance (`AGENTS.md` + `CLAUDE.md`), comprehensive ADRs, `dotnet new` item templates, and repo-local automation/skills for common workflows
 
 ## Quick start
 
@@ -67,15 +67,15 @@ Modulith treats AI coding agents as first-class collaborators alongside human de
 
 Agent context is organized hierarchically so the right instructions are always close to the work:
 
-- **`/CLAUDE.md`** — repo-wide operating manual: invariants, workflow, common commands, footguns
-- **`/src/Modules/CLAUDE.md`** — module shape conventions and cross-module rules
-- **`/src/Modules/<Module>/CLAUDE.md`** — per-module domain vocabulary and business rules
-- **`/tests/CLAUDE.md`** — test patterns and what belongs in each layer
-- **`/docs/adr/CLAUDE.md`** — ADR format guidance
+- **`/AGENTS.md`** — primary repo-wide operating manual: invariants, workflow, common commands, footguns
+- **Scoped `AGENTS.md` files** — when present, they refine guidance for specific subtrees
+- **`/CLAUDE.md` + scoped `CLAUDE.md` files** — compatibility guidance for Claude-oriented workflows
 
-### The `.claude/` harness
+### Agent tooling in this repo
 
-The `.claude/` directory ships an active harness that Claude Code picks up automatically, plus repo-local skills for recurring implementation workflows.
+This repository includes agent tooling designed to keep implementation aligned with architecture rules. Some of it is generic and some of it is agent-specific.
+
+The `.claude/` directory ships an active harness for Claude Code, plus repo-local skills for recurring implementation workflows. Codex and other agents should use `AGENTS.md` (and scoped variants) as the primary instruction surface.
 
 **Hooks** enforce rules at the moment they would be violated, not at PR review time:
 
@@ -115,6 +115,12 @@ The `.claude/` directory ships an active harness that Claude Code picks up autom
 - `migration-writer` — adds EF Core migrations and summarizes the generated SQL
 - `adr-drafter` — turns design conversations into ADR drafts for human review and commit
 
+### Supported agent workflows
+
+- **Codex**: uses `AGENTS.md` and any scoped `AGENTS.md` files as the primary operating instructions.
+- **Claude Code**: uses layered `CLAUDE.md` files and the `.claude/` harness (hooks, commands, skills, sub-agents).
+- **Other agents**: can follow the same architecture docs, ADRs, and boundary rules, with `AGENTS.md` as the baseline guidance.
+
 ### Why both humans and agents benefit
 
 The structural choices reinforce each other:
@@ -141,7 +147,8 @@ The structural choices reinforce each other:
 - [`docs/examples/`](docs/examples/) — worked patterns extracted from real modules (query slice, command+event, cross-module subscriber, scheduled job, security-sensitive slice)
 - [`COMPLIANCE.md`](COMPLIANCE.md) — GDPR posture and compliance considerations
 - [`CONFIG.md`](CONFIG.md) — configuration hierarchy and secrets management
-- [`CLAUDE.md`](CLAUDE.md) — operating manual for AI agents working in this codebase
+- [`AGENTS.md`](AGENTS.md) — primary operating manual for AI agents working in this codebase
+- [`CLAUDE.md`](CLAUDE.md) — Claude-oriented compatibility and tooling guide
 
 ## License
 

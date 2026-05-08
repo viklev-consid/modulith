@@ -16,7 +16,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -24,10 +24,10 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ForgotPassword_WithKnownEmail_Returns200()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/password/forgot",
+        var response = await client.PostAsJsonAsync("/v1/users/password/forgot",
             new ForgotPasswordRequest("alice@example.com"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -37,7 +37,7 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     public async Task ForgotPassword_WithUnknownEmail_AlsoReturns200_AntiEnumeration()
     {
         // Must return identical 200 for unknown email — no user enumeration.
-        var response = await _client.PostAsJsonAsync("/v1/users/password/forgot",
+        var response = await client.PostAsJsonAsync("/v1/users/password/forgot",
             new ForgotPasswordRequest("nobody@example.com"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -46,10 +46,10 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ForgotPassword_CreatesHashedTokenInDatabase()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
-        await _client.PostAsJsonAsync("/v1/users/password/forgot",
+        await client.PostAsJsonAsync("/v1/users/password/forgot",
             new ForgotPasswordRequest("alice@example.com"));
 
         using var scope = fixture.Services.CreateScope();
@@ -62,7 +62,7 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ResetPassword_WithValidToken_ResetsPasswordAndRevokesAllRefreshTokens()
     {
-        var reg = await _client.PostAsJsonAsync("/v1/users/register",
+        var reg = await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
         var regBody = await reg.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(regBody);
@@ -80,18 +80,18 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
             rawToken = raw;
         }
 
-        var response = await _client.PostAsJsonAsync("/v1/users/password/reset",
+        var response = await client.PostAsJsonAsync("/v1/users/password/reset",
             new ResetPasswordRequest(rawToken, "NewPassword1!"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         // Pre-existing refresh token must be revoked
-        var refreshAttempt = await _client.PostAsJsonAsync("/v1/users/token/refresh",
+        var refreshAttempt = await client.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(regBody.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, refreshAttempt.StatusCode);
 
         // New password must work
-        var newLogin = await _client.PostAsJsonAsync("/v1/users/login",
+        var newLogin = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "NewPassword1!"));
         Assert.Equal(HttpStatusCode.OK, newLogin.StatusCode);
     }
@@ -99,7 +99,7 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ResetPassword_WithInvalidToken_Returns400()
     {
-        var response = await _client.PostAsJsonAsync("/v1/users/password/reset",
+        var response = await client.PostAsJsonAsync("/v1/users/password/reset",
             new ResetPasswordRequest("invalid-token", "NewPassword1!"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -108,7 +108,7 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ResetPassword_TokenCannotBeUsedTwice()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
         string rawToken;
@@ -123,10 +123,10 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
             rawToken = raw;
         }
 
-        await _client.PostAsJsonAsync("/v1/users/password/reset",
+        await client.PostAsJsonAsync("/v1/users/password/reset",
             new ResetPasswordRequest(rawToken, "NewPassword1!"));
 
-        var second = await _client.PostAsJsonAsync("/v1/users/password/reset",
+        var second = await client.PostAsJsonAsync("/v1/users/password/reset",
             new ResetPasswordRequest(rawToken, "AnotherPassword1!"));
 
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);

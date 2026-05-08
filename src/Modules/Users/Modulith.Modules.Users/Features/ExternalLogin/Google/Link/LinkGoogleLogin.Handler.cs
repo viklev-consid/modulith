@@ -5,8 +5,8 @@ using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
-using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ExternalLogin.Google.Link;
@@ -61,10 +61,11 @@ public sealed class LinkGoogleLoginHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg &&
-                                           string.Equals(pg.SqlState, "23505", StringComparison.Ordinal))
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
-            return string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal)
+            // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
+            db.ChangeTracker.Clear();
+            return ex.IsUniqueConstraintViolation("ix_external_logins_provider_subject")
                 ? UsersErrors.ExternalLoginLinkedToOtherUser
                 : UsersErrors.ExternalLoginAlreadyLinked;
         }

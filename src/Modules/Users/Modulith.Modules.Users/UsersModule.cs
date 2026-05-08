@@ -5,20 +5,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OpenTelemetry;
 using Modulith.Modules.Users.ConsentManagement;
+using Modulith.Modules.Users.Contracts.Authorization;
 using Modulith.Modules.Users.Features.ChangePassword;
+using Modulith.Modules.Users.Features.ChangeUserRole;
 using Modulith.Modules.Users.Features.ConfirmEmailChange;
+using Modulith.Modules.Users.Features.DeleteAccount;
+using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Link;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Unlink;
 using Modulith.Modules.Users.Features.ExternalLogin.SetInitialPassword;
-using Modulith.Modules.Users.Features.DeleteAccount;
-using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ForgotPassword;
-using Modulith.Modules.Users.Features.ChangeUserRole;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.GetUserById;
 using Modulith.Modules.Users.Features.ListUsers;
@@ -34,14 +34,15 @@ using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Modules.Users.Seeding;
-using Modulith.Modules.Users.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
+using OpenTelemetry;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 
 namespace Modulith.Modules.Users;
 
@@ -73,7 +74,7 @@ public static class UsersModule
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
-        services.AddDbContext<UsersDbContext>((sp, opts) =>
+        services.AddDbContextWithWolverineIntegration<UsersDbContext>((sp, opts) =>
         {
             opts.UseNpgsql(
                 configuration.GetConnectionString("db"),
@@ -92,7 +93,8 @@ public static class UsersModule
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, UsersPersonalDataEraser>();
+        services.AddScoped<UsersPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<UsersPersonalDataEraser>());
         services.AddScoped<PersonalDataOrchestrator>();
 
         services.AddHealthChecks()

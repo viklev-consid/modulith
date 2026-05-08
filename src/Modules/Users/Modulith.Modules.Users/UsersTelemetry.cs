@@ -6,7 +6,7 @@ namespace Modulith.Modules.Users;
 
 /// <summary>
 /// OpenTelemetry instrumentation primitives for the Users module.
-/// ActivitySource for distributed tracing; Meter/counters for metrics.
+/// ActivitySource for distributed tracing; meter/counters for metrics.
 /// </summary>
 internal static class UsersTelemetry
 {
@@ -15,20 +15,20 @@ internal static class UsersTelemetry
 
     internal static readonly ActivitySource ActivitySource = new(SourceName, "1.0.0");
 
-    private static readonly Meter Meter = new(MeterName, "1.0.0");
+    private static readonly Meter meter = new(MeterName, "1.0.0");
 
     internal static readonly Counter<long> CommandsHandled =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.users.commands.handled",
             description: "Total commands successfully handled by the Users module.");
 
     internal static readonly Counter<long> CommandsFailed =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.users.commands.failed",
             description: "Total command failures in the Users module.");
 
     internal static readonly Counter<long> EventsPublished =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.users.events.published",
             description: "Total integration events published by the Users module.");
 

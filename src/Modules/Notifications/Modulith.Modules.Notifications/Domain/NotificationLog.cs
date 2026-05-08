@@ -12,14 +12,14 @@ public sealed class NotificationLog : Entity<NotificationLogId>
         string recipientEmail,
         NotificationType notificationType,
         string subject,
-        DateTimeOffset sentAt,
+        DateTimeOffset createdAt,
         Guid idempotencyKey) : base(id)
     {
         UserId = userId;
         RecipientEmail = recipientEmail;
         NotificationType = notificationType;
         Subject = subject;
-        SentAt = sentAt;
+        CreatedAt = createdAt;
         IdempotencyKey = idempotencyKey;
         DeliveryStatus = NotificationDeliveryStatus.Pending;
     }
@@ -28,18 +28,28 @@ public sealed class NotificationLog : Entity<NotificationLogId>
     public string RecipientEmail { get; private set; } = string.Empty;
     public NotificationType NotificationType { get; private set; }
     public string Subject { get; private set; } = string.Empty;
-    public DateTimeOffset SentAt { get; private set; }
+    /// <summary>Timestamp when the log row was created (before delivery).</summary>
+    public DateTimeOffset CreatedAt { get; private set; }
+    /// <summary>Timestamp when delivery was confirmed (<c>Sending → Sent</c>). Null until then.</summary>
+    public DateTimeOffset? SentAt { get; private set; }
     public Guid IdempotencyKey { get; private set; }
     public NotificationDeliveryStatus DeliveryStatus { get; private set; }
+    /// <summary>Timestamp at which the exclusive send claim was taken (Pending → Sending).
+    /// Null until the claim is first acquired. Used to detect stuck Sending rows.</summary>
+    public DateTimeOffset? SendingClaimedAt { get; private set; }
 
-    public void MarkSent() => DeliveryStatus = NotificationDeliveryStatus.Sent;
+    /// <summary>Opaque token generated when the send claim is taken. Every transition
+    /// (<c>MarkReady</c>, <c>MarkSentAsync</c>, <c>MarkFailedAsync</c>) must supply the matching
+    /// token, ensuring that only the holder of the current claim can advance the row.
+    /// Cleared whenever the row leaves the <c>Sending</c> state.</summary>
+    public Guid? SendingLeaseToken { get; private set; }
 
     public static NotificationLog Create(
         Guid userId,
         string recipientEmail,
         NotificationType notificationType,
         string subject,
-        DateTimeOffset sentAt,
+        DateTimeOffset createdAt,
         Guid idempotencyKey)
         => new(
             new NotificationLogId(Guid.NewGuid()),
@@ -47,6 +57,6 @@ public sealed class NotificationLog : Entity<NotificationLogId>
             recipientEmail,
             notificationType,
             subject,
-            sentAt,
+            createdAt,
             idempotencyKey);
 }

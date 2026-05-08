@@ -15,37 +15,37 @@ namespace Modulith.Modules.Users.Security.Authorization;
 /// </summary>
 internal sealed class PermissionCatalog : IPermissionCatalog
 {
-    private readonly IReadOnlyCollection<string> _allPermissions;
-    private readonly Dictionary<string, IReadOnlyCollection<string>> _roleMap;
-    private readonly Dictionary<string, string> _versionCache;
-    private readonly HashSet<string> _knownRoles;
+    private readonly IReadOnlyCollection<string> allPermissions;
+    private readonly Dictionary<string, IReadOnlyCollection<string>> roleMap;
+    private readonly Dictionary<string, string> versionCache;
+    private readonly HashSet<string> knownRoles;
 
     public PermissionCatalog(IEnumerable<IPermissionSource> sources)
     {
-        _allPermissions = [.. sources
+        allPermissions = [.. sources
             .SelectMany(s => s.GetPermissions())
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)];
 
-        _roleMap = BuildRoleMap(_allPermissions);
-        _versionCache = BuildVersionCache(_roleMap);
-        _knownRoles = new HashSet<string>(_roleMap.Keys, StringComparer.OrdinalIgnoreCase);
-        // Note: _knownRoles is typed as HashSet<string> so ResolveRole can call TryGetValue,
+        roleMap = BuildRoleMap(allPermissions);
+        versionCache = BuildVersionCache(roleMap);
+        knownRoles = new HashSet<string>(roleMap.Keys, StringComparer.OrdinalIgnoreCase);
+        // Note: knownRoles is typed as HashSet<string> so ResolveRole can call TryGetValue,
         // which returns the stored canonical key rather than just true/false.
     }
 
-    public IReadOnlyCollection<string> AllPermissions => _allPermissions;
+    public IReadOnlyCollection<string> AllPermissions => allPermissions;
 
-    public IReadOnlySet<string> KnownRoles => _knownRoles;
+    public IReadOnlySet<string> KnownRoles => knownRoles;
 
     public string? ResolveRole(string name) =>
-        _knownRoles.TryGetValue(name, out var canonical) ? canonical : null;
+        knownRoles.TryGetValue(name, out var canonical) ? canonical : null;
 
     public IReadOnlyCollection<string> GetPermissionsForRole(string roleName) =>
-        _roleMap.TryGetValue(roleName, out var perms) ? perms : [];
+        roleMap.TryGetValue(roleName, out var perms) ? perms : [];
 
     public string GetPermissionsVersion(string roleName) =>
-        _versionCache.TryGetValue(roleName, out var v) ? v : ComputeVersion([]);
+        versionCache.TryGetValue(roleName, out var v) ? v : ComputeVersion([]);
 
     // ---------- private helpers ----------
 
@@ -55,7 +55,7 @@ internal sealed class PermissionCatalog : IPermissionCatalog
         return new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["admin"] = all,
-            ["user"]  = []
+            ["user"] = []
         };
     }
 

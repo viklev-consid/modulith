@@ -7,16 +7,20 @@ using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
+using Wolverine.Attributes;
+
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
 
 /// <summary>
 /// Alerts the OLD email address after a confirmed email change — defence-in-depth
 /// against silent account takeover.
 /// </summary>
+[NonTransactional]
 public sealed class OnEmailChangedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
-    IClock clock)
+    IClock clock,
+    NotificationSendGuard sendGuard)
 {
     public async Task Handle(EmailChangedV1 @event, CancellationToken ct)
     {
@@ -36,12 +40,11 @@ public sealed class OnEmailChangedHandler(
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             db.Entry(log).State = EntityState.Detached;
-            log = await db.NotificationLogs
-                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
-            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
-            {
-                return;
-            }
+        }
+
+        if (await sendGuard.TryClaimAsync(@event.EventId, ct) is not { } leaseToken)
+        {
+            return;
         }
 
         var message = new EmailMessage(
@@ -50,8 +53,20 @@ public sealed class OnEmailChangedHandler(
             HtmlBody: EmailChangedTemplate.HtmlBody(@event.NewEmail),
             PlainTextBody: EmailChangedTemplate.PlainTextBody(@event.NewEmail));
 
-        await emailSender.SendAsync(message, ct);
-        log.MarkSent();
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (RetryableSmtpException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, leaseToken, ct);
+            throw;
+        }
+        catch (TerminalSmtpException)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            throw;
+        }
+        await sendGuard.MarkSentAsync(@event.EventId, leaseToken, ct);
     }
 }

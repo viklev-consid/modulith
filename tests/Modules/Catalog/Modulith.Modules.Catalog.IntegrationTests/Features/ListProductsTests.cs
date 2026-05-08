@@ -9,8 +9,8 @@ namespace Modulith.Modules.Catalog.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class ListProductsTests(CatalogApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anonClient = fixture.CreateAnonymousClient();
-    private readonly HttpClient _authedClient = fixture.CreateAuthenticatedClient(
+    private readonly HttpClient anonClient = fixture.CreateAnonymousClient();
+    private readonly HttpClient authedClient = fixture.CreateAuthenticatedClient(
         Guid.NewGuid(), "admin@example.com", "Admin", "admin");
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
@@ -19,7 +19,7 @@ public sealed class ListProductsTests(CatalogApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ListProducts_WhenNoProducts_ReturnsEmptyList()
     {
-        var response = await _anonClient.GetAsync("/v1/catalog/products");
+        var response = await anonClient.GetAsync("/v1/catalog/products");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ListProductsResponse>();
@@ -30,12 +30,12 @@ public sealed class ListProductsTests(CatalogApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ListProducts_AfterCreatingProducts_ReturnsThem()
     {
-        await _authedClient.PostAsJsonAsync("/v1/catalog/products",
+        await authedClient.PostAsJsonAsync("/v1/catalog/products",
             new CreateProductRequest("WIDGET-001", "Widget One", 9.99m, "USD"));
-        await _authedClient.PostAsJsonAsync("/v1/catalog/products",
+        await authedClient.PostAsJsonAsync("/v1/catalog/products",
             new CreateProductRequest("WIDGET-002", "Widget Two", 19.99m, "USD"));
 
-        var response = await _anonClient.GetAsync("/v1/catalog/products");
+        var response = await anonClient.GetAsync("/v1/catalog/products");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ListProductsResponse>();
@@ -46,7 +46,7 @@ public sealed class ListProductsTests(CatalogApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ListProducts_IsPublic_NoAuthRequired()
     {
-        var response = await _anonClient.GetAsync("/v1/catalog/products");
+        var response = await anonClient.GetAsync("/v1/catalog/products");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

@@ -5,8 +5,8 @@ using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
-using Npgsql;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ConfirmEmailChange;
@@ -64,18 +64,23 @@ public sealed class ConfirmEmailChangeHandler(
 
         db.PendingEmailChanges.Remove(pending);
 
-        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
-
         try
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation("ix_users_email"))
         {
             // Between the pre-check in RequestEmailChange and this confirmation committing, someone else
-            // claimed the target email. Return the same opaque error — the token is effectively spent.
+            // claimed the target email. The save was rolled back — token, pending-change, and email
+            // mutation are all unwound. Return the same opaque error without revoking any sessions.
+            db.ChangeTracker.Clear();
             return UsersErrors.InvalidOrExpiredToken;
         }
+
+        // Revoke all active refresh tokens only after the email change is committed.
+        // Running this before SaveChangesAsync would revoke sessions even when the save fails
+        // (e.g. email uniqueness race), logging the user out without the change taking effect.
+        await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
 
         await bus.PublishAsync(new EmailChangedV1(user.Id.Value, oldEmail, user.Email.Value, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailChangedV1)));

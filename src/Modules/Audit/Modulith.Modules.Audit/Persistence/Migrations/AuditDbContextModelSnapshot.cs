@@ -18,7 +18,7 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("audit")
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -38,6 +38,10 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("event_type");
+
+                    b.Property<Guid?>("IdempotencyKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("idempotency_key");
 
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone")
@@ -62,6 +66,11 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
 
                     b.HasIndex("ActorId")
                         .HasDatabaseName("ix_audit_entries_actor_id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_audit_entries_idempotency_key")
+                        .HasFilter("idempotency_key IS NOT NULL");
 
                     b.HasIndex("OccurredAt")
                         .HasDatabaseName("ix_audit_entries_occurred_at");

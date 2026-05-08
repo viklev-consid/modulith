@@ -6,13 +6,13 @@ namespace Modulith.Modules.Users.UnitTests.Domain;
 [Trait("Category", "Unit")]
 public sealed class RefreshTokenTests
 {
-    private static readonly UserId SomeUserId = new(Guid.NewGuid());
+    private static readonly UserId someUserId = new(Guid.NewGuid());
 
     [Fact]
     public void Issue_StoresHashNotRawValue()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, rawValue) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, rawValue) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
 
         var rawBytes = System.Text.Encoding.UTF8.GetBytes(rawValue);
         Assert.False(token.TokenHash.SequenceEqual(rawBytes), "TokenHash must not be the raw value.");
@@ -22,7 +22,7 @@ public sealed class RefreshTokenTests
     public void Issue_HashMatchesRawValue()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, rawValue) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, rawValue) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
 
         var expectedHash = RefreshToken.HashRawValue(rawValue);
         Assert.True(token.TokenHash.SequenceEqual(expectedHash));
@@ -32,7 +32,7 @@ public sealed class RefreshTokenTests
     public void IsActive_WhenNotRevokedAndNotExpired_ReturnsTrue()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, _) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, _) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
 
         Assert.True(token.IsActive(clock));
     }
@@ -41,7 +41,7 @@ public sealed class RefreshTokenTests
     public void IsActive_WhenExpired_ReturnsFalse()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, _) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, _) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
 
         clock.Advance(TimeSpan.FromDays(31));
         Assert.False(token.IsActive(clock));
@@ -51,7 +51,7 @@ public sealed class RefreshTokenTests
     public void IsActive_AfterRevoke_ReturnsFalse()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, _) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, _) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
 
         token.Revoke(clock);
         Assert.False(token.IsActive(clock));
@@ -61,7 +61,7 @@ public sealed class RefreshTokenTests
     public void Revoke_IsIdempotent()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, _) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, _) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
 
         var revokedAt = clock.UtcNow;
         token.Revoke(clock);
@@ -75,7 +75,7 @@ public sealed class RefreshTokenTests
     public void MarkRotatedTo_SetsRevokedAtAndRotatedTo()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, _) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, _) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
         var newTokenId = RefreshTokenId.New();
 
         token.MarkRotatedTo(newTokenId, clock);
@@ -89,7 +89,7 @@ public sealed class RefreshTokenTests
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
         var (token, _) = RefreshToken.Issue(
-            SomeUserId, TimeSpan.FromDays(30), clock, "Mozilla/5.0", "1.2.3.4");
+            someUserId, TimeSpan.FromDays(30), clock, "Mozilla/5.0", "1.2.3.4");
 
         Assert.NotNull(token.DeviceFingerprint);
         Assert.NotEmpty(token.DeviceFingerprint);
@@ -99,7 +99,7 @@ public sealed class RefreshTokenTests
     public void Issue_WithoutUserAgent_LeavesDeviceFingerprintNull()
     {
         var clock = new TokenFixedClock(DateTimeOffset.UtcNow);
-        var (token, _) = RefreshToken.Issue(SomeUserId, TimeSpan.FromDays(30), clock, null, null);
+        var (token, _) = RefreshToken.Issue(someUserId, TimeSpan.FromDays(30), clock, null, null);
 
         Assert.Null(token.DeviceFingerprint);
     }
@@ -107,7 +107,7 @@ public sealed class RefreshTokenTests
 
 file sealed class TokenFixedClock(DateTimeOffset now) : IClock
 {
-    private DateTimeOffset _now = now;
-    public DateTimeOffset UtcNow => _now;
-    public void Advance(TimeSpan duration) => _now += duration;
+    private DateTimeOffset now = now;
+    public DateTimeOffset UtcNow => now;
+    public void Advance(TimeSpan duration) => now += duration;
 }

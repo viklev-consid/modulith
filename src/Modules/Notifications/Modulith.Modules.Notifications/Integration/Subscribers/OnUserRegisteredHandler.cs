@@ -8,13 +8,17 @@ using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
+using Wolverine.Attributes;
+
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
 
+[NonTransactional]
 public sealed class OnUserRegisteredHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IConsentRegistry consentRegistry,
-    IClock clock)
+    IClock clock,
+    NotificationSendGuard sendGuard)
 {
     public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
     {
@@ -42,12 +46,11 @@ public sealed class OnUserRegisteredHandler(
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             db.Entry(log).State = EntityState.Detached;
-            log = await db.NotificationLogs
-                .FirstAsync(l => l.IdempotencyKey == @event.EventId, ct);
-            if (log.DeliveryStatus == NotificationDeliveryStatus.Sent)
-            {
-                return;
-            }
+        }
+
+        if (await sendGuard.TryClaimAsync(@event.EventId, ct) is not { } leaseToken)
+        {
+            return;
         }
 
         var message = new EmailMessage(
@@ -56,8 +59,20 @@ public sealed class OnUserRegisteredHandler(
             HtmlBody: WelcomeEmailTemplate.HtmlBody(@event.DisplayName),
             PlainTextBody: WelcomeEmailTemplate.PlainTextBody(@event.DisplayName));
 
-        await emailSender.SendAsync(message, ct);
-        log.MarkSent();
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await emailSender.SendAsync(message, ct);
+        }
+        catch (RetryableSmtpException)
+        {
+            await sendGuard.MarkReadyAsync(@event.EventId, leaseToken, ct);
+            throw;
+        }
+        catch (TerminalSmtpException)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            throw;
+        }
+        await sendGuard.MarkSentAsync(@event.EventId, leaseToken, ct);
     }
 }

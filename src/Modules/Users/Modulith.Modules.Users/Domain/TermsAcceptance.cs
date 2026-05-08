@@ -4,7 +4,7 @@ namespace Modulith.Modules.Users.Domain;
 
 public sealed class TermsAcceptance : Entity<TermsAcceptanceId>
 {
-    private const int MaxUserAgentLength = 512;
+    private const int maxUserAgentLength = 512;
 
     private TermsAcceptance(
         TermsAcceptanceId id,
@@ -41,7 +41,7 @@ public sealed class TermsAcceptance : Entity<TermsAcceptanceId>
         string? acceptedFromIp,
         string? userAgent)
     {
-        var ua = userAgent?.Length > MaxUserAgentLength ? userAgent[..MaxUserAgentLength] : userAgent;
+        var ua = userAgent?.Length > maxUserAgentLength ? userAgent[..maxUserAgentLength] : userAgent;
         return new(TermsAcceptanceId.New(), userId, version, acceptedAt, acceptedFromIp, ua);
     }
 }

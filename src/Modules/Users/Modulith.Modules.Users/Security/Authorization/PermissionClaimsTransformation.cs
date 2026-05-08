@@ -12,12 +12,12 @@ namespace Modulith.Modules.Users.Security.Authorization;
 internal sealed class PermissionClaimsTransformation(IPermissionCatalog catalog)
     : IClaimsTransformation
 {
-    private const string PermissionClaimType = "permission";
+    private const string permissionClaimType = "permission";
 
     public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
         // Idempotent: skip if permission claims already present.
-        if (principal.HasClaim(c => string.Equals(c.Type, PermissionClaimType, StringComparison.Ordinal)))
+        if (principal.HasClaim(c => string.Equals(c.Type, permissionClaimType, StringComparison.Ordinal)))
         {
             return Task.FromResult(principal);
         }
@@ -37,7 +37,7 @@ internal sealed class PermissionClaimsTransformation(IPermissionCatalog catalog)
         var clonedIdentity = new ClaimsIdentity(principal.Identity);
         foreach (var permission in permissions)
         {
-            clonedIdentity.AddClaim(new Claim(PermissionClaimType, permission));
+            clonedIdentity.AddClaim(new Claim(permissionClaimType, permission));
         }
 
         var clonedPrincipal = new ClaimsPrincipal(clonedIdentity);

@@ -1,14 +1,17 @@
 using ErrorOr;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Gdpr;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Gdpr;
+using Wolverine;
 
 namespace Modulith.Modules.Users.Features.DeleteAccount;
 
 public sealed class DeleteAccountHandler(
     UsersDbContext db,
-    PersonalDataOrchestrator orchestrator)
+    UsersPersonalDataEraser eraser,
+    IMessageBus bus)
 {
     public async Task<ErrorOr<Deleted>> Handle(DeleteAccountCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(DeleteAccountHandler), () => HandleCoreAsync(cmd, ct));
@@ -23,10 +26,9 @@ public sealed class DeleteAccountHandler(
 
         var userRef = new UserRef(user.Id.Value, user.DisplayName);
 
-        foreach (var eraser in orchestrator.Erasers)
-        {
-            await eraser.EraseAsync(userRef, ErasureStrategy.HardDelete, ct);
-        }
+        await eraser.EraseAsync(userRef, ErasureStrategy.HardDelete, ct);
+
+        await bus.PublishAsync(new UserErasureRequestedV1(userRef.UserId, userRef.DisplayName, Guid.NewGuid()));
 
         return Result.Deleted;
     }

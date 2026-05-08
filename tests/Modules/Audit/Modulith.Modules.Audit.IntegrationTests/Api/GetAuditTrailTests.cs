@@ -12,7 +12,7 @@ namespace Modulith.Modules.Audit.IntegrationTests.Api;
 [Trait("Category", "Integration")]
 public sealed class GetAuditTrailTests(AuditCrossModuleFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anon = fixture.CreateAnonymousClient();
+    private readonly HttpClient anon = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -21,7 +21,7 @@ public sealed class GetAuditTrailTests(AuditCrossModuleFixture fixture) : IAsync
     // UserRegisteredV1 event and the audit entry has been written to the DB.
     private async Task<Guid> RegisterAndWaitForAuditEntryAsync(string email, string name = "Test User")
     {
-        var resp = await _anon.PostAsJsonAsync("/v1/users/register",
+        var resp = await anon.PostAsJsonAsync("/v1/users/register",
             new { Email = email, Password = "Password1!", DisplayName = name });
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
 

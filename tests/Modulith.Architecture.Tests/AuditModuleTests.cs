@@ -8,13 +8,13 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class AuditModuleTests
 {
-    private static readonly Assembly AuditAssembly = typeof(AuditEntry).Assembly;
-    private static readonly Assembly ContractsAssembly = typeof(GetAuditTrailQuery).Assembly;
+    private static readonly Assembly auditAssembly = typeof(AuditEntry).Assembly;
+    private static readonly Assembly contractsAssembly = typeof(GetAuditTrailQuery).Assembly;
 
     [Fact]
     public void AuditDomain_HasNoEfCoreReferences()
     {
-        var result = Types.InAssembly(AuditAssembly)
+        var result = Types.InAssembly(auditAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.EntityFrameworkCore")
             .GetResult();
@@ -28,7 +28,7 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditDomain_HasNoAspNetCoreReferences()
     {
-        var result = Types.InAssembly(AuditAssembly)
+        var result = Types.InAssembly(auditAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.AspNetCore")
             .GetResult();
@@ -42,7 +42,7 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditDomain_HasNoWolverineReferences()
     {
-        var result = Types.InAssembly(AuditAssembly)
+        var result = Types.InAssembly(auditAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Wolverine")
             .GetResult();
@@ -56,7 +56,7 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditDomain_HasNoFluentValidationReferences()
     {
-        var result = Types.InAssembly(AuditAssembly)
+        var result = Types.InAssembly(auditAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("FluentValidation")
             .GetResult();
@@ -70,7 +70,7 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditDomain_HasNoFeatureManagementReferences()
     {
-        var result = Types.InAssembly(AuditAssembly)
+        var result = Types.InAssembly(auditAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.FeatureManagement")
             .GetResult();
@@ -84,7 +84,7 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditDomain_HasNoCachingReferences()
     {
-        var result = Types.InAssembly(AuditAssembly)
+        var result = Types.InAssembly(auditAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.Extensions.Caching")
             .GetResult();
@@ -113,13 +113,13 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditContracts_DoesNotReferenceAuditInternal()
     {
-        var referencedNames = ContractsAssembly
+        var referencedNames = contractsAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();
 
         Assert.False(
-            referencedNames.Contains(AuditAssembly.GetName().Name),
+            referencedNames.Contains(auditAssembly.GetName().Name),
             "FAIL: Audit.Contracts must not reference the Audit internal project. " +
             "This would expose internal types to other modules. " +
             "Contracts should reference only Shared.Kernel and Shared.Contracts.");
@@ -128,7 +128,7 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditModule_DoesNotReferenceUsersInternalProject()
     {
-        var referencedNames = AuditAssembly
+        var referencedNames = auditAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();
@@ -142,7 +142,7 @@ public sealed class AuditModuleTests
     [Fact]
     public void AuditModule_DoesNotReferenceCatalogInternalProject()
     {
-        var referencedNames = AuditAssembly
+        var referencedNames = auditAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();
@@ -158,7 +158,7 @@ public sealed class AuditModuleTests
     {
         // Audit.Contracts exposes queries and DTOs, not integration events.
         // This test guards the future: if events are added to Audit.Contracts they must be versioned.
-        var eventTypes = ContractsAssembly
+        var eventTypes = contractsAssembly
             .GetExportedTypes()
             .Where(t => t.Namespace?.Contains(".Events") == true)
             .Where(t => !t.Name.EndsWith("V1", StringComparison.Ordinal)

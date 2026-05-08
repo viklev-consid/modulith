@@ -12,7 +12,7 @@ internal sealed class UsersDevSeeder(
     IPasswordHasher passwordHasher,
     IOptions<UsersDevOptions> devOpts) : IModuleSeeder
 {
-    private static readonly (string Email, string Password, string DisplayName)[] SeedUsers =
+    private static readonly (string Email, string Password, string DisplayName)[] seedUsers =
     [
         ("alice@example.com",   "Password1!", "Alice Example"),
         ("bob@example.com",     "Password1!", "Bob Example"),
@@ -27,7 +27,7 @@ internal sealed class UsersDevSeeder(
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
         // Seed regular users.
-        foreach (var (email, password, displayName) in SeedUsers)
+        foreach (var (email, password, displayName) in seedUsers)
         {
             await EnsureUserAsync(email, password, displayName, Role.User, cancellationToken);
         }

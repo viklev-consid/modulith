@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Respawn;
+using Respawn.Graph;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -24,11 +25,11 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
     public const string TestJwtIssuer = "modulith-test";
     public const string TestJwtAudience = "modulith-test";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
+    private readonly PostgreSqlContainer postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
 
-    private Respawner? _respawner;
-    protected string ConnectionString => _postgres.GetConnectionString();
+    private Respawner? respawner;
+    public string ConnectionString => postgres.GetConnectionString();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -42,7 +43,14 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         // Satisfies GoogleAuthOptions [Required] validation so all tests can start.
         builder.UseSetting("Modules:Users:Google:ClientId", "test-google-client-id");
 
-        builder.ConfigureServices(services => ConfigureTestServices(services));
+        builder.ConfigureServices(services =>
+        {
+            // Cap host shutdown so Wolverine's DurabilityAgent (which retries against the
+            // already-stopped Postgres container) cannot keep the test process alive past
+            // this deadline. Default is 30 s; 5 s is ample for any real graceful-stop work.
+            services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(5));
+            ConfigureTestServices(services);
+        });
     }
 
     protected virtual void ConfigureTestServices(IServiceCollection services) { }
@@ -62,23 +70,29 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     async Task IAsyncLifetime.InitializeAsync()
     {
-        await _postgres.StartAsync();
+        await postgres.StartAsync();
 
         // Allow subclasses to start additional containers (e.g. Mailpit) before the host
         // is built, so their ports are available inside ConfigureWebHost.
         await StartAdditionalContainersAsync();
 
         // Trigger host build (reads ConnectionString set above) then migrate.
+        // Wolverine auto-provisions its schema when its hosted service starts.
         using var scope = Services.CreateScope();
         await MigrateAsync(scope.ServiceProvider);
 
         await using var conn = new NpgsqlConnection(ConnectionString);
         await conn.OpenAsync();
 
-        _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
+        respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = GetSchemasToReset(),
+            SchemasToInclude = [.. GetSchemasToReset(), "wolverine"],
+            TablesToIgnore =
+            [
+                new Table("wolverine", "wolverine_nodes"),
+                new Table("wolverine", "wolverine_node_assignments"),
+            ],
         });
     }
 
@@ -94,14 +108,28 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     public async Task ResetDatabaseAsync()
     {
-        if (_respawner is null)
+        if (respawner is null)
         {
             return;
         }
 
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        await conn.OpenAsync();
-        await _respawner.ResetAsync(conn);
+        // Retry on PostgreSQL deadlock (40P01): the Wolverine DurabilityAgent may hold
+        // short-lived locks on the wolverine schema concurrently with Respawn's DELETE sweep.
+        // A brief wait lets the in-flight agent transaction complete.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await using var conn = new NpgsqlConnection(ConnectionString);
+            await conn.OpenAsync();
+            try
+            {
+                await respawner.ResetAsync(conn);
+                return;
+            }
+            catch (Npgsql.PostgresException ex) when (string.Equals(ex.SqlState, "40P01", StringComparison.Ordinal) && attempt < 3)
+            {
+                await Task.Delay(150 * attempt);
+            }
+        }
     }
 
     public HttpClient CreateAnonymousClient() => CreateClient();
@@ -149,8 +177,25 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     async Task IAsyncLifetime.DisposeAsync()
     {
-        await _postgres.DisposeAsync();
+        // Stop the host with a hard deadline before tearing down the database.
+        // Wolverine's DurabilityAgent polls Postgres in a background loop; without
+        // a deadline it keeps retrying after the container stops, blocking process exit.
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await ApplicationHost.StopAsync(cts.Token);
+        }
+        catch (OperationCanceledException) { /* deadline reached — expected */ }
+
+        await postgres.DisposeAsync();
         await DisposeAdditionalContainersAsync();
+
+        // Explicitly dispose WebApplicationFactory (TestServer, service provider)
+        // since xUnit only calls IAsyncLifetime.DisposeAsync(), not base Dispose().
+        // WebApplicationFactory only implements IDisposable (not IAsyncDisposable).
+#pragma warning disable S6966
+        Dispose();
+#pragma warning restore S6966
     }
 
     /// <summary>Override to dispose extra containers started in StartAdditionalContainersAsync.</summary>

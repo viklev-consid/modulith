@@ -7,8 +7,8 @@ namespace Modulith.Shared.Infrastructure.Blobs;
 
 public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> options) : IBlobStore
 {
-    private readonly string _rootPath = options.Value.RootPath;
-    private readonly byte[] _signingKey = Encoding.UTF8.GetBytes(options.Value.SigningKey);
+    private readonly string rootPath = options.Value.RootPath;
+    private readonly byte[] signingKey = Encoding.UTF8.GetBytes(options.Value.SigningKey);
 
     public async Task<BlobRef> PutAsync(Stream content, BlobMetadata metadata, CancellationToken ct)
     {
@@ -17,7 +17,7 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
             ? SanitizeContainer(Path.GetExtension(metadata.FileName).TrimStart('.'))
             : "files";
 
-        var dir = Path.Combine(_rootPath, container);
+        var dir = Path.Combine(rootPath, container);
         Directory.CreateDirectory(dir);
 
         var fileStream = File.Create(GetFilePath(container, key));
@@ -83,16 +83,16 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
     private string ComputeToken(string container, string key, long expiresAt)
     {
         var message = $"{container}:{key}:{expiresAt}";
-        using var hmac = new HMACSHA256(_signingKey);
+        using var hmac = new HMACSHA256(signingKey);
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(message));
         return Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
     private string GetFilePath(string container, string key) =>
-        Path.Combine(_rootPath, container, key);
+        Path.Combine(rootPath, container, key);
 
     private string GetMetaPath(string container, string key) =>
-        Path.Combine(_rootPath, container, key + ".meta.json");
+        Path.Combine(rootPath, container, key + ".meta.json");
 
     private static string SanitizeContainer(string value)
     {

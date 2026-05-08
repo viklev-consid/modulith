@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OpenTelemetry;
+using Modulith.Modules.Catalog.Contracts.Authorization;
 using Modulith.Modules.Catalog.Features.CreateProduct;
 using Modulith.Modules.Catalog.Features.GetProductById;
 using Modulith.Modules.Catalog.Features.ListProducts;
@@ -13,11 +13,11 @@ using Modulith.Modules.Catalog.Gdpr;
 using Modulith.Modules.Catalog.Integration.Subscribers;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Catalog.Seeding;
-using Modulith.Modules.Catalog.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Kernel.Interfaces;
+using OpenTelemetry;
 using Wolverine;
 
 namespace Modulith.Modules.Catalog;
@@ -48,7 +48,8 @@ public static class CatalogModule
         services.AddValidatorsFromAssemblyContaining<CreateProductValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 
         services.AddScoped<IPersonalDataExporter, CatalogPersonalDataExporter>();
-        services.AddScoped<IPersonalDataEraser, CatalogPersonalDataEraser>();
+        services.AddScoped<CatalogPersonalDataEraser>();
+        services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<CatalogPersonalDataEraser>());
 
         services.AddHealthChecks()
             .AddDbContextCheck<CatalogDbContext>("catalog-db", tags: ["ready"]);
@@ -71,6 +72,7 @@ public static class CatalogModule
         opts.Discovery.IncludeType<GetProductByIdHandler>();
         opts.Discovery.IncludeType<ListProductsHandler>();
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
+        opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         return opts;
     }
 

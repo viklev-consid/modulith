@@ -1,9 +1,13 @@
+using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Catalog.Domain;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Users.Contracts.Events;
+using Modulith.Shared.Infrastructure.Persistence;
+using Wolverine.Attributes;
 
 namespace Modulith.Modules.Catalog.Integration.Subscribers;
 
+[NonTransactional]
 public sealed class OnUserRegisteredHandler(CatalogDbContext db)
 {
     public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
@@ -13,6 +17,14 @@ public sealed class OnUserRegisteredHandler(CatalogDbContext db)
 
         var customer = Customer.FromUserRegistered(@event.UserId, @event.Email, @event.DisplayName);
         db.Customers.Add(customer);
-        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            // Idempotency: duplicate delivery — customer already exists, nothing to do.
+        }
     }
 }

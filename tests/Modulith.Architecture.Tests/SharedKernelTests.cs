@@ -5,13 +5,13 @@ namespace Modulith.Architecture.Tests;
 
 public sealed class SharedKernelTests
 {
-    private static readonly Types KernelTypes = Types.InAssembly(typeof(DomainEvent).Assembly);
+    private static readonly Types kernelTypes = Types.InAssembly(typeof(DomainEvent).Assembly);
 
     [Fact]
     [Trait("Category", "Architecture")]
     public void SharedKernel_DoesNotDependOn_EntityFrameworkCore()
     {
-        var result = KernelTypes
+        var result = kernelTypes
             .Should()
             .NotHaveDependencyOn("Microsoft.EntityFrameworkCore")
             .GetResult();
@@ -27,7 +27,7 @@ public sealed class SharedKernelTests
     [Trait("Category", "Architecture")]
     public void SharedKernel_DoesNotDependOn_AspNetCore()
     {
-        var result = KernelTypes
+        var result = kernelTypes
             .Should()
             .NotHaveDependencyOn("Microsoft.AspNetCore")
             .GetResult();
@@ -43,7 +43,7 @@ public sealed class SharedKernelTests
     [Trait("Category", "Architecture")]
     public void SharedKernel_DoesNotDependOn_Wolverine()
     {
-        var result = KernelTypes
+        var result = kernelTypes
             .Should()
             .NotHaveDependencyOn("Wolverine")
             .GetResult();
@@ -59,7 +59,7 @@ public sealed class SharedKernelTests
     [Trait("Category", "Architecture")]
     public void SharedKernel_DoesNotDependOn_FluentValidation()
     {
-        var result = KernelTypes
+        var result = kernelTypes
             .Should()
             .NotHaveDependencyOn("FluentValidation")
             .GetResult();

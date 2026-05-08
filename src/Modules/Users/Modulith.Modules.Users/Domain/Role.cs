@@ -10,7 +10,7 @@ namespace Modulith.Modules.Users.Domain;
 /// </summary>
 public sealed record Role(string Name)
 {
-    private static readonly System.Text.RegularExpressions.Regex ValidPattern =
+    private static readonly System.Text.RegularExpressions.Regex validPattern =
         new(@"^[a-z][a-z0-9_-]{1,31}$",
             System.Text.RegularExpressions.RegexOptions.Compiled,
             TimeSpan.FromMilliseconds(100));
@@ -28,7 +28,7 @@ public sealed record Role(string Name)
             return UsersErrors.RoleNameEmpty;
         }
 
-        if (!ValidPattern.IsMatch(name))
+        if (!validPattern.IsMatch(name))
         {
             return UsersErrors.RoleNameInvalid;
         }

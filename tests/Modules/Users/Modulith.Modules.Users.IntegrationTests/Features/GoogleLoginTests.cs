@@ -21,7 +21,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -31,7 +31,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
     {
         fixture.GoogleVerifier.SetIdentity("sub-new", "brand-new@example.com", "New User");
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -43,12 +43,12 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
     public async Task GoogleLogin_WhenEmailRegisteredButNotLinked_Returns202()
     {
         const string email = "existingnotlinked@example.com";
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
 
         fixture.GoogleVerifier.SetIdentity("sub-unlinked", email, "Alice");
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -63,7 +63,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         const string subject = "sub-fastpath";
 
         // Seed: register user and link Google directly via domain
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
 
         using (var scope = fixture.Services.CreateScope())
@@ -80,7 +80,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
 
         fixture.GoogleVerifier.SetIdentity(subject, email, "Alice");
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -96,7 +96,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
     {
         fixture.GoogleVerifier.SetError(Error.Unauthorized("Users.ExternalLogin.InvalidIdToken", "invalid"));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("bad-token"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -105,7 +105,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
     [Fact]
     public async Task GoogleLogin_WhenIdTokenEmpty_Returns422()
     {
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest(""));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -116,7 +116,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
     {
         var oversized = new string('a', 4097);
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest(oversized));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -127,7 +127,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
     {
         fixture.GoogleVerifier.SetIdentity("sub-pending", "pending@example.com", "Pending User");
 
-        await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
 
         using var scope = fixture.Services.CreateScope();
@@ -144,7 +144,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         var overlong = new string('A', 150);
         fixture.GoogleVerifier.SetIdentity("sub-longname", "longname@example.com", overlong);
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -192,7 +192,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             await db.SaveChangesAsync();
         }
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -223,7 +223,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         const string subject = "sub-postunlink";
 
         // Register a user with a password so the credential-retention guardrail allows unlink.
-        var regResp = await _client.PostAsJsonAsync("/v1/users/register",
+        var regResp = await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
         var regBody = await regResp.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(regBody);
@@ -242,12 +242,12 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
 
         // Confirm the fast path works before unlink.
         fixture.GoogleVerifier.SetIdentity(subject, email, "Alice");
-        var fastPathBefore = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var fastPathBefore = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
         Assert.Equal(HttpStatusCode.OK, fastPathBefore.StatusCode);
 
         // Obtain a session token to authenticate the unlink request.
-        var loginResp = await _client.PostAsJsonAsync("/v1/users/login",
+        var loginResp = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest(email, "Password1!"));
         var loginBody = await loginResp.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(loginBody);
@@ -260,7 +260,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         // The fast path must now be dead: the ExternalLogin row is gone, so login must
         // fall through to the email loop and return 202 instead of 200 with tokens.
         fixture.GoogleVerifier.SetIdentity(subject, email, "Alice");
-        var fastPathAfter = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var fastPathAfter = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-id-token"));
 
         Assert.Equal(HttpStatusCode.Accepted, fastPathAfter.StatusCode);
@@ -278,7 +278,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         const string email = "fastpath-event@example.com";
         const string subject = "sub-fastpath-event";
 
-        await _client.PostAsJsonAsync("/v1/users/register", new RegisterRequest(email, "Password1!", "Alice"));
+        await client.PostAsJsonAsync("/v1/users/register", new RegisterRequest(email, "Password1!", "Alice"));
 
         Guid userId;
         using (var scope = fixture.Services.CreateScope())
@@ -300,7 +300,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             .WaitForMessageToBeReceivedAt<UserLoggedInV1>(fixture.ApplicationHost)
             .ExecuteAndWaitAsync((Func<Wolverine.IMessageContext, Task>)(async _ =>
             {
-                await _client.PostAsJsonAsync("/v1/users/auth/google/login", new GoogleLoginRequest("any-id-token"));
+                await client.PostAsJsonAsync("/v1/users/auth/google/login", new GoogleLoginRequest("any-id-token"));
             }));
 
         using var auditScope = fixture.Services.CreateScope();
