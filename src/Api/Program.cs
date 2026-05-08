@@ -12,11 +12,8 @@ using Modulith.Api.Infrastructure.DeadLetters;
 using Modulith.Api.Infrastructure.Exceptions;
 using Modulith.Api.Infrastructure.FeatureFlags;
 using Modulith.Api.Infrastructure.Logging;
+using Modulith.Api.Infrastructure.Modules;
 using Modulith.Api.Infrastructure.OpenApi;
-using Modulith.Modules.Audit;
-using Modulith.Modules.Catalog;
-using Modulith.Modules.Notifications;
-using Modulith.Modules.Users;
 using Modulith.Modules.Users.Security.Authorization;
 using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Identity;
@@ -33,6 +30,7 @@ using Wolverine.ErrorHandling;
 using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
+var modules = ModuleCatalog.DiscoverInstallers();
 
 // 1. Aspire service defaults (OTel, health checks, resilience, service discovery)
 builder.AddServiceDefaults();
@@ -116,11 +114,7 @@ builder.Services.AddOpenApi(opts =>
 });
 
 // 7. Module registration
-builder.Services
-    .AddUsersModule(builder.Configuration, builder.Environment)
-    .AddCatalogModule(builder.Configuration, builder.Environment)
-    .AddAuditModule(builder.Configuration)
-    .AddNotificationsModule(builder.Configuration);
+builder.InstallModules(modules);
 
 // 7a. RBAC — must follow module registrations so all *.Contracts assemblies are loaded
 builder.Services.AddRbac();
@@ -271,10 +265,7 @@ builder.UseWolverine(opts =>
     opts.Policies.AddMiddleware<CacheInvalidationMiddleware>(_ => true);
 
     // Register internal handlers per module (internal types require explicit inclusion)
-    opts.AddUsersHandlers();
-    opts.AddCatalogHandlers();
-    opts.AddAuditHandlers();
-    opts.AddNotificationsHandlers();
+    opts.ConfigureModuleMessaging(modules);
 });
 
 // Shared infrastructure services
@@ -311,10 +302,8 @@ else
 app.UseHttpsRedirection();
 
 // 14. Module endpoint registrations
-app.MapUsersEndpoints();
-app.MapCatalogEndpoints();
-app.MapAuditEndpoints();
-app.MapNotificationsEndpoints();
+app.MapModuleEndpoints(modules);
+app.UseModules(modules);
 
 // 15. Admin — dead-letter management (Admin policy, all environments)
 app.MapDeadLetterAdminEndpoints();

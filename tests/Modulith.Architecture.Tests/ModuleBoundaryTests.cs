@@ -1,16 +1,12 @@
 using System.Reflection;
-using Modulith.Modules.Audit.Contracts.Queries;
-using Modulith.Modules.Catalog.Contracts.Events;
-using Modulith.Modules.Users.Contracts.Events;
 
 namespace Modulith.Architecture.Tests;
 
 [Trait("Category", "Architecture")]
 public sealed class ModuleBoundaryTests
 {
-    private static readonly Assembly usersContractsAssembly = typeof(UserRegisteredV1).Assembly;
-    private static readonly Assembly catalogContractsAssembly = typeof(ProductCreatedV1).Assembly;
-    private static readonly Assembly auditContractsAssembly = typeof(GetAuditTrailQuery).Assembly;
+    private static readonly IReadOnlyList<Assembly> contractsAssemblies =
+        ModuleAssemblyCatalog.ContractsAssemblies;
 
     [Fact]
     public void ContractsAssemblies_DoNotReferenceEachOther()
@@ -18,13 +14,6 @@ public sealed class ModuleBoundaryTests
         // A module's .Contracts assembly must not reference another module's .Contracts assembly.
         // Each Contracts project must remain independently versionable.
         // If types need to be shared across contracts, they belong in Shared.Contracts.
-        var contractsAssemblies = new[]
-        {
-            usersContractsAssembly,
-            catalogContractsAssembly,
-            auditContractsAssembly,
-        };
-
         var contractsAssemblyNames = contractsAssemblies
             .Select(a => a.GetName().Name!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -49,24 +38,20 @@ public sealed class ModuleBoundaryTests
     }
 
     [Fact]
-    public void UsersContracts_DoesNotReferenceOtherModuleContracts()
+    public void ContractsAssemblies_DoNotReferenceOtherModuleContracts()
     {
-        var forbidden = new[] { "Modulith.Modules.Catalog.Contracts", "Modulith.Modules.Audit.Contracts", "Modulith.Modules.Notifications.Contracts" };
-        AssertNoForbiddenReferences(usersContractsAssembly, forbidden);
-    }
+        foreach (var assembly in contractsAssemblies)
+        {
+            var forbidden = contractsAssemblies
+                .Where(a => !string.Equals(
+                    a.GetName().Name,
+                    assembly.GetName().Name,
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(a => a.GetName().Name!)
+                .ToArray();
 
-    [Fact]
-    public void CatalogContracts_DoesNotReferenceOtherModuleContracts()
-    {
-        var forbidden = new[] { "Modulith.Modules.Users.Contracts", "Modulith.Modules.Audit.Contracts", "Modulith.Modules.Notifications.Contracts" };
-        AssertNoForbiddenReferences(catalogContractsAssembly, forbidden);
-    }
-
-    [Fact]
-    public void AuditContracts_DoesNotReferenceOtherModuleContracts()
-    {
-        var forbidden = new[] { "Modulith.Modules.Users.Contracts", "Modulith.Modules.Catalog.Contracts", "Modulith.Modules.Notifications.Contracts" };
-        AssertNoForbiddenReferences(auditContractsAssembly, forbidden);
+            AssertNoForbiddenReferences(assembly, forbidden);
+        }
     }
 
     private static void AssertNoForbiddenReferences(Assembly assembly, string[] forbiddenNames)

@@ -39,6 +39,7 @@ This produces:
 With the following files already populated:
 
 - `InventoryModule.cs` — `AddInventoryModule`, `AddInventoryHandlers` (Wolverine handler discovery), and `MapInventoryEndpoints` extension methods
+- `InventoryModuleInstaller.cs` — the auto-discovered module entry point used by the API host
 - `InventoryDbContext.cs` — inherits `ModuleDbContext`, `inventory` schema wired via `HasDefaultSchema`
 - `InventoryRoutes.cs` — route constants with `GroupTag` and `Prefix`
 - `InventoryErrors.cs` — stub static errors class using `ErrorOr`
@@ -176,33 +177,44 @@ public sealed class InventoryDbContext : ModuleDbContext
 }
 ```
 
-### 6. Register in `Api/Program.cs`
+### 6. Add the module installer
+
+The API host auto-discovers concrete `IModuleInstaller` implementations from `Modulith.Modules.*` assemblies. New modules should expose one installer and delegate to the module's registration methods:
 
 ```csharp
-// In the module registration block
-builder.Services
-    .AddUsersModule(builder.Configuration)
-    .AddOrdersModule(builder.Configuration)
-    .AddInventoryModule(builder.Configuration);   // ← add
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Modulith.Shared.Infrastructure.Modules;
+using Wolverine;
 
-// In the endpoint mapping block
-app
-    .MapUsersEndpoints()
-    .MapOrdersEndpoints()
-    .MapInventoryEndpoints();   // ← add
-```
+namespace Modulith.Modules.Inventory;
 
-### 7. Register Wolverine assembly scanning
-
-In `Program.cs`:
-
-```csharp
-builder.Host.UseWolverine(opts =>
+public sealed class InventoryModuleInstaller : IModuleInstaller
 {
-    opts.Discovery.IncludeAssembly(typeof(InventoryModule).Assembly);
-    // ... other modules
-});
+    public string Name => "Inventory";
+
+    public void Install(WebApplicationBuilder builder)
+    {
+        builder.Services.AddInventoryModule(builder.Configuration, builder.Environment);
+    }
+
+    public void ConfigureMessaging(WolverineOptions options)
+    {
+        options.AddInventoryHandlers();
+    }
+
+    public void MapEndpoints(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapInventoryEndpoints();
+    }
+}
 ```
+
+No `Api/Program.cs` edit is needed for normal module registration.
+
+### 7. Register Wolverine handlers
+
+Add handlers to the module's `AddInventoryHandlers` method. The installer calls this method from the API's Wolverine configuration.
 
 ### 8. Add the first migration (once you have entities)
 

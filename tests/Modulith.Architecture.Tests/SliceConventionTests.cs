@@ -1,8 +1,4 @@
 using System.Reflection;
-using Modulith.Modules.Audit.Domain;
-using Modulith.Modules.Catalog.Domain;
-using Modulith.Modules.Notifications.Domain;
-using Modulith.Modules.Users.Domain;
 using Modulith.Shared.Kernel.Domain;
 
 namespace Modulith.Architecture.Tests;
@@ -15,13 +11,8 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class SliceConventionTests
 {
-    private static readonly Assembly[] allModuleAssemblies =
-    [
-        typeof(User).Assembly,
-        typeof(Product).Assembly,
-        typeof(AuditEntry).Assembly,
-        typeof(NotificationLog).Assembly,
-    ];
+    private static readonly IReadOnlyList<Assembly> allModuleAssemblies =
+        ModuleAssemblyCatalog.ModuleAssemblies;
 
     [Fact]
     public void FeatureHandlers_MustResideInFeaturesNamespace()

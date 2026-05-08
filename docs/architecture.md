@@ -125,7 +125,8 @@ Modulith.Modules.Orders/
 │   └── Migrations/
 ├── Seeding/
 │   └── OrdersModuleSeeder.cs
-└── OrdersModule.cs                    # AddOrdersModule / MapOrdersEndpoints
+├── OrdersModule.cs                    # AddOrdersModule / AddOrdersHandlers / MapOrdersEndpoints
+└── OrdersModuleInstaller.cs           # Auto-discovered module entry point
 ```
 
 And in `Modulith.Modules.Orders.Contracts/`:

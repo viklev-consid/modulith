@@ -30,7 +30,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Command.** A request to change state. Named imperatively (`PlaceOrder`, `CancelOrder`). Handled by exactly one feature handler; in this codebase those handlers return `ErrorOr<T>`. Records, not classes.
 
-**Composition Root.** The single place where dependency injection registrations are wired up. In this codebase, `Api/Program.cs` plus each module's `AddXxxModule` extension.
+**Composition Root.** The single place where dependency injection registrations are wired up. In this codebase, `Api/Program.cs` discovers each module's `IModuleInstaller`, and installers delegate to module-local registration methods.
 
 **Contract.** A type in a module's `.Contracts` project — a public command, query, event, or DTO that other modules may depend on. Contracts are the module's API surface. Changing a contract is a breaking change.
 
