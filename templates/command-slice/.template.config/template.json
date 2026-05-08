@@ -1,10 +1,10 @@
 {
   "$schema": "http://json.schemastore.org/template",
   "author": "Modulith",
-  "classifications": ["Modulith", "Slice", "Feature"],
-  "identity": "Modulith.Slice",
-  "name": "Modulith Feature Slice",
-  "shortName": "modulith-slice",
+  "classifications": ["Modulith", "Slice", "Feature", "Command"],
+  "identity": "Modulith.CommandSlice",
+  "name": "Modulith Command Slice",
+  "shortName": "modulith-command-slice",
   "description": "Scaffolds the six files of a command/write vertical feature slice inside an existing module.",
   "sourceName": "FeatureName",
   "symbols": {
@@ -13,7 +13,7 @@
       "datatype": "string",
       "replaces": "ModuleName",
       "isRequired": true,
-      "description": "The PascalCase module name this slice belongs to (e.g. Catalog, Orders)."
+      "description": "The PascalCase module name this command slice belongs to (e.g. Catalog, Orders)."
     },
     "moduleNameLower": {
       "type": "derived",

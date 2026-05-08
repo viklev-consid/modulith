@@ -17,6 +17,8 @@
   },
   "sources": [
     {
+      "source": "./ModuleName",
+      "target": ".",
       "include": ["**/*"],
       "exclude": [".template.config/**"]
     }

@@ -483,7 +483,7 @@ Full flows: export, erase, verify data is gone (or anonymized where appropriate)
 
 ## Phase 9: dotnet new templates ✓
 
-**Goal:** `dotnet new modulith-slice` and `dotnet new modulith-module` work.
+**Goal:** `dotnet new modulith-slice`, `dotnet new modulith-command-slice`, `dotnet new modulith-query-slice`, `dotnet new modulith-integration-pair`, and `dotnet new modulith-module` work.
 
 ### 9.1 Slice template
 
@@ -491,19 +491,29 @@ Full flows: export, erase, verify data is gone (or anonymized where appropriate)
 
 - `.template.config/template.json` with symbols for `--module` and `--name`
 - Source files with replacement tokens
+- Explicit command and query variants in `templates/command-slice/` and `templates/query-slice/`
 
 ### 9.2 Module template
 
 `templates/module/` similarly.
 
+### 9.2.1 Integration pair template
+
+`templates/integration-pair/` generates a versioned event in `.Contracts/Events` plus a public Wolverine subscriber stub.
+
 ### 9.3 Install locally and test
 
 ```bash
 dotnet new install ./templates/slice
+dotnet new install ./templates/command-slice
+dotnet new install ./templates/query-slice
+dotnet new install ./templates/integration-pair
 dotnet new install ./templates/module
 
 dotnet new modulith-module --name TestModule
 dotnet new modulith-slice --module TestModule --name TestFeature
+dotnet new modulith-query-slice --module TestModule --name GetTestFeature
+dotnet new modulith-integration-pair --module TestModule --name TestFeatureCreated
 ```
 
 Verify the generated files compile and integrate.
