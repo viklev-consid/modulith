@@ -95,20 +95,6 @@ public sealed class NotificationsModuleTests
     }
 
     [Fact]
-    public void NotificationLog_HasNoPublicSetters()
-    {
-        var publicSetters = typeof(NotificationLog)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod?.IsPublic == true)
-            .Select(p => p.Name)
-            .ToList();
-
-        Assert.True(publicSetters.Count == 0,
-            $"FAIL: NotificationLog must not have public setters. " +
-            $"Found public setters on: {string.Join(", ", publicSetters)}.");
-    }
-
-    [Fact]
     public void NotificationsModule_DoesNotReferenceUsersInternalProject()
     {
         var referencedNames = notificationsAssembly

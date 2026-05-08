@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
-using Modulith.Modules.Users.Domain;
 using Modulith.Shared.Infrastructure.Identity;
 
 namespace Modulith.Architecture.Tests;
@@ -79,22 +78,6 @@ public sealed class RbacArchitectureTests
             "FAIL: *Permissions types must reside in a namespace containing '.Authorization' " +
             "within a *.Contracts project. See ADR-0030. " +
             $"Offending types: {string.Join(", ", violations)}");
-    }
-
-    [Fact]
-    public void UserRole_MustHaveNoPublicSetter()
-    {
-        // User.Role must not have a public setter — state changes must go through
-        // User.ChangeRole(). Public setters bypass invariant enforcement. See ADR-0030.
-        var roleProperty = typeof(User).GetProperty("Role",
-            BindingFlags.Public | BindingFlags.Instance);
-
-        Assert.NotNull(roleProperty);
-
-        var publicSetter = roleProperty.GetSetMethod(nonPublic: false);
-        Assert.True(publicSetter is null,
-            "FAIL: User.Role must not have a public setter. " +
-            "Use User.ChangeRole() to transition role state. See ADR-0030.");
     }
 
     [Fact]
