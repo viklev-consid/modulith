@@ -67,7 +67,12 @@ Failure messages are custom-written to be actionable. When one fails, read it li
 
 - `ApiTestFixture` - base WebApplicationFactory + Testcontainers lifecycle.
 - `CreateAnonymousClient()` / `CreateAuthenticatedClient(...)` - JWT-backed `HttpClient` helpers.
+- `CreateAuthenticatedClientBuilder()` - fluent JWT client builder for tests that need custom claims.
 - `CreateAuthenticatedClientWithToken(...)` - uses a token issued by the real auth flow.
+- `QueryDbAsync<TDbContext, TResult>()` / `ExecuteDbAsync<TDbContext>()` / `SeedDbAsync<TDbContext>()` - scoped DbContext helpers.
+- `TrackWolverineActivityAsync(...)` - wrapper around Wolverine `TrackActivity()` with the repo default timeout.
+- `VerifyTestSettings` - shared snapshot settings that scrub volatile members.
+- `WireMockFixture` - lightweight HTTP fake for module fixtures that call third-party APIs.
 - `Fakes/` - fake and flaky email senders for module fixtures.
 - `TestClock` - controllable `IClock` implementation.
 
@@ -115,7 +120,7 @@ Rules of thumb:
 - **Name describes scenario + outcome.** `PlacingOrderWithEmptyCart_ReturnsValidationFailure`.
 - **Use the fixture client helpers.** Don't craft JWTs inline.
 - **Use module-specific fixture helpers when they exist.** Otherwise seed through the module's real APIs or a scoped DbContext.
-- **Snapshot deliberately.** The template does not currently wire Verify; add a snapshot library only when a response shape is worth reviewing as a contract artifact.
+- **Snapshot deliberately.** Use `VerifyTestSettings.Create()` when a response shape is worth reviewing as a contract artifact.
 
 ---
 
@@ -161,7 +166,7 @@ Not for:
 
 - **Unit layer: no mocks, ever.**
 - **Integration layer: no mocks for internal infrastructure (DbContext, IMessageBus).** Real Postgres, real Wolverine.
-- **Integration layer: fake external HTTP at the transport boundary.** Add WireMock.Net or a similar fixture in the module that needs it.
+- **Integration layer: fake external HTTP at the transport boundary.** Use `WireMockFixture` in the module fixture that needs it.
 - **Integration layer: TestClock for time when you need to control it.**
 
 `Moq` or `NSubstitute` are not forbidden outright - occasionally a handler has a genuine external dependency with no HTTP surface. But reach for real infrastructure first.

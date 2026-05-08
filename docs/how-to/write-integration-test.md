@@ -47,9 +47,10 @@ The base `ApiTestFixture` handles:
 - Running migrations once.
 - Building a `WebApplicationFactory<Program>`.
 - Exposing `CreateAnonymousClient()` and `CreateAuthenticatedClient(...)` for HTTP calls.
+- Exposing `CreateAuthenticatedClientBuilder()` when custom claims make a scenario clearer.
 - Exposing `CreateAuthenticatedClientWithToken(...)` for tokens issued by the real auth flow.
-- Exposing `Services` for scoped DbContext verification queries.
-- Exposing `ApplicationHost` so tests can call Wolverine's `TrackActivity()` for message assertions.
+- Exposing `QueryDbAsync<TDbContext, TResult>()`, `ExecuteDbAsync<TDbContext>()`, and `SeedDbAsync<TDbContext>()` for scoped DbContext setup and assertions.
+- Exposing `TrackWolverineActivityAsync(...)` as the default wrapper around Wolverine's `TrackActivity()` for message assertions.
 - Respawn-based cleanup between tests.
 
 ---
@@ -81,9 +82,9 @@ public sealed class PlaceOrderTests(OrdersApiFixture fixture)
         body.OrderId.ShouldNotBe(Guid.Empty);
 
         // Assert — persistence
-        using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
-        var order = await db.Orders.SingleOrDefaultAsync(o => o.Id == new OrderId(body.OrderId));
+        var order = await fixture.QueryDbAsync<OrdersDbContext, Order?>(db =>
+            db.Orders.SingleOrDefaultAsync(o => o.Id == new OrderId(body.OrderId)));
+
         order.ShouldNotBeNull();
         order.Status.ShouldBe(OrderStatus.Placed);
         order.Lines.Count.ShouldBe(1);
@@ -97,7 +98,7 @@ public sealed class PlaceOrderTests(OrdersApiFixture fixture)
 
 ### Arrange
 
-Prefer arranging data through the module's public API. When a scenario really needs direct setup, create a scoped DbContext from `fixture.Services` and use the aggregate factory methods so invariants are still exercised.
+Prefer arranging data through the module's public API. When a scenario really needs direct setup, use `SeedDbAsync<TDbContext>` and aggregate factory methods so invariants are still exercised.
 
 Build the authenticated client:
 
@@ -107,6 +108,16 @@ var client = fixture.CreateAuthenticatedClient(
     "alice@example.com",
     "Alice",
     role: "admin");
+```
+
+For custom claims:
+
+```csharp
+var client = fixture.CreateAuthenticatedClientBuilder()
+    .WithUser(Guid.NewGuid(), "alice@example.com", "Alice")
+    .WithRole("admin")
+    .WithClaim("permission", "orders.manage")
+    .Build();
 ```
 
 Unauthenticated requests:
@@ -119,27 +130,35 @@ var client = fixture.CreateAnonymousClient();
 
 Call the endpoint via the client. Prefer strongly-typed bodies (`PostAsJsonAsync`, `PutAsJsonAsync`) for write endpoints; response comes back as `HttpResponseMessage`.
 
-For flows that publish cross-module events, use `TrackActivity`:
+For flows that publish cross-module events, use `TrackWolverineActivityAsync`:
 
 ```csharp
-var session = await fixture.ApplicationHost.TrackActivity()
-    .Timeout(TimeSpan.FromSeconds(10))
-    .ExecuteAndWaitAsync(async () =>
+var session = await fixture.TrackWolverineActivityAsync(async () =>
+{
+    var response = await client.PostAsJsonAsync("/v1/orders", request);
+    response.EnsureSuccessStatusCode();
+});
+```
+
+`TrackWolverineActivityAsync` blocks until all cascading messages finish — no sleeps, no polling. Use `assertOnExceptions: false` only for retry and dead-letter policy tests where exceptions are expected:
+
+```csharp
+var session = await fixture.TrackWolverineActivityAsync(
+    async () =>
     {
         var response = await client.PostAsJsonAsync("/v1/orders", request);
         response.EnsureSuccessStatusCode();
-    });
+    },
+    assertOnExceptions: false);
 ```
-
-`TrackActivity` blocks until all cascading messages finish — no sleeps, no polling.
 
 ### Assert
 
 Three categories of assertions:
 
 1. **HTTP response.** Status code, body shape, headers.
-2. **Persistence state.** Read back from the DbContext through a scoped service provider.
-3. **Side-effect messages.** Use the `TrackActivity()` session returned from `fixture.ApplicationHost`.
+2. **Persistence state.** Read back from the DbContext through `QueryDbAsync`.
+3. **Side-effect messages.** Use the session returned from `TrackWolverineActivityAsync`.
 
 Keep assertions tight to the scenario. A happy-path test asserting five different persistence details is a smell.
 
@@ -147,7 +166,7 @@ Keep assertions tight to the scenario. A happy-path test asserting five differen
 
 ## Snapshot testing contracts
 
-The template does not currently include a snapshot library. If a response or event is important enough to review as a contract artifact, add a snapshot package deliberately and keep the fixture setup local to that test project:
+If a response or event is important enough to review as a contract artifact, use Verify with the shared TestSupport settings:
 
 ```csharp
 [Fact]
@@ -155,11 +174,11 @@ The template does not currently include a snapshot library. If a response or eve
 public async Task PlaceOrderResponse_MatchesSnapshot()
 {
     var body = await PlaceValidOrderAndReturnBody();
-    await Verify(body);
+    await Verifier.Verify(body, VerifyTestSettings.Create());
 }
 ```
 
-For Verify, the first run creates `PlaceOrderResponse_MatchesSnapshot.verified.json`. Subsequent runs fail if the shape changes, prompting a review-and-accept. Scrub volatile fields such as timestamps and IDs in the test project that owns the snapshots.
+For Verify, the first run creates `PlaceOrderResponse_MatchesSnapshot.verified.json`. Subsequent runs fail if the shape changes, prompting a review-and-accept. Add scenario-specific scrubbers to the returned settings when a contract includes volatile IDs.
 
 ---
 
@@ -213,22 +232,15 @@ Clients pattern-match on `errorCode`, not on `title` or `detail`.
 
 ## Mocking external HTTP
 
-WireMock.Net is the preferred tool for external HTTP. The shared `TestSupport` project does not currently ship a `WireMockFixture`; add a module-specific fixture when a module needs one:
+WireMock.Net is the preferred tool for external HTTP. Use `WireMockFixture` inside a module fixture and configure the application to point at `wireMock.Url` via settings or options overrides.
 
 ```csharp
-[Fact]
-[Trait("Category", "Integration")]
-public async Task PlacingOrder_CallsPaymentProvider()
-{
-    wireMock
-        .Given(Request.Create().WithPath("/payments/charge").UsingPost())
-        .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(new { id = "ch_123" }));
+wireMock.Server
+    .Given(Request.Create().WithPath("/payments/charge").UsingPost())
+    .RespondWith(Response.Create().WithStatusCode(200).WithBodyAsJson(new { id = "ch_123" }));
 
-    // ... act and assert
-}
+// ... act and assert
 ```
-
-The module fixture should configure the application to point at the WireMock URL via an `IOptions` override.
 
 ---
 
