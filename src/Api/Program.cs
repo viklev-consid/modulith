@@ -16,6 +16,7 @@ using Modulith.Api.Infrastructure.Modules;
 using Modulith.Api.Infrastructure.OpenApi;
 using Modulith.Modules.Users.Security.Authorization;
 using Modulith.Shared.Infrastructure.Auth;
+using Modulith.Shared.Infrastructure.Blobs;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Logging;
 using Modulith.Shared.Infrastructure.Messaging;
@@ -272,6 +273,7 @@ builder.UseWolverine(opts =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddBlobStorage(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
