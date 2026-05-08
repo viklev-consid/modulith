@@ -8,7 +8,7 @@ using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
-using Npgsql;
+using Modulith.Shared.Infrastructure.Persistence;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
@@ -96,7 +96,7 @@ public sealed class GoogleLoginConfirmHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
             db.ChangeTracker.Clear();
@@ -148,19 +148,18 @@ public sealed class GoogleLoginConfirmHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg &&
-                                           string.Equals(pg.SqlState, "23505", StringComparison.Ordinal))
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // Detach the failed provisioning graph before all return paths so AutoApplyTransactions'
             // SaveChangesAsync doesn't retry the failed entities.
             DetachFailedProvisioningAttempt(user, consent);
 
-            if (string.Equals(pg.ConstraintName, "ix_external_logins_provider_subject", StringComparison.Ordinal))
+            if (ex.IsUniqueConstraintViolation("ix_external_logins_provider_subject"))
             {
                 return UsersErrors.ExternalLoginLinkedToOtherUser;
             }
 
-            if (string.Equals(pg.ConstraintName, "ix_users_email", StringComparison.Ordinal))
+            if (ex.IsUniqueConstraintViolation("ix_users_email"))
             {
                 // Registration committed after our existing-user lookup but before this insert.
                 // Roll the failed graph out of the DbContext and retry through the link path.

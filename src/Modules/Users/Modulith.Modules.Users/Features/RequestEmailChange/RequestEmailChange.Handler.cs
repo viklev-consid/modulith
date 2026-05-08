@@ -5,7 +5,7 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
-using Npgsql;
+using Modulith.Shared.Infrastructure.Persistence;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.RequestEmailChange;
@@ -65,7 +65,7 @@ public sealed class RequestEmailChangeHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // A concurrent request from the same user hit the unique index on pending_email_changes.user_id.
             // The first request succeeded; silently return the same success shape.

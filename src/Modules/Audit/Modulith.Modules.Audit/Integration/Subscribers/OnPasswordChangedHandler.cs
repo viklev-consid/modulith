@@ -4,7 +4,7 @@ using Modulith.Modules.Audit.Domain;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Kernel.Interfaces;
-using Npgsql;
+using Modulith.Shared.Infrastructure.Persistence;
 using Wolverine.Attributes;
 
 namespace Modulith.Modules.Audit.Integration.Subscribers;
@@ -33,7 +33,7 @@ public sealed class OnPasswordChangedHandler(AuditDbContext db, IClock clock)
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // Idempotency: duplicate delivery — audit entry already recorded, nothing to do.
         }

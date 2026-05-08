@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Catalog.Domain;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Users.Contracts.Events;
-using Npgsql;
+using Modulith.Shared.Infrastructure.Persistence;
 using Wolverine.Attributes;
 
 namespace Modulith.Modules.Catalog.Integration.Subscribers;
@@ -22,7 +22,7 @@ public sealed class OnUserRegisteredHandler(CatalogDbContext db)
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // Idempotency: duplicate delivery — customer already exists, nothing to do.
         }

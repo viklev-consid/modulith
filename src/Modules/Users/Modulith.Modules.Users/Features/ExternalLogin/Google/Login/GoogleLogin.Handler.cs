@@ -7,7 +7,7 @@ using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
-using Npgsql;
+using Modulith.Shared.Infrastructure.Persistence;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
@@ -154,7 +154,7 @@ public sealed class GoogleLoginHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // Race: a concurrent request won the insert for (provider, subject).
             // Treat as success — that request will publish the event and send the email.

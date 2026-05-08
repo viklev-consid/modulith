@@ -6,7 +6,7 @@ using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
-using Npgsql;
+using Modulith.Shared.Infrastructure.Persistence;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ConfirmEmailChange;
@@ -68,7 +68,7 @@ public sealed class ConfirmEmailChangeHandler(
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "ix_users_email" })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation("ix_users_email"))
         {
             // Between the pre-check in RequestEmailChange and this confirmation committing, someone else
             // claimed the target email. The save was rolled back — token, pending-change, and email
