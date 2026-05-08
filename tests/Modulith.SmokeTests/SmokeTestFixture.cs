@@ -21,7 +21,7 @@ public sealed class SmokeCollection : ICollectionFixture<SmokeTestFixture> { }
 public sealed class SmokeTestFixture : ApiTestFixture
 {
     // Mailpit: SMTP on 1025, HTTP API on 8025.
-    private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:latest")
+    private readonly IContainer mailpit = new ContainerBuilder("axllent/mailpit:latest")
         .WithPortBinding(1025, assignRandomHostPort: true)
         .WithPortBinding(8025, assignRandomHostPort: true)
         .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8025, _ => { }))
@@ -29,7 +29,7 @@ public sealed class SmokeTestFixture : ApiTestFixture
 
     /// <summary>Base URL of the Mailpit HTTP API (e.g. http://localhost:PORT).</summary>
     public string MailpitApiUrl =>
-        $"http://localhost:{_mailpit.GetMappedPublicPort(8025)}";
+        $"http://localhost:{mailpit.GetMappedPublicPort(8025)}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -44,17 +44,17 @@ public sealed class SmokeTestFixture : ApiTestFixture
         // Point the real SmtpEmailSender at the Mailpit container.
         builder.UseSetting("Modules:Notifications:Smtp:Host", "127.0.0.1");
         builder.UseSetting("Modules:Notifications:Smtp:Port",
-            _mailpit.GetMappedPublicPort(1025).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            mailpit.GetMappedPublicPort(1025).ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     protected override async Task StartAdditionalContainersAsync()
     {
-        await _mailpit.StartAsync();
+        await mailpit.StartAsync();
     }
 
     protected override async Task DisposeAdditionalContainersAsync()
     {
-        await _mailpit.DisposeAsync();
+        await mailpit.DisposeAsync();
     }
 
     protected override async Task MigrateAsync(IServiceProvider services)

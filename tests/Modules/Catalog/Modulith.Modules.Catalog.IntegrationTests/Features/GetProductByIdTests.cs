@@ -9,8 +9,8 @@ namespace Modulith.Modules.Catalog.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class GetProductByIdTests(CatalogApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anonClient = fixture.CreateAnonymousClient();
-    private readonly HttpClient _authedClient = fixture.CreateAuthenticatedClient(
+    private readonly HttpClient anonClient = fixture.CreateAnonymousClient();
+    private readonly HttpClient authedClient = fixture.CreateAuthenticatedClient(
         Guid.NewGuid(), "admin@example.com", "Admin", "admin");
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
@@ -19,11 +19,11 @@ public sealed class GetProductByIdTests(CatalogApiFixture fixture) : IAsyncLifet
     [Fact]
     public async Task GetProductById_WithExistingProduct_Returns200()
     {
-        var createResponse = await _authedClient.PostAsJsonAsync("/v1/catalog/products",
+        var createResponse = await authedClient.PostAsJsonAsync("/v1/catalog/products",
             new CreateProductRequest("WIDGET-001", "Widget One", 9.99m, "USD"));
         var created = await createResponse.Content.ReadFromJsonAsync<CreateProductResponse>();
 
-        var response = await _anonClient.GetAsync($"/v1/catalog/products/{created!.ProductId}");
+        var response = await anonClient.GetAsync($"/v1/catalog/products/{created!.ProductId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<GetProductByIdResponse>();
@@ -36,7 +36,7 @@ public sealed class GetProductByIdTests(CatalogApiFixture fixture) : IAsyncLifet
     [Fact]
     public async Task GetProductById_WithUnknownId_Returns404()
     {
-        var response = await _anonClient.GetAsync($"/v1/catalog/products/{Guid.NewGuid()}");
+        var response = await anonClient.GetAsync($"/v1/catalog/products/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -44,11 +44,11 @@ public sealed class GetProductByIdTests(CatalogApiFixture fixture) : IAsyncLifet
     [Fact]
     public async Task GetProductById_IsPublic_NoAuthRequired()
     {
-        var createResponse = await _authedClient.PostAsJsonAsync("/v1/catalog/products",
+        var createResponse = await authedClient.PostAsJsonAsync("/v1/catalog/products",
             new CreateProductRequest("WIDGET-001", "Widget One", 9.99m, "USD"));
         var created = await createResponse.Content.ReadFromJsonAsync<CreateProductResponse>();
 
-        var response = await _anonClient.GetAsync($"/v1/catalog/products/{created!.ProductId}");
+        var response = await anonClient.GetAsync($"/v1/catalog/products/{created!.ProductId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

@@ -11,7 +11,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class DeleteAccountTests(GdprApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anonymous = fixture.CreateAnonymousClient();
+    private readonly HttpClient anonymous = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -19,7 +19,7 @@ public sealed class DeleteAccountTests(GdprApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task DeleteAccount_Authenticated_Returns204()
     {
-        var registerResp = await (await _anonymous.PostAsJsonAsync("/v1/users/register",
+        var registerResp = await (await anonymous.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice")))
             .Content.ReadFromJsonAsync<RegisterResponse>();
 
@@ -34,7 +34,7 @@ public sealed class DeleteAccountTests(GdprApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task DeleteAccount_AfterDeletion_UserCannotLoginAgain()
     {
-        var registerResp = await (await _anonymous.PostAsJsonAsync("/v1/users/register",
+        var registerResp = await (await anonymous.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice")))
             .Content.ReadFromJsonAsync<RegisterResponse>();
 
@@ -51,7 +51,7 @@ public sealed class DeleteAccountTests(GdprApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task DeleteAccount_Unauthenticated_Returns401()
     {
-        var response = await _anonymous.DeleteAsync("/v1/users/me");
+        var response = await anonymous.DeleteAsync("/v1/users/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -60,7 +60,7 @@ public sealed class DeleteAccountTests(GdprApiFixture fixture) : IAsyncLifetime
     public async Task DeleteAccount_PublishesUserErasureRequestedV1()
     {
         // Arrange
-        var registerResp = await (await _anonymous.PostAsJsonAsync("/v1/users/register",
+        var registerResp = await (await anonymous.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("erasure-event@example.com", "Password1!", "Erasure")))
             .Content.ReadFromJsonAsync<RegisterResponse>();
 

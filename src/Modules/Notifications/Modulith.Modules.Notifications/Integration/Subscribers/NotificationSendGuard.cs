@@ -35,7 +35,7 @@ namespace Modulith.Modules.Notifications.Integration.Subscribers;
 /// <para>
 /// Crash recovery: if the process terminates between steps 2 and 4 the row stays
 /// <c>Sending</c>. <see cref="TryClaimAsync"/> detects rows whose
-/// <see cref="NotificationLog.SendingClaimedAt"/> exceeds <see cref="StuckSendingThreshold"/>,
+/// <see cref="NotificationLog.SendingClaimedAt"/> exceeds <see cref="stuckSendingThreshold"/>,
 /// resets them to <c>Pending</c> (clearing the stale token), and re-claims with a fresh
 /// token. This path is crash-recovery only — a row whose original sender is still legitimately
 /// running will not be eligible because its <c>SendingClaimedAt</c> is recent, and even if
@@ -53,7 +53,7 @@ namespace Modulith.Modules.Notifications.Integration.Subscribers;
 public sealed class NotificationSendGuard(NotificationsDbContext db, IClock clock)
 {
     /// <summary>Rows stuck in Sending for longer than this are eligible for automatic recovery.</summary>
-    private static readonly TimeSpan StuckSendingThreshold = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan stuckSendingThreshold = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Attempts to atomically claim the send slot for <paramref name="idempotencyKey"/>.
@@ -74,7 +74,7 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
 
         // Crash recovery: row stuck in Sending due to process crash.
         // Reset to Pending after the stale threshold so the next attempt can re-claim.
-        var staleThreshold = clock.UtcNow - StuckSendingThreshold;
+        var staleThreshold = clock.UtcNow - stuckSendingThreshold;
         var staleRecovered = await db.NotificationLogs
             .Where(l => l.IdempotencyKey == idempotencyKey
                         && l.DeliveryStatus == NotificationDeliveryStatus.Sending

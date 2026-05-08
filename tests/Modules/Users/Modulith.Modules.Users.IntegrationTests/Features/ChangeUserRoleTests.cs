@@ -16,7 +16,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anon = fixture.CreateAnonymousClient();
+    private readonly HttpClient anon = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -25,7 +25,7 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
 
     private async Task<RegisterResponse> RegisterAsync(string email, string name = "Test User")
     {
-        var resp = await _anon.PostAsJsonAsync("/v1/users/register",
+        var resp = await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", name));
         return (await resp.Content.ReadFromJsonAsync<RegisterResponse>())!;
     }
@@ -85,7 +85,7 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
     {
         var target = await RegisterAsync("target@example.com");
 
-        var response = await _anon.PutAsJsonAsync($"/v1/users/{target.UserId}/role",
+        var response = await anon.PutAsJsonAsync($"/v1/users/{target.UserId}/role",
             new ChangeUserRoleRequest("admin"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -261,7 +261,7 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
         var target = await RegisterAsync("target@example.com", "Target");
 
         // Log in as target to create an active refresh token.
-        var loginResp = await _anon.PostAsJsonAsync("/v1/users/login",
+        var loginResp = await anon.PostAsJsonAsync("/v1/users/login",
             new { Email = "target@example.com", Password = "Password1!" });
         Assert.Equal(HttpStatusCode.OK, loginResp.StatusCode);
 

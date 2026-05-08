@@ -8,7 +8,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -18,7 +18,7 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
     {
         var request = new RegisterRequest("alice@example.com", "Password1!", "Alice");
 
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+        var response = await client.PostAsJsonAsync("/v1/users/register", request);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<RegisterResponse>();
@@ -32,9 +32,9 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
     public async Task Register_WithDuplicateEmail_Returns409()
     {
         var request = new RegisterRequest("alice@example.com", "Password1!", "Alice");
-        await _client.PostAsJsonAsync("/v1/users/register", request);
+        await client.PostAsJsonAsync("/v1/users/register", request);
 
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+        var response = await client.PostAsJsonAsync("/v1/users/register", request);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -44,7 +44,7 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
     {
         var request = new RegisterRequest("not-an-email", "Password1!", "Alice");
 
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+        var response = await client.PostAsJsonAsync("/v1/users/register", request);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -54,7 +54,7 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
     {
         var request = new RegisterRequest("alice@example.com", "short", "Alice");
 
-        var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+        var response = await client.PostAsJsonAsync("/v1/users/register", request);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -62,10 +62,10 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Register_EmailIsCaseInsensitive()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("Alice@Example.COM", "Password1!", "Alice"));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/register",
+        var response = await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);

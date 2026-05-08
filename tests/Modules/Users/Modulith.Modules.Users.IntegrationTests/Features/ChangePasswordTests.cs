@@ -11,7 +11,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class ChangePasswordTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anon = fixture.CreateAnonymousClient();
+    private readonly HttpClient anon = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -46,7 +46,7 @@ public sealed class ChangePasswordTests(UsersApiFixture fixture) : IAsyncLifetim
         var login1 = await RegisterAndLoginAsync("alice@example.com");
 
         // Login from a second "device"
-        var login2Resp = await _anon.PostAsJsonAsync("/v1/users/login",
+        var login2Resp = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "Password1!"));
         var login2 = await login2Resp.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(login2);
@@ -57,12 +57,12 @@ public sealed class ChangePasswordTests(UsersApiFixture fixture) : IAsyncLifetim
             new ChangePasswordRequest("Password1!", "NewPassword1!"));
 
         // login1 refresh token (the current session) should still work
-        var rt1Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+        var rt1Refresh = await anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(login1.RefreshToken));
         Assert.Equal(HttpStatusCode.OK, rt1Refresh.StatusCode);
 
         // login2 refresh token (other session) should be revoked
-        var rt2Refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+        var rt2Refresh = await anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(login2.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, rt2Refresh.StatusCode);
     }
@@ -70,7 +70,7 @@ public sealed class ChangePasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task ChangePassword_RequiresAuthentication()
     {
-        var response = await _anon.PostAsJsonAsync("/v1/users/me/password",
+        var response = await anon.PostAsJsonAsync("/v1/users/me/password",
             new ChangePasswordRequest("Password1!", "NewPassword1!"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -78,10 +78,10 @@ public sealed class ChangePasswordTests(UsersApiFixture fixture) : IAsyncLifetim
 
     private async Task<LoginResponse> RegisterAndLoginAsync(string email)
     {
-        await _anon.PostAsJsonAsync("/v1/users/register",
+        await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
 
-        var response = await _anon.PostAsJsonAsync("/v1/users/login",
+        var response = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest(email, "Password1!"));
 
         var body = await response.Content.ReadFromJsonAsync<LoginResponse>();

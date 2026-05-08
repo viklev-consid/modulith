@@ -16,7 +16,7 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class RbacArchitectureTests
 {
-    private static readonly Assembly[] AllContractsAssemblies =
+    private static readonly Assembly[] allContractsAssemblies =
     [
         typeof(UsersPermissions).Assembly,
         typeof(CatalogPermissions).Assembly,
@@ -25,7 +25,7 @@ public sealed class RbacArchitectureTests
     ];
 
     // All module assemblies that contain Endpoint types.
-    private static readonly Assembly[] AllModuleAssemblies =
+    private static readonly Assembly[] allModuleAssemblies =
     [
         typeof(User).Assembly,
         typeof(Modulith.Modules.Catalog.Domain.Product).Assembly,
@@ -33,7 +33,7 @@ public sealed class RbacArchitectureTests
         typeof(Modulith.Modules.Notifications.Domain.NotificationLog).Assembly,
     ];
 
-    private static readonly Regex PermissionFormat =
+    private static readonly Regex permissionFormat =
         new(@"^[a-z][a-z0-9_-]*\.[a-z][a-z0-9_-]*\.[a-z][a-z0-9_-]*$",
             RegexOptions.NonBacktracking | RegexOptions.CultureInvariant);
 
@@ -44,7 +44,7 @@ public sealed class RbacArchitectureTests
         // All parts lowercase, dot-separated. See ADR-0030.
         var violations = new List<string>();
 
-        foreach (var assembly in AllContractsAssemblies)
+        foreach (var assembly in allContractsAssemblies)
         {
             var permissionTypes = assembly.GetExportedTypes()
                 .Where(t => t.Name.EndsWith("Permissions", StringComparison.Ordinal)
@@ -58,7 +58,7 @@ public sealed class RbacArchitectureTests
 
                 foreach (var (name, value) in constants)
                 {
-                    if (!PermissionFormat.IsMatch(value))
+                    if (!permissionFormat.IsMatch(value))
                     {
                         violations.Add($"{name} = \"{value}\"");
                     }
@@ -79,7 +79,7 @@ public sealed class RbacArchitectureTests
         // accessible to consuming modules without crossing internal boundaries. See ADR-0030.
         var violations = new List<string>();
 
-        foreach (var assembly in AllContractsAssemblies)
+        foreach (var assembly in allContractsAssemblies)
         {
             var badTypes = assembly.GetExportedTypes()
                 .Where(t => t.Name.EndsWith("Permissions", StringComparison.Ordinal))
@@ -117,7 +117,7 @@ public sealed class RbacArchitectureTests
         // ClaimTypes.Role must only be referenced in the CurrentUser implementation.
         // Handlers and endpoints must read role/permissions via ICurrentUser. See ADR-0030.
 
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetTypes())
             .Where(t => !string.Equals(t.Name, nameof(CurrentUser), StringComparison.Ordinal))
             .Where(t => t.GetMethods(

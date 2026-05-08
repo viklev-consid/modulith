@@ -13,7 +13,7 @@ namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
 [Trait("Category", "Integration")]
 public sealed class OnUserErasureRequestedTests(CrossModuleApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -27,7 +27,7 @@ public sealed class OnUserErasureRequestedTests(CrossModuleApiFixture fixture) :
 
         Func<IMessageContext, Task> register = async _ =>
         {
-            var resp = await _client.PostAsJsonAsync("/v1/users/register", request);
+            var resp = await client.PostAsJsonAsync("/v1/users/register", request);
             var body = await resp.Content.ReadFromJsonAsync<JsonDocument>();
             userId = body!.RootElement.GetProperty("userId").GetGuid();
         };
@@ -84,7 +84,7 @@ public sealed class OnUserErasureRequestedTests(CrossModuleApiFixture fixture) :
 
         Func<IMessageContext, Task> register = async _ =>
         {
-            var resp = await _client.PostAsJsonAsync("/v1/users/register", request);
+            var resp = await client.PostAsJsonAsync("/v1/users/register", request);
             var body = await resp.Content.ReadFromJsonAsync<JsonDocument>();
             userId = body!.RootElement.GetProperty("userId").GetGuid();
         };

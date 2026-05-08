@@ -6,7 +6,7 @@ namespace Modulith.Modules.Audit;
 
 /// <summary>
 /// OpenTelemetry instrumentation primitives for the Audit module.
-/// ActivitySource for distributed tracing; Meter/counters for metrics.
+/// ActivitySource for distributed tracing; meter/counters for metrics.
 /// </summary>
 internal static class AuditTelemetry
 {
@@ -15,20 +15,20 @@ internal static class AuditTelemetry
 
     internal static readonly ActivitySource ActivitySource = new(SourceName, "1.0.0");
 
-    private static readonly Meter Meter = new(MeterName, "1.0.0");
+    private static readonly Meter meter = new(MeterName, "1.0.0");
 
     internal static readonly Counter<long> QueriesHandled =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.audit.queries.handled",
             description: "Total queries successfully handled by the Audit module.");
 
     internal static readonly Counter<long> QueriesFailed =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.audit.queries.failed",
             description: "Total query failures in the Audit module.");
 
     internal static readonly Counter<long> EventsProcessed =
-        Meter.CreateCounter<long>(
+        meter.CreateCounter<long>(
             "modulith.audit.events.processed",
             description: "Total integration events processed by the Audit module.");
 

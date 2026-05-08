@@ -22,18 +22,18 @@ namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
 public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : IAsyncLifetime
 {
     // Admin client — role "admin" passes the Admin authorization policy.
-    private readonly HttpClient _adminClient = fixture.CreateAuthenticatedClient(
+    private readonly HttpClient adminClient = fixture.CreateAuthenticatedClient(
         Guid.NewGuid(), "dlq-admin@example.com", "DLQ Admin", "admin");
 
     // Normal user client — should be rejected by the Admin policy.
-    private readonly HttpClient _userClient = fixture.CreateAuthenticatedClient(
+    private readonly HttpClient userClient = fixture.CreateAuthenticatedClient(
         Guid.NewGuid(), "dlq-user@example.com", "DLQ User", "user");
 
     // Unauthenticated client — should receive 401.
-    private readonly HttpClient _anonClient = fixture.CreateAnonymousClient();
+    private readonly HttpClient anonClient = fixture.CreateAnonymousClient();
 
     // Separate client for producing dead letters so headers don't bleed.
-    private readonly HttpClient _registerClient = fixture.CreateAnonymousClient();
+    private readonly HttpClient registerClient = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -49,7 +49,7 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
         var request = new { Email = $"dlq-{Guid.NewGuid():N}@example.com", Password = "Password1!", DisplayName = "DLQ Test" };
         Func<IMessageContext, Task> act = async _ =>
         {
-            var response = await _registerClient.PostAsJsonAsync("/v1/users/register", request);
+            var response = await registerClient.PostAsJsonAsync("/v1/users/register", request);
             response.EnsureSuccessStatusCode();
         };
         await fixture.ApplicationHost.TrackActivity()
@@ -63,14 +63,14 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
     [Fact]
     public async Task ListDeadLetters_AnonymousRequest_Returns401()
     {
-        var response = await _anonClient.GetAsync("/v1/admin/dead-letters");
+        var response = await anonClient.GetAsync("/v1/admin/dead-letters");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
     public async Task ListDeadLetters_UserRoleToken_Returns403()
     {
-        var response = await _userClient.GetAsync("/v1/admin/dead-letters");
+        var response = await userClient.GetAsync("/v1/admin/dead-letters");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -81,7 +81,7 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
     {
         await ProduceDeadLetterAsync();
 
-        var response = await _adminClient.GetAsync("/v1/admin/dead-letters");
+        var response = await adminClient.GetAsync("/v1/admin/dead-letters");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -96,11 +96,11 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
     {
         await ProduceDeadLetterAsync();
 
-        var list = await _adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
+        var list = await adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
         var id = list.GetProperty("envelopes")[0].GetProperty("id").GetString();
         Assert.NotNull(id);
 
-        var response = await _adminClient.GetAsync($"/v1/admin/dead-letters/{id}");
+        var response = await adminClient.GetAsync($"/v1/admin/dead-letters/{id}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -111,7 +111,7 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
     [Fact]
     public async Task GetDeadLetterById_UnknownId_Returns404()
     {
-        var response = await _adminClient.GetAsync($"/v1/admin/dead-letters/{Guid.NewGuid()}");
+        var response = await adminClient.GetAsync($"/v1/admin/dead-letters/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -122,13 +122,13 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
     {
         await ProduceDeadLetterAsync();
 
-        var list = await _adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
+        var list = await adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
         var ids = list.GetProperty("envelopes")
             .EnumerateArray()
             .Select(e => Guid.Parse(e.GetProperty("id").GetString()!))
             .ToArray();
 
-        var response = await _adminClient.PostAsJsonAsync("/v1/admin/dead-letters/replay", new { messageIds = ids });
+        var response = await adminClient.PostAsJsonAsync("/v1/admin/dead-letters/replay", new { messageIds = ids });
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
@@ -140,17 +140,17 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
     {
         await ProduceDeadLetterAsync();
 
-        var list = await _adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
+        var list = await adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
         var ids = list.GetProperty("envelopes")
             .EnumerateArray()
             .Select(e => Guid.Parse(e.GetProperty("id").GetString()!))
             .ToArray();
         Assert.NotEmpty(ids);
 
-        var discardResponse = await _adminClient.PostAsJsonAsync("/v1/admin/dead-letters/discard", new { messageIds = ids });
+        var discardResponse = await adminClient.PostAsJsonAsync("/v1/admin/dead-letters/discard", new { messageIds = ids });
         Assert.Equal(HttpStatusCode.NoContent, discardResponse.StatusCode);
 
-        var afterList = await _adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
+        var afterList = await adminClient.GetFromJsonAsync<JsonElement>("/v1/admin/dead-letters");
         Assert.Equal(0, afterList.GetProperty("totalCount").GetInt32());
     }
 

@@ -21,7 +21,7 @@ namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
 [Trait("Category", "Integration")]
 public sealed class DurabilityTests(CrossModuleApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -57,7 +57,7 @@ public sealed class DurabilityTests(CrossModuleApiFixture fixture) : IAsyncLifet
 
         Func<IMessageContext, Task> act = async _ =>
         {
-            var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+            var response = await client.PostAsJsonAsync("/v1/users/register", request);
             response.EnsureSuccessStatusCode();
         };
         await fixture.ApplicationHost.TrackActivity()
@@ -83,7 +83,7 @@ public sealed class DurabilityTests(CrossModuleApiFixture fixture) : IAsyncLifet
 
         Func<IMessageContext, Task> act = async _ =>
         {
-            registerResponse = await _client.PostAsJsonAsync("/v1/users/register", request);
+            registerResponse = await client.PostAsJsonAsync("/v1/users/register", request);
         };
         await fixture.ApplicationHost.TrackActivity()
             .Timeout(TimeSpan.FromSeconds(10))

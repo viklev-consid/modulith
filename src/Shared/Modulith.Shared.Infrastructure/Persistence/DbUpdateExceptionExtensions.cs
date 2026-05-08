@@ -6,11 +6,11 @@ namespace Modulith.Shared.Infrastructure.Persistence;
 public static class DbUpdateExceptionExtensions
 {
     // PostgreSQL error code for unique_violation
-    private const string UniqueViolationSqlState = "23505";
+    private const string uniqueViolationSqlState = "23505";
 
     public static bool IsUniqueConstraintViolation(this DbUpdateException ex)
         => ex.InnerException is PostgresException pg &&
-           string.Equals(pg.SqlState, UniqueViolationSqlState, StringComparison.Ordinal);
+           string.Equals(pg.SqlState, uniqueViolationSqlState, StringComparison.Ordinal);
 
     public static bool IsUniqueConstraintViolation(this DbUpdateException ex, string constraintName)
         => ex.IsUniqueConstraintViolation() &&

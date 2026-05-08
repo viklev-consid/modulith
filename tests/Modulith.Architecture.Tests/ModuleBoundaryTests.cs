@@ -8,9 +8,9 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class ModuleBoundaryTests
 {
-    private static readonly Assembly UsersContractsAssembly = typeof(UserRegisteredV1).Assembly;
-    private static readonly Assembly CatalogContractsAssembly = typeof(ProductCreatedV1).Assembly;
-    private static readonly Assembly AuditContractsAssembly = typeof(GetAuditTrailQuery).Assembly;
+    private static readonly Assembly usersContractsAssembly = typeof(UserRegisteredV1).Assembly;
+    private static readonly Assembly catalogContractsAssembly = typeof(ProductCreatedV1).Assembly;
+    private static readonly Assembly auditContractsAssembly = typeof(GetAuditTrailQuery).Assembly;
 
     [Fact]
     public void ContractsAssemblies_DoNotReferenceEachOther()
@@ -20,9 +20,9 @@ public sealed class ModuleBoundaryTests
         // If types need to be shared across contracts, they belong in Shared.Contracts.
         var contractsAssemblies = new[]
         {
-            UsersContractsAssembly,
-            CatalogContractsAssembly,
-            AuditContractsAssembly,
+            usersContractsAssembly,
+            catalogContractsAssembly,
+            auditContractsAssembly,
         };
 
         var contractsAssemblyNames = contractsAssemblies
@@ -52,21 +52,21 @@ public sealed class ModuleBoundaryTests
     public void UsersContracts_DoesNotReferenceOtherModuleContracts()
     {
         var forbidden = new[] { "Modulith.Modules.Catalog.Contracts", "Modulith.Modules.Audit.Contracts", "Modulith.Modules.Notifications.Contracts" };
-        AssertNoForbiddenReferences(UsersContractsAssembly, forbidden);
+        AssertNoForbiddenReferences(usersContractsAssembly, forbidden);
     }
 
     [Fact]
     public void CatalogContracts_DoesNotReferenceOtherModuleContracts()
     {
         var forbidden = new[] { "Modulith.Modules.Users.Contracts", "Modulith.Modules.Audit.Contracts", "Modulith.Modules.Notifications.Contracts" };
-        AssertNoForbiddenReferences(CatalogContractsAssembly, forbidden);
+        AssertNoForbiddenReferences(catalogContractsAssembly, forbidden);
     }
 
     [Fact]
     public void AuditContracts_DoesNotReferenceOtherModuleContracts()
     {
         var forbidden = new[] { "Modulith.Modules.Users.Contracts", "Modulith.Modules.Catalog.Contracts", "Modulith.Modules.Notifications.Contracts" };
-        AssertNoForbiddenReferences(AuditContractsAssembly, forbidden);
+        AssertNoForbiddenReferences(auditContractsAssembly, forbidden);
     }
 
     private static void AssertNoForbiddenReferences(Assembly assembly, string[] forbiddenNames)

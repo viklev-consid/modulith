@@ -18,7 +18,7 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class GeneralArchitectureTests
 {
-    private static readonly Assembly[] AllModuleAssemblies =
+    private static readonly Assembly[] allModuleAssemblies =
     [
         typeof(User).Assembly,
         typeof(Product).Assembly,
@@ -26,7 +26,7 @@ public sealed class GeneralArchitectureTests
         typeof(NotificationLog).Assembly,
     ];
 
-    private static readonly Assembly[] AllContractsAssemblies =
+    private static readonly Assembly[] allContractsAssemblies =
     [
         typeof(UserRegisteredV1).Assembly,
         typeof(ProductCreatedV1).Assembly,
@@ -40,7 +40,7 @@ public sealed class GeneralArchitectureTests
         // All other types must use strongly-typed IOptions<T> with ValidateOnStart(). See ADR-0021.
         var iConfigType = typeof(Microsoft.Extensions.Configuration.IConfiguration);
 
-        var violations = AllModuleAssemblies
+        var violations = allModuleAssemblies
             .SelectMany(a => a.GetTypes())
             .Where(t => !t.Name.EndsWith("Module", StringComparison.Ordinal))
             .Where(t => t.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
@@ -64,7 +64,7 @@ public sealed class GeneralArchitectureTests
         // Integration events in *.Contracts.Events.* must be declared as 'sealed record'.
         // 'sealed' prevents serialization surprises from subclassing
         // 'record' provides value equality and immutability suitable for message envelopes.
-        var violations = AllContractsAssemblies
+        var violations = allContractsAssemblies
             .SelectMany(a => a.GetExportedTypes())
             .Where(t => t.Namespace?.Contains(".Events") == true)
             .Where(t => !t.IsSealed || !IsRecord(t))
@@ -86,7 +86,7 @@ public sealed class GeneralArchitectureTests
         // See ADR-0012 (GDPR) and ADR-0015.
         var violations = new List<string>();
 
-        foreach (var assembly in AllModuleAssemblies)
+        foreach (var assembly in allModuleAssemblies)
         {
             var hasUserIdEntity = assembly.GetTypes()
                 .Where(t => t.IsClass && !t.IsAbstract)
@@ -129,7 +129,7 @@ public sealed class GeneralArchitectureTests
         var fileType = typeof(System.IO.File);
         var violations = new List<string>();
 
-        foreach (var assembly in AllModuleAssemblies)
+        foreach (var assembly in allModuleAssemblies)
         {
             var offending = assembly.GetTypes()
                 .SelectMany(t => t.GetMethods(

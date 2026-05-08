@@ -6,8 +6,8 @@ using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
-using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
+using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Npgsql;
@@ -19,7 +19,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -32,7 +32,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
 
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -52,7 +52,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
 
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
 
-        await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         using var scope = fixture.Services.CreateScope();
@@ -73,12 +73,12 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         const string email = "existinglinked@example.com";
         const string subject = "sub-existing-confirm";
 
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
 
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: true);
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -94,12 +94,12 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         const string email = "existinglinked2@example.com";
         const string subject = "sub-existing-confirm2";
 
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
 
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: true);
 
-        await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         using var scope = fixture.Services.CreateScope();
@@ -119,12 +119,12 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         const string subject = "sub-fastpath-confirm";
 
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
-        await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         // Now the Google account is linked — fast path should return 200
         fixture.GoogleVerifier.SetIdentity(subject, email, "Test User");
-        var loginResp = await _client.PostAsJsonAsync("/v1/users/auth/google/login",
+        var loginResp = await client.PostAsJsonAsync("/v1/users/auth/google/login",
             new GoogleLoginRequest("any-token"));
 
         Assert.Equal(HttpStatusCode.OK, loginResp.StatusCode);
@@ -141,7 +141,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
 
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false, lifetime: TimeSpan.FromSeconds(-1));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -156,11 +156,11 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
 
         // Consume once successfully (user gets created)
-        await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         // Second attempt must fail
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -169,7 +169,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
     [Fact]
     public async Task GoogleLoginConfirm_WithUnknownToken_Returns422()
     {
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest("totally-unknown-token-value"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -178,7 +178,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
     [Fact]
     public async Task GoogleLoginConfirm_WithEmptyToken_Returns422()
     {
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(""));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -189,7 +189,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
     {
         var oversized = new string('a', 65);
 
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(oversized));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -205,11 +205,11 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false);
 
         // User registers with a password *after* the pending record was created.
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
 
         // Confirm should link Google to the now-existing account, not try to provision a new one.
-        var response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
             new GoogleLoginConfirmRequest(rawToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -241,13 +241,13 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
 
         try
         {
-            var confirmTask = _client.PostAsJsonAsync(
+            var confirmTask = client.PostAsJsonAsync(
                 "/v1/users/auth/google/confirm",
                 new GoogleLoginConfirmRequest(rawToken));
 
             await WaitForExternalProvisionInsertAsync(connectionString);
 
-            var registerResponse = await _client.PostAsJsonAsync(
+            var registerResponse = await client.PostAsJsonAsync(
                 "/v1/users/register",
                 new RegisterRequest(email, "Password1!", "Alice"));
 
@@ -315,7 +315,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
             .WaitForMessageToBeReceivedAt<UserLoggedInV1>(fixture.ApplicationHost)
             .ExecuteAndWaitAsync((Func<Wolverine.IMessageContext, Task>)(async _ =>
             {
-                response = await _client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+                response = await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
                     new GoogleLoginConfirmRequest(rawToken));
             }));
 

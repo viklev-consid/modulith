@@ -9,7 +9,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class GetCurrentUserTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anonymous = fixture.CreateAnonymousClient();
+    private readonly HttpClient anonymous = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -17,7 +17,7 @@ public sealed class GetCurrentUserTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task GetCurrentUser_Authenticated_ReturnsProfile()
     {
-        var registerResponse = await (await _anonymous.PostAsJsonAsync("/v1/users/register",
+        var registerResponse = await (await anonymous.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice")))
             .Content.ReadFromJsonAsync<RegisterResponse>();
 
@@ -37,7 +37,7 @@ public sealed class GetCurrentUserTests(UsersApiFixture fixture) : IAsyncLifetim
     [Fact]
     public async Task GetCurrentUser_Unauthenticated_Returns401()
     {
-        var response = await _anonymous.GetAsync("/v1/users/me");
+        var response = await anonymous.GetAsync("/v1/users/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

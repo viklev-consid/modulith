@@ -9,7 +9,7 @@ namespace Modulith.SmokeTests;
 [Trait("Category", "Smoke")]
 public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -19,7 +19,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task StackBoots_HealthEndpointReturns200()
     {
-        var response = await _client.GetAsync("/health");
+        var response = await client.GetAsync("/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -30,7 +30,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
     public async Task RegisterLoginGetMe_FullPipeline()
     {
         // Register
-        var registerResponse = await _client.PostAsJsonAsync(
+        var registerResponse = await client.PostAsJsonAsync(
             "/v1/users/register",
             new RegisterRequest("smoke@example.com", "Password1!", "Smoke User"));
 
@@ -55,7 +55,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task WelcomeEmailArrivesInMailpit_AfterRegister()
     {
-        await _client.PostAsJsonAsync(
+        await client.PostAsJsonAsync(
             "/v1/users/register",
             new RegisterRequest("notify@example.com", "Password1!", "Notify User"));
 
@@ -88,7 +88,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task OpenApiDocument_GeneratesSuccessfully()
     {
-        var response = await _client.GetAsync("/openapi/v1.json");
+        var response = await client.GetAsync("/openapi/v1.json");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 

@@ -13,7 +13,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class RefreshTokenTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -23,7 +23,7 @@ public sealed class RefreshTokenTests(UsersApiFixture fixture) : IAsyncLifetime
     {
         var login = await RegisterAndLoginAsync();
 
-        var response = await _client.PostAsJsonAsync("/v1/users/token/refresh",
+        var response = await client.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(login.RefreshToken));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -40,19 +40,19 @@ public sealed class RefreshTokenTests(UsersApiFixture fixture) : IAsyncLifetime
         var login = await RegisterAndLoginAsync();
 
         // First use — legitimate rotation
-        var first = await _client.PostAsJsonAsync("/v1/users/token/refresh",
+        var first = await client.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(login.RefreshToken));
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var rotated = await first.Content.ReadFromJsonAsync<RefreshTokenResponse>();
         Assert.NotNull(rotated);
 
         // Reuse the original token (already rotated) — must be rejected and chain revoked
-        var reuse = await _client.PostAsJsonAsync("/v1/users/token/refresh",
+        var reuse = await client.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(login.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
 
         // The replacement token issued during the legitimate rotation must also be revoked
-        var afterRevoke = await _client.PostAsJsonAsync("/v1/users/token/refresh",
+        var afterRevoke = await client.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(rotated.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, afterRevoke.StatusCode);
     }
@@ -60,7 +60,7 @@ public sealed class RefreshTokenTests(UsersApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task RefreshToken_WithInvalidToken_Returns401()
     {
-        var response = await _client.PostAsJsonAsync("/v1/users/token/refresh",
+        var response = await client.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest("not-a-real-token"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -84,10 +84,10 @@ public sealed class RefreshTokenTests(UsersApiFixture fixture) : IAsyncLifetime
 
     private async Task<LoginResponse> RegisterAndLoginAsync()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/login",
+        var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "Password1!"));
 
         var body = await response.Content.ReadFromJsonAsync<LoginResponse>();

@@ -17,7 +17,7 @@ namespace Modulith.Modules.Audit.IntegrationTests.Integration;
 [Trait("Category", "Integration")]
 public sealed class OnRefreshTokenReuseDetectedAuditTests(AuditCrossModuleFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -29,13 +29,13 @@ public sealed class OnRefreshTokenReuseDetectedAuditTests(AuditCrossModuleFixtur
         var (userId, _, refreshToken) = await RegisterAndLoginAsync("reuse-audit@example.com");
 
         // First use — legitimate rotation
-        await _client.PostAsJsonAsync("/v1/users/token/refresh",
+        await client.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(refreshToken));
 
         // Act — reuse the already-rotated token under TrackActivity so the audit subscriber completes
         Func<IMessageContext, Task> act = async _ =>
         {
-            await _client.PostAsJsonAsync("/v1/users/token/refresh",
+            await client.PostAsJsonAsync("/v1/users/token/refresh",
                 new RefreshTokenRequest(refreshToken));
         };
         await fixture.ApplicationHost
@@ -65,7 +65,7 @@ public sealed class OnRefreshTokenReuseDetectedAuditTests(AuditCrossModuleFixtur
         // Act — normal refresh under TrackActivity
         Func<IMessageContext, Task> act = async _ =>
         {
-            var resp = await _client.PostAsJsonAsync("/v1/users/token/refresh",
+            var resp = await client.PostAsJsonAsync("/v1/users/token/refresh",
                 new RefreshTokenRequest(refreshToken));
             Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         };
@@ -118,7 +118,7 @@ public sealed class OnRefreshTokenReuseDetectedAuditTests(AuditCrossModuleFixtur
         HttpResponseMessage? registerResponse = null;
         Func<IMessageContext, Task> act = async _ =>
         {
-            registerResponse = await _client.PostAsJsonAsync(
+            registerResponse = await client.PostAsJsonAsync(
                 "/v1/users/register",
                 new RegisterRequest(email, "Password1!", "Test User"));
         };
@@ -131,7 +131,7 @@ public sealed class OnRefreshTokenReuseDetectedAuditTests(AuditCrossModuleFixtur
         var body = await registerResponse.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
-        var loginResp = await _client.PostAsJsonAsync("/v1/users/login",
+        var loginResp = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest(email, "Password1!"));
         var login = await loginResp.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(login);

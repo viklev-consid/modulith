@@ -8,7 +8,7 @@ namespace Modulith.Modules.Users.Domain;
 
 public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 {
-    private readonly List<ExternalLogin> _externalLogins = [];
+    private readonly List<ExternalLogin> externalLogins = [];
 
     private User(
         UserId id,
@@ -38,7 +38,7 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public Role Role { get; private set; } = Role.User;
     public bool HasCompletedOnboarding { get; private set; }
 
-    public IReadOnlyList<ExternalLogin> ExternalLogins => _externalLogins.AsReadOnly();
+    public IReadOnlyList<ExternalLogin> ExternalLogins => externalLogins.AsReadOnly();
 
     public DateTimeOffset CreatedAt { get; private set; }
     public string? CreatedBy { get; private set; }
@@ -165,13 +165,13 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         string subject,
         DateTimeOffset linkedAt)
     {
-        if (_externalLogins.Any(e => e.Provider == provider))
+        if (externalLogins.Any(e => e.Provider == provider))
         {
             return UsersErrors.ExternalLoginAlreadyLinked;
         }
 
         var login = ExternalLogin.Create(Id, provider, subject, linkedAt);
-        _externalLogins.Add(login);
+        externalLogins.Add(login);
         RaiseEvent(new ExternalLoginLinked(Id, provider, subject, linkedAt));
         return Result.Success;
     }
@@ -183,19 +183,19 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     /// </summary>
     public ErrorOr<Success> UnlinkExternalLogin(ExternalLoginProvider provider)
     {
-        var login = _externalLogins.FirstOrDefault(e => e.Provider == provider);
+        var login = externalLogins.FirstOrDefault(e => e.Provider == provider);
         if (login is null)
         {
             return UsersErrors.ExternalLoginNotLinked;
         }
 
-        var hasOtherCredential = PasswordHash is not null || _externalLogins.Count > 1;
+        var hasOtherCredential = PasswordHash is not null || externalLogins.Count > 1;
         if (!hasOtherCredential)
         {
             return UsersErrors.CredentialRetentionViolation;
         }
 
-        _externalLogins.Remove(login);
+        externalLogins.Remove(login);
         RaiseEvent(new ExternalLoginUnlinked(Id, provider));
         return Result.Success;
     }

@@ -8,13 +8,13 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class CatalogModuleTests
 {
-    private static readonly Assembly CatalogAssembly = typeof(Product).Assembly;
-    private static readonly Assembly ContractsAssembly = typeof(ProductCreatedV1).Assembly;
+    private static readonly Assembly catalogAssembly = typeof(Product).Assembly;
+    private static readonly Assembly contractsAssembly = typeof(ProductCreatedV1).Assembly;
 
     [Fact]
     public void CatalogDomain_HasNoEfCoreReferences()
     {
-        var result = Types.InAssembly(CatalogAssembly)
+        var result = Types.InAssembly(catalogAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.EntityFrameworkCore")
             .GetResult();
@@ -28,7 +28,7 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogDomain_HasNoAspNetCoreReferences()
     {
-        var result = Types.InAssembly(CatalogAssembly)
+        var result = Types.InAssembly(catalogAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.AspNetCore")
             .GetResult();
@@ -41,7 +41,7 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogDomain_HasNoWolverineReferences()
     {
-        var result = Types.InAssembly(CatalogAssembly)
+        var result = Types.InAssembly(catalogAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Wolverine")
             .GetResult();
@@ -54,7 +54,7 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogDomain_HasNoFluentValidationReferences()
     {
-        var result = Types.InAssembly(CatalogAssembly)
+        var result = Types.InAssembly(catalogAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("FluentValidation")
             .GetResult();
@@ -68,7 +68,7 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogDomain_HasNoFeatureManagementReferences()
     {
-        var result = Types.InAssembly(CatalogAssembly)
+        var result = Types.InAssembly(catalogAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.FeatureManagement")
             .GetResult();
@@ -82,7 +82,7 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogDomain_HasNoCachingReferences()
     {
-        var result = Types.InAssembly(CatalogAssembly)
+        var result = Types.InAssembly(catalogAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.Extensions.Caching")
             .GetResult();
@@ -111,13 +111,13 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogContracts_DoesNotReferenceCatalogInternal()
     {
-        var referencedNames = ContractsAssembly
+        var referencedNames = contractsAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();
 
         Assert.False(
-            referencedNames.Contains(CatalogAssembly.GetName().Name),
+            referencedNames.Contains(catalogAssembly.GetName().Name),
             "FAIL: Catalog.Contracts must not reference Catalog internal project. " +
             "This would expose internal types to other modules. " +
             "Contracts should reference only Shared.Kernel and Shared.Contracts.");
@@ -126,7 +126,7 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogIntegrationEvents_HaveVersionSuffix()
     {
-        var eventTypes = ContractsAssembly
+        var eventTypes = contractsAssembly
             .GetExportedTypes()
             .Where(t => t.Namespace?.Contains(".Events") == true)
             .Where(t => !t.Name.EndsWith("V1", StringComparison.Ordinal)
@@ -143,7 +143,7 @@ public sealed class CatalogModuleTests
     [Fact]
     public void CatalogModule_DoesNotReferenceUsersInternalProject()
     {
-        var referencedNames = CatalogAssembly
+        var referencedNames = catalogAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();

@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Audit.Domain;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Users.Contracts.Events;
-using Modulith.Shared.Kernel.Interfaces;
 using Modulith.Shared.Infrastructure.Persistence;
+using Modulith.Shared.Kernel.Interfaces;
 using Wolverine.Attributes;
 
 namespace Modulith.Modules.Audit.Integration.Subscribers;

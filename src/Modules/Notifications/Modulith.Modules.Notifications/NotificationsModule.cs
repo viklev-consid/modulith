@@ -2,15 +2,15 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OpenTelemetry;
+using Modulith.Modules.Notifications.Contracts.Authorization;
 using Modulith.Modules.Notifications.Gdpr;
 using Modulith.Modules.Notifications.Integration.Subscribers;
 using Modulith.Modules.Notifications.Persistence;
-using Modulith.Modules.Notifications.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using OpenTelemetry;
 using Wolverine;
 
 namespace Modulith.Modules.Notifications;

@@ -28,7 +28,7 @@ public sealed class SmallCapFixture : UsersApiFixture
 [Trait("Category", "Integration")]
 public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<SmallCapFixture>, IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -37,7 +37,7 @@ public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<Sma
     public async Task Login_WhenCapReached_RevokesOldestTokenAndKeepsCount()
     {
         // Arrange — register once, then login three times (cap = 2).
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
         _ = await LoginAsync();
@@ -66,7 +66,7 @@ public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<Sma
 
     private async Task<LoginResponse> LoginAsync()
     {
-        var response = await _client.PostAsJsonAsync("/v1/users/login",
+        var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "Password1!"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

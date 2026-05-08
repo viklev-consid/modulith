@@ -7,7 +7,7 @@ namespace Modulith.Modules.Catalog.Seeding;
 
 internal sealed class CatalogDevSeeder(CatalogDbContext db) : IModuleSeeder
 {
-    private static readonly (string Sku, string Name, decimal Price, string Currency)[] SeedProducts =
+    private static readonly (string Sku, string Name, decimal Price, string Currency)[] seedProducts =
     [
         ("WIDGET-001", "Basic Widget",           9.99m,  "USD"),
         ("WIDGET-002", "Premium Widget",         49.99m, "USD"),
@@ -25,7 +25,7 @@ internal sealed class CatalogDevSeeder(CatalogDbContext db) : IModuleSeeder
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        foreach (var (rawSku, name, price, currency) in SeedProducts)
+        foreach (var (rawSku, name, price, currency) in seedProducts)
         {
             var skuResult = Sku.Create(rawSku);
             if (skuResult.IsError)

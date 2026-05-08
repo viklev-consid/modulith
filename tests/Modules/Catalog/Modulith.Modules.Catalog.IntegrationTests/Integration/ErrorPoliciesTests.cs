@@ -121,7 +121,7 @@ public sealed class AlwaysThrowConsentRegistry : IConsentRegistry
 [Trait("Category", "Integration")]
 public sealed class TransientRetryPolicyTests(WolverineRetryPolicyFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -142,7 +142,7 @@ public sealed class TransientRetryPolicyTests(WolverineRetryPolicyFixture fixtur
         // intermediate IOException even though the message ultimately succeeds.
         Func<IMessageContext, Task> act = async _ =>
         {
-            var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+            var response = await client.PostAsJsonAsync("/v1/users/register", request);
             response.EnsureSuccessStatusCode();
         };
         await fixture.ApplicationHost.TrackActivity()
@@ -182,7 +182,7 @@ public sealed class TransientRetryPolicyTests(WolverineRetryPolicyFixture fixtur
 [Trait("Category", "Integration")]
 public sealed class DeadLetterPolicyTests(WolverineDeadLetterFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -198,7 +198,7 @@ public sealed class DeadLetterPolicyTests(WolverineDeadLetterFixture fixture) : 
         // immediately (no retries), placing exactly one envelope in the dead-letter table.
         Func<IMessageContext, Task> act = async _ =>
         {
-            var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+            var response = await client.PostAsJsonAsync("/v1/users/register", request);
             response.EnsureSuccessStatusCode();
         };
         await fixture.ApplicationHost.TrackActivity()

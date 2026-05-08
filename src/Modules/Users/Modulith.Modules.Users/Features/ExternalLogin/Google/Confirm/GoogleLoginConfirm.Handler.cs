@@ -7,8 +7,8 @@ using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
-using Modulith.Shared.Kernel.Interfaces;
 using Modulith.Shared.Infrastructure.Persistence;
+using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;

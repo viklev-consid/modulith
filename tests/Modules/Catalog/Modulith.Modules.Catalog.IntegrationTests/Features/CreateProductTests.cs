@@ -8,8 +8,8 @@ namespace Modulith.Modules.Catalog.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class CreateProductTests(CatalogApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anonClient = fixture.CreateAnonymousClient();
-    private readonly HttpClient _authedClient = fixture.CreateAuthenticatedClient(
+    private readonly HttpClient anonClient = fixture.CreateAnonymousClient();
+    private readonly HttpClient authedClient = fixture.CreateAuthenticatedClient(
         Guid.NewGuid(), "admin@example.com", "Admin", "admin");
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
@@ -20,7 +20,7 @@ public sealed class CreateProductTests(CatalogApiFixture fixture) : IAsyncLifeti
     {
         var request = new CreateProductRequest("TEST-001", "Test Widget", 9.99m, "USD");
 
-        var response = await _authedClient.PostAsJsonAsync("/v1/catalog/products", request);
+        var response = await authedClient.PostAsJsonAsync("/v1/catalog/products", request);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<CreateProductResponse>();
@@ -36,9 +36,9 @@ public sealed class CreateProductTests(CatalogApiFixture fixture) : IAsyncLifeti
     public async Task CreateProduct_WithDuplicateSku_Returns409()
     {
         var request = new CreateProductRequest("TEST-001", "Test Widget", 9.99m, "USD");
-        await _authedClient.PostAsJsonAsync("/v1/catalog/products", request);
+        await authedClient.PostAsJsonAsync("/v1/catalog/products", request);
 
-        var response = await _authedClient.PostAsJsonAsync("/v1/catalog/products", request);
+        var response = await authedClient.PostAsJsonAsync("/v1/catalog/products", request);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -48,7 +48,7 @@ public sealed class CreateProductTests(CatalogApiFixture fixture) : IAsyncLifeti
     {
         var request = new CreateProductRequest("", "Test Widget", 9.99m, "USD");
 
-        var response = await _authedClient.PostAsJsonAsync("/v1/catalog/products", request);
+        var response = await authedClient.PostAsJsonAsync("/v1/catalog/products", request);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -58,7 +58,7 @@ public sealed class CreateProductTests(CatalogApiFixture fixture) : IAsyncLifeti
     {
         var request = new CreateProductRequest("TEST-002", "Widget", -1m, "USD");
 
-        var response = await _authedClient.PostAsJsonAsync("/v1/catalog/products", request);
+        var response = await authedClient.PostAsJsonAsync("/v1/catalog/products", request);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -68,7 +68,7 @@ public sealed class CreateProductTests(CatalogApiFixture fixture) : IAsyncLifeti
     {
         var request = new CreateProductRequest("TEST-001", "Test Widget", 9.99m, "USD");
 
-        var response = await _anonClient.PostAsJsonAsync("/v1/catalog/products", request);
+        var response = await anonClient.PostAsJsonAsync("/v1/catalog/products", request);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

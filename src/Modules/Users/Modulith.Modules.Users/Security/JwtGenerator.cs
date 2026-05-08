@@ -14,12 +14,12 @@ internal sealed class JwtGenerator(
     IOptions<UsersOptions> usersOptions,
     IClock clock) : IJwtGenerator
 {
-    private readonly JwtOptions _jwt = jwtOptions.Value;
-    private readonly UsersOptions _users = usersOptions.Value;
+    private readonly JwtOptions jwt = jwtOptions.Value;
+    private readonly UsersOptions users = usersOptions.Value;
 
     public string Generate(UserId userId, string email, string displayName, string role, Guid refreshTokenId)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.SigningKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var now = clock.UtcNow.UtcDateTime;
@@ -34,11 +34,11 @@ internal sealed class JwtGenerator(
         };
 
         var token = new JwtSecurityToken(
-            issuer: _jwt.Issuer,
-            audience: _jwt.Audience,
+            issuer: jwt.Issuer,
+            audience: jwt.Audience,
             claims: claims,
             notBefore: now,
-            expires: now.AddMinutes(_users.AccessTokenLifetimeMinutes),
+            expires: now.AddMinutes(users.AccessTokenLifetimeMinutes),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

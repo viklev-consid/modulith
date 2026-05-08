@@ -25,11 +25,11 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
     public const string TestJwtIssuer = "modulith-test";
     public const string TestJwtAudience = "modulith-test";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
+    private readonly PostgreSqlContainer postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
 
-    private Respawner? _respawner;
-    public string ConnectionString => _postgres.GetConnectionString();
+    private Respawner? respawner;
+    public string ConnectionString => postgres.GetConnectionString();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -70,7 +70,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     async Task IAsyncLifetime.InitializeAsync()
     {
-        await _postgres.StartAsync();
+        await postgres.StartAsync();
 
         // Allow subclasses to start additional containers (e.g. Mailpit) before the host
         // is built, so their ports are available inside ConfigureWebHost.
@@ -84,7 +84,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         await using var conn = new NpgsqlConnection(ConnectionString);
         await conn.OpenAsync();
 
-        _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
+        respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = [.. GetSchemasToReset(), "wolverine"],
@@ -108,7 +108,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     public async Task ResetDatabaseAsync()
     {
-        if (_respawner is null)
+        if (respawner is null)
         {
             return;
         }
@@ -122,7 +122,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
             await conn.OpenAsync();
             try
             {
-                await _respawner.ResetAsync(conn);
+                await respawner.ResetAsync(conn);
                 return;
             }
             catch (Npgsql.PostgresException ex) when (string.Equals(ex.SqlState, "40P01", StringComparison.Ordinal) && attempt < 3)
@@ -187,7 +187,7 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         }
         catch (OperationCanceledException) { /* deadline reached — expected */ }
 
-        await _postgres.DisposeAsync();
+        await postgres.DisposeAsync();
         await DisposeAdditionalContainersAsync();
 
         // Explicitly dispose WebApplicationFactory (TestServer, service provider)

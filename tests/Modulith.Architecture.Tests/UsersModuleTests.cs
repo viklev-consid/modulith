@@ -8,13 +8,13 @@ namespace Modulith.Architecture.Tests;
 [Trait("Category", "Architecture")]
 public sealed class UsersModuleTests
 {
-    private static readonly Assembly UsersAssembly = typeof(User).Assembly;
-    private static readonly Assembly ContractsAssembly = typeof(UserRegisteredV1).Assembly;
+    private static readonly Assembly usersAssembly = typeof(User).Assembly;
+    private static readonly Assembly contractsAssembly = typeof(UserRegisteredV1).Assembly;
 
     [Fact]
     public void UsersDomain_HasNoEfCoreReferences()
     {
-        var result = Types.InAssembly(UsersAssembly)
+        var result = Types.InAssembly(usersAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.EntityFrameworkCore")
             .GetResult();
@@ -28,7 +28,7 @@ public sealed class UsersModuleTests
     [Fact]
     public void UsersDomain_HasNoAspNetCoreReferences()
     {
-        var result = Types.InAssembly(UsersAssembly)
+        var result = Types.InAssembly(usersAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.AspNetCore")
             .GetResult();
@@ -41,7 +41,7 @@ public sealed class UsersModuleTests
     [Fact]
     public void UsersDomain_HasNoWolverineReferences()
     {
-        var result = Types.InAssembly(UsersAssembly)
+        var result = Types.InAssembly(usersAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Wolverine")
             .GetResult();
@@ -54,7 +54,7 @@ public sealed class UsersModuleTests
     [Fact]
     public void UsersDomain_HasNoFluentValidationReferences()
     {
-        var result = Types.InAssembly(UsersAssembly)
+        var result = Types.InAssembly(usersAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("FluentValidation")
             .GetResult();
@@ -68,7 +68,7 @@ public sealed class UsersModuleTests
     [Fact]
     public void UsersDomain_HasNoFeatureManagementReferences()
     {
-        var result = Types.InAssembly(UsersAssembly)
+        var result = Types.InAssembly(usersAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.FeatureManagement")
             .GetResult();
@@ -82,7 +82,7 @@ public sealed class UsersModuleTests
     [Fact]
     public void UsersDomain_HasNoCachingReferences()
     {
-        var result = Types.InAssembly(UsersAssembly)
+        var result = Types.InAssembly(usersAssembly)
             .That().ResideInNamespaceContaining(".Domain")
             .ShouldNot().HaveDependencyOn("Microsoft.Extensions.Caching")
             .GetResult();
@@ -153,13 +153,13 @@ public sealed class UsersModuleTests
     [Fact]
     public void UsersContracts_DoesNotReferenceUsersInternal()
     {
-        var referencedNames = ContractsAssembly
+        var referencedNames = contractsAssembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)
             .ToList();
 
         Assert.False(
-            referencedNames.Contains(UsersAssembly.GetName().Name),
+            referencedNames.Contains(usersAssembly.GetName().Name),
             "FAIL: Users.Contracts must not reference Users internal project. " +
             "This would expose internal types to other modules. " +
             "Contracts should reference only Shared.Kernel and Shared.Contracts.");
@@ -168,7 +168,7 @@ public sealed class UsersModuleTests
     [Fact]
     public void IntegrationEvents_HaveVersionSuffix()
     {
-        var eventTypes = ContractsAssembly
+        var eventTypes = contractsAssembly
             .GetExportedTypes()
             .Where(t => t.Namespace?.Contains(".Events") == true)
             .Where(t => !t.Name.EndsWith("V1", StringComparison.Ordinal)
@@ -190,7 +190,7 @@ public sealed class UsersModuleTests
         //
         // This test checks for the method reference via IL inspection — any direct call to
         // DateTime.get_UtcNow in non-test code in the Users assembly is a violation.
-        var violations = UsersAssembly.GetTypes()
+        var violations = usersAssembly.GetTypes()
             .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
                                           BindingFlags.Static | BindingFlags.Instance |
                                           BindingFlags.DeclaredOnly))

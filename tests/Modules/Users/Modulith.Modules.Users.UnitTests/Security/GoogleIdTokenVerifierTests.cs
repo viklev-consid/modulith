@@ -13,27 +13,27 @@ namespace Modulith.Modules.Users.UnitTests.Security;
 [Trait("Category", "Unit")]
 public sealed class GoogleIdTokenVerifierTests : IDisposable
 {
-    private const string ClientId = "test-client-id";
-    private const string ValidSubject = "109742855438971236270";
-    private const string ValidEmail = "alice@example.com";
-    private const string ValidName = "Alice";
+    private const string clientId = "test-client-id";
+    private const string validSubject = "109742855438971236270";
+    private const string validEmail = "alice@example.com";
+    private const string validName = "Alice";
 
-    private readonly RSA _rsa;
-    private readonly RsaSecurityKey _signingKey;
-    private readonly string _jwksJson;
+    private readonly RSA rsa;
+    private readonly RsaSecurityKey signingKey;
+    private readonly string jwksJson;
 
     public GoogleIdTokenVerifierTests()
     {
-        _rsa = RSA.Create(2048);
-        _signingKey = new RsaSecurityKey(_rsa) { KeyId = "test-key-id" };
+        rsa = RSA.Create(2048);
+        signingKey = new RsaSecurityKey(rsa) { KeyId = "test-key-id" };
 
-        var p = _rsa.ExportParameters(includePrivateParameters: false);
+        var p = rsa.ExportParameters(includePrivateParameters: false);
         var n = Base64UrlEncoder.Encode(p.Modulus!);
         var e = Base64UrlEncoder.Encode(p.Exponent!);
-        _jwksJson = $$"""{"keys":[{"kty":"RSA","kid":"test-key-id","use":"sig","n":"{{n}}","e":"{{e}}"}]}""";
+        jwksJson = $$"""{"keys":[{"kty":"RSA","kid":"test-key-id","use":"sig","n":"{{n}}","e":"{{e}}"}]}""";
     }
 
-    public void Dispose() => _rsa.Dispose();
+    public void Dispose() => rsa.Dispose();
 
     [Fact]
     public async Task VerifyAsync_WithEmailVerifiedTrue_ReturnsGoogleIdentity()
@@ -44,8 +44,8 @@ public sealed class GoogleIdTokenVerifierTests : IDisposable
         var result = await verifier.VerifyAsync(token);
 
         Assert.False(result.IsError);
-        Assert.Equal(ValidSubject, result.Value.Subject);
-        Assert.Equal(ValidEmail, result.Value.Email);
+        Assert.Equal(validSubject, result.Value.Subject);
+        Assert.Equal(validEmail, result.Value.Email);
     }
 
     [Fact]
@@ -72,11 +72,11 @@ public sealed class GoogleIdTokenVerifierTests : IDisposable
 
     private GoogleIdTokenVerifier CreateVerifier()
     {
-        var httpClient = new HttpClient(new StubJwksMessageHandler(_jwksJson));
+        var httpClient = new HttpClient(new StubJwksMessageHandler(jwksJson));
         var cache = new MemoryCache(new MemoryCacheOptions());
         var opts = Options.Create(new GoogleAuthOptions
         {
-            ClientId = ClientId,
+            ClientId = clientId,
             JwksUri = "https://www.googleapis.com/oauth2/v3/certs",
         });
         return new GoogleIdTokenVerifier(httpClient, cache, opts);
@@ -84,13 +84,13 @@ public sealed class GoogleIdTokenVerifierTests : IDisposable
 
     private string CreateToken(string? emailVerified)
     {
-        var credentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256);
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256);
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, ValidSubject),
-            new(JwtRegisteredClaimNames.Email, ValidEmail),
-            new("name", ValidName),
+            new(JwtRegisteredClaimNames.Sub, validSubject),
+            new(JwtRegisteredClaimNames.Email, validEmail),
+            new("name", validName),
         };
 
         if (emailVerified is not null)
@@ -101,7 +101,7 @@ public sealed class GoogleIdTokenVerifierTests : IDisposable
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = "accounts.google.com",
-            Audience = ClientId,
+            Audience = clientId,
             Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = credentials,

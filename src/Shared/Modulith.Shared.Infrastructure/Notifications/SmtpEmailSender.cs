@@ -8,12 +8,12 @@ namespace Modulith.Shared.Infrastructure.Notifications;
 
 public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSender
 {
-    private readonly SmtpOptions _options = options.Value;
+    private readonly SmtpOptions options = options.Value;
 
     public async Task SendAsync(EmailMessage message, CancellationToken ct)
     {
         var mail = new MimeMessage();
-        mail.From.Add(MailboxAddress.Parse(message.From ?? _options.DefaultFrom));
+        mail.From.Add(MailboxAddress.Parse(message.From ?? options.DefaultFrom));
         mail.To.Add(MailboxAddress.Parse(message.To));
         mail.Subject = message.Subject;
 
@@ -26,7 +26,7 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
 
         using var client = new SmtpClient();
 
-        var secureSocketOptions = _options.UseSsl
+        var secureSocketOptions = options.UseSsl
             ? SecureSocketOptions.SslOnConnect
             : SecureSocketOptions.None;
 
@@ -36,18 +36,18 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         // Network/protocol errors are transient and safe to retry.
         try
         {
-            await client.ConnectAsync(_options.Host, _options.Port, secureSocketOptions, ct).ConfigureAwait(false);
+            await client.ConnectAsync(options.Host, options.Port, secureSocketOptions, ct).ConfigureAwait(false);
         }
         catch (SslHandshakeException ex)
         {
             throw new TerminalSmtpException(
-                $"TLS handshake failed connecting to {_options.Host}:{_options.Port}: {ex.Message}", ex);
+                $"TLS handshake failed connecting to {options.Host}:{options.Port}: {ex.Message}", ex);
         }
         catch (AuthenticationException ex)
         {
             // Catches any remaining TLS authentication failure not covered by SslHandshakeException.
             throw new TerminalSmtpException(
-                $"TLS authentication failed connecting to {_options.Host}:{_options.Port}: {ex.Message}", ex);
+                $"TLS authentication failed connecting to {options.Host}:{options.Port}: {ex.Message}", ex);
         }
         catch (SmtpCommandException ex) when ((int)ex.StatusCode >= 500)
         {
@@ -66,22 +66,22 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         catch (IOException ex)
         {
             throw new RetryableSmtpException(
-                $"Network I/O error connecting to {_options.Host}:{_options.Port}: {ex.Message}", ex);
+                $"Network I/O error connecting to {options.Host}:{options.Port}: {ex.Message}", ex);
         }
 
         // --- Authenticate ---
         // AuthenticationException means wrong credentials or no supported mechanism — terminal config
         // problem. 5xx SmtpCommandException from the auth exchange is also permanent. 4xx is transient.
-        if (_options.Username is not null)
+        if (options.Username is not null)
         {
             try
             {
-                await client.AuthenticateAsync(_options.Username, _options.Password ?? string.Empty, ct).ConfigureAwait(false);
+                await client.AuthenticateAsync(options.Username, options.Password ?? string.Empty, ct).ConfigureAwait(false);
             }
             catch (AuthenticationException ex)
             {
                 throw new TerminalSmtpException(
-                    $"SMTP authentication failed for '{_options.Username}': {ex.Message}", ex);
+                    $"SMTP authentication failed for '{options.Username}': {ex.Message}", ex);
             }
             catch (SmtpCommandException ex) when ((int)ex.StatusCode >= 500)
             {

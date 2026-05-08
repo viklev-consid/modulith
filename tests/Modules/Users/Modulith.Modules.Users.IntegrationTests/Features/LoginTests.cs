@@ -9,7 +9,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -17,10 +17,10 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Login_WithValidCredentials_Returns200AndToken()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/login",
+        var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "Password1!"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -33,10 +33,10 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Login_WithWrongPassword_Returns401()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/login",
+        var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "WrongPassword1!"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -45,7 +45,7 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Login_WithUnknownEmail_Returns401()
     {
-        var response = await _client.PostAsJsonAsync("/v1/users/login",
+        var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("nobody@example.com", "Password1!"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -54,10 +54,10 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Login_EmailIsCaseInsensitive()
     {
-        await _client.PostAsJsonAsync("/v1/users/register",
+        await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
 
-        var response = await _client.PostAsJsonAsync("/v1/users/login",
+        var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("ALICE@EXAMPLE.COM", "Password1!"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

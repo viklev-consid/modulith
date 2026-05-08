@@ -20,7 +20,7 @@ namespace Modulith.Modules.Notifications.IntegrationTests.Integration;
 [Trait("Category", "Integration")]
 public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -44,7 +44,7 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
         // intermediate RetryableSmtpException even though the message ultimately succeeds.
         Func<IMessageContext, Task> act = async _ =>
         {
-            var response = await _client.PostAsJsonAsync("/v1/users/register", request);
+            var response = await client.PostAsJsonAsync("/v1/users/register", request);
             response.EnsureSuccessStatusCode();
         };
         await fixture.ApplicationHost.TrackActivity()

@@ -12,7 +12,7 @@ namespace Modulith.Modules.Audit.IntegrationTests.Integration;
 [Trait("Category", "Integration")]
 public sealed class OnUserErasureRequestedTests(AuditCrossModuleFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -25,7 +25,7 @@ public sealed class OnUserErasureRequestedTests(AuditCrossModuleFixture fixture)
 
         Func<IMessageContext, Task> register = async _ =>
         {
-            await _client.PostAsJsonAsync("/v1/users/register", request);
+            await client.PostAsJsonAsync("/v1/users/register", request);
         };
         await fixture.ApplicationHost.TrackActivity()
             .Timeout(TimeSpan.FromSeconds(10))
@@ -65,7 +65,7 @@ public sealed class OnUserErasureRequestedTests(AuditCrossModuleFixture fixture)
 
         Func<IMessageContext, Task> register = async _ =>
         {
-            await _client.PostAsJsonAsync("/v1/users/register", request);
+            await client.PostAsJsonAsync("/v1/users/register", request);
         };
         await fixture.ApplicationHost.TrackActivity()
             .Timeout(TimeSpan.FromSeconds(10))

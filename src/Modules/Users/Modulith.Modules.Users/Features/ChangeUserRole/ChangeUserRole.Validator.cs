@@ -4,7 +4,7 @@ namespace Modulith.Modules.Users.Features.ChangeUserRole;
 
 internal sealed class ChangeUserRoleValidator : AbstractValidator<ChangeUserRoleRequest>
 {
-    private static readonly System.Text.RegularExpressions.Regex ValidPattern =
+    private static readonly System.Text.RegularExpressions.Regex validPattern =
         new(@"^[a-z][a-z0-9_-]{1,31}$",
             System.Text.RegularExpressions.RegexOptions.Compiled,
             TimeSpan.FromMilliseconds(100));
@@ -14,7 +14,7 @@ internal sealed class ChangeUserRoleValidator : AbstractValidator<ChangeUserRole
         RuleFor(r => r.Role)
             .NotEmpty()
             .WithMessage("Role is required.")
-            .Matches(ValidPattern)
+            .Matches(validPattern)
             .WithMessage("Role must match ^[a-z][a-z0-9_-]{1,31}$ (lowercase ASCII, no spaces).");
     }
 }

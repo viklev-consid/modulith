@@ -5,13 +5,13 @@ namespace Modulith.Modules.Catalog.UnitTests.Domain;
 [Trait("Category", "Unit")]
 public sealed class ProductTests
 {
-    private static Sku ValidSku => Sku.Create("WIDGET-001").Value;
-    private static Money ValidPrice => Money.Create(9.99m, "USD").Value;
+    private static Sku validSku => Sku.Create("WIDGET-001").Value;
+    private static Money validPrice => Money.Create(9.99m, "USD").Value;
 
     [Fact]
     public void Create_WithValidArguments_ReturnsProduct()
     {
-        var result = Product.Create(ValidSku, "Test Widget", ValidPrice);
+        var result = Product.Create(validSku, "Test Widget", validPrice);
 
         Assert.False(result.IsError);
         Assert.Equal("WIDGET-001", result.Value.Sku.Value);
@@ -23,7 +23,7 @@ public sealed class ProductTests
     [Fact]
     public void Create_WithEmptyName_ReturnsError()
     {
-        var result = Product.Create(ValidSku, "   ", ValidPrice);
+        var result = Product.Create(validSku, "   ", validPrice);
 
         Assert.True(result.IsError);
     }
@@ -31,7 +31,7 @@ public sealed class ProductTests
     [Fact]
     public void Create_WithNameTooLong_ReturnsError()
     {
-        var result = Product.Create(ValidSku, new string('x', 201), ValidPrice);
+        var result = Product.Create(validSku, new string('x', 201), validPrice);
 
         Assert.True(result.IsError);
     }
@@ -39,7 +39,7 @@ public sealed class ProductTests
     [Fact]
     public void Create_RaisesDomainEvent()
     {
-        var result = Product.Create(ValidSku, "Test Widget", ValidPrice);
+        var result = Product.Create(validSku, "Test Widget", validPrice);
 
         Assert.Single(result.Value.DomainEvents);
     }
@@ -47,7 +47,7 @@ public sealed class ProductTests
     [Fact]
     public void Deactivate_ActiveProduct_SetsIsActiveFalse()
     {
-        var product = Product.Create(ValidSku, "Test Widget", ValidPrice).Value;
+        var product = Product.Create(validSku, "Test Widget", validPrice).Value;
 
         var result = product.Deactivate();
 
@@ -58,7 +58,7 @@ public sealed class ProductTests
     [Fact]
     public void Deactivate_AlreadyInactiveProduct_ReturnsError()
     {
-        var product = Product.Create(ValidSku, "Test Widget", ValidPrice).Value;
+        var product = Product.Create(validSku, "Test Widget", validPrice).Value;
         product.Deactivate();
 
         var result = product.Deactivate();
@@ -69,7 +69,7 @@ public sealed class ProductTests
     [Fact]
     public void UpdatePrice_ChangesPrice()
     {
-        var product = Product.Create(ValidSku, "Test Widget", ValidPrice).Value;
+        var product = Product.Create(validSku, "Test Widget", validPrice).Value;
         var newPrice = Money.Create(19.99m, "USD").Value;
 
         var result = product.UpdatePrice(newPrice);

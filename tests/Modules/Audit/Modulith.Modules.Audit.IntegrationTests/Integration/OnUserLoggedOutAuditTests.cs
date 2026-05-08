@@ -17,7 +17,7 @@ namespace Modulith.Modules.Audit.IntegrationTests.Integration;
 [Trait("Category", "Integration")]
 public sealed class OnUserLoggedOutAuditTests(AuditCrossModuleFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _client = fixture.CreateAnonymousClient();
+    private readonly HttpClient client = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -138,7 +138,7 @@ public sealed class OnUserLoggedOutAuditTests(AuditCrossModuleFixture fixture) :
         HttpResponseMessage? registerResponse = null;
         Func<IMessageContext, Task> act = async _ =>
         {
-            registerResponse = await _client.PostAsJsonAsync(
+            registerResponse = await client.PostAsJsonAsync(
                 "/v1/users/register",
                 new RegisterRequest(email, "Password1!", "Test User"));
         };
@@ -150,7 +150,7 @@ public sealed class OnUserLoggedOutAuditTests(AuditCrossModuleFixture fixture) :
         var body = await registerResponse.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
 
-        var loginResp = await _client.PostAsJsonAsync("/v1/users/login", new LoginRequest(email, "Password1!"));
+        var loginResp = await client.PostAsJsonAsync("/v1/users/login", new LoginRequest(email, "Password1!"));
         var login = await loginResp.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(login);
 

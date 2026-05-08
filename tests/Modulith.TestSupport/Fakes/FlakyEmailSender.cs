@@ -25,16 +25,16 @@ namespace Modulith.TestSupport.Fakes;
 /// </remarks>
 public sealed class FlakyEmailSender(TestClock clock, TimeSpan clockAdvance, bool throwRetryable = false) : IEmailSender
 {
-    private readonly List<EmailMessage> _sent = [];
-    private int _attempts;
+    private readonly List<EmailMessage> sent = [];
+    private int attempts;
 
-    public IReadOnlyList<EmailMessage> SentMessages => _sent.AsReadOnly();
+    public IReadOnlyList<EmailMessage> SentMessages => sent.AsReadOnly();
 
-    public int TotalAttempts => _attempts;
+    public int TotalAttempts => attempts;
 
     public Task SendAsync(EmailMessage message, CancellationToken ct)
     {
-        var attempt = Interlocked.Increment(ref _attempts);
+        var attempt = Interlocked.Increment(ref attempts);
         if (attempt == 1)
         {
             // Advance the clock BEFORE throwing so that when Wolverine retries the handler
@@ -53,7 +53,7 @@ public sealed class FlakyEmailSender(TestClock clock, TimeSpan clockAdvance, boo
             throw new IOException("Simulated transient SMTP connection failure");
         }
 
-        _sent.Add(message);
+        sent.Add(message);
         return Task.CompletedTask;
     }
 }

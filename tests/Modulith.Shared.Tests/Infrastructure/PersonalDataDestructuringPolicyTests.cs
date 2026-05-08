@@ -7,7 +7,7 @@ namespace Modulith.Shared.Tests.Infrastructure;
 [Trait("Category", "Unit")]
 public sealed class PersonalDataDestructuringPolicyTests
 {
-    private readonly PersonalDataDestructuringPolicy _policy = new();
+    private readonly PersonalDataDestructuringPolicy policy = new();
 
     private sealed class FakePropertyValueFactory : Serilog.Core.ILogEventPropertyValueFactory
     {
@@ -45,7 +45,7 @@ public sealed class PersonalDataDestructuringPolicyTests
             Role = "admin",
         };
 
-        var ok = _policy.TryDestructure(dto, new FakePropertyValueFactory(), out var result);
+        var ok = policy.TryDestructure(dto, new FakePropertyValueFactory(), out var result);
 
         Assert.True(ok);
         var structure = Assert.IsType<StructureValue>(result);
@@ -62,7 +62,7 @@ public sealed class PersonalDataDestructuringPolicyTests
     {
         var dto = new NoPersonalDataDto { Name = "test", Count = 5 };
 
-        var ok = _policy.TryDestructure(dto, new FakePropertyValueFactory(), out var result);
+        var ok = policy.TryDestructure(dto, new FakePropertyValueFactory(), out var result);
 
         Assert.False(ok);
         Assert.Null(result);
@@ -79,7 +79,7 @@ public sealed class PersonalDataDestructuringPolicyTests
             Role = "user",
         };
 
-        _policy.TryDestructure(dto, new FakePropertyValueFactory(), out var result);
+        policy.TryDestructure(dto, new FakePropertyValueFactory(), out var result);
 
         var structure = Assert.IsType<StructureValue>(result);
         var props = structure.Properties.ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);

@@ -16,7 +16,7 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 [Trait("Category", "Integration")]
 public sealed class EmailChangeTests(UsersApiFixture fixture) : IAsyncLifetime
 {
-    private readonly HttpClient _anon = fixture.CreateAnonymousClient();
+    private readonly HttpClient anon = fixture.CreateAnonymousClient();
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -37,7 +37,7 @@ public sealed class EmailChangeTests(UsersApiFixture fixture) : IAsyncLifetime
     public async Task RequestEmailChange_WithTakenEmail_AlsoReturns200_AntiEnumeration()
     {
         // Register a second user with the target email
-        await _anon.PostAsJsonAsync("/v1/users/register",
+        await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("bob@example.com", "Password1!", "Bob"));
 
         var login = await RegisterAndLoginAsync("alice@example.com");
@@ -82,12 +82,12 @@ public sealed class EmailChangeTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         // All refresh tokens must be revoked after email change
-        var refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+        var refresh = await anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(login.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
 
         // New email must work for login
-        var newLogin = await _anon.PostAsJsonAsync("/v1/users/login",
+        var newLogin = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("newalice@example.com", "Password1!"));
         Assert.Equal(HttpStatusCode.OK, newLogin.StatusCode);
     }
@@ -131,7 +131,7 @@ public sealed class EmailChangeTests(UsersApiFixture fixture) : IAsyncLifetime
         }
 
         // Simulate the race: another user registers the target email before alice confirms
-        await _anon.PostAsJsonAsync("/v1/users/register",
+        await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("newalice@example.com", "Password1!", "Bob"));
 
         // Act: alice confirms — should fail due to uniqueness violation
@@ -141,17 +141,17 @@ public sealed class EmailChangeTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, confirm.StatusCode);
 
         // Assert: alice's session must still be valid — no spurious logout
-        var refresh = await _anon.PostAsJsonAsync("/v1/users/token/refresh",
+        var refresh = await anon.PostAsJsonAsync("/v1/users/token/refresh",
             new RefreshTokenRequest(login.RefreshToken));
         Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
     }
 
     private async Task<LoginResponse> RegisterAndLoginAsync(string email)
     {
-        await _anon.PostAsJsonAsync("/v1/users/register",
+        await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
 
-        var response = await _anon.PostAsJsonAsync("/v1/users/login",
+        var response = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest(email, "Password1!"));
 
         var body = await response.Content.ReadFromJsonAsync<LoginResponse>();

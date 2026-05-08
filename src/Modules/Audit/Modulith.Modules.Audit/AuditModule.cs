@@ -2,16 +2,16 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OpenTelemetry;
 using Modulith.Modules.Audit.Authorization;
+using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Modules.Audit.Features.GetAuditTrail;
 using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
 using Modulith.Modules.Audit.Persistence;
-using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using OpenTelemetry;
 using Wolverine;
 
 namespace Modulith.Modules.Audit;
