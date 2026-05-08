@@ -21,10 +21,9 @@ Sources, in order (later overrides earlier):
 ```
 1. appsettings.json               (committed; defaults + non-secret config)
 2. appsettings.{Environment}.json (committed; per-environment overrides)
-3. appsettings.Local.json         (GITIGNORED; developer overrides)
-4. User Secrets                   (development secrets; dotnet user-secrets)
-5. Environment variables          (deployment-layer configuration)
-6. External secret store          (production secrets; Key Vault, etc.)
+3. User Secrets                   (development secrets; dotnet user-secrets)
+4. Environment variables          (deployment-layer configuration)
+5. External secret store          (production secrets; Key Vault, etc., when wired by the app)
 ```
 
 ### appsettings.json
@@ -43,12 +42,6 @@ Committed. Contains:
 Committed. Per-environment overrides. `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.Production.json`.
 
 Environment detection via `ASPNETCORE_ENVIRONMENT`. In Aspire dev, this defaults to `Development`.
-
-### appsettings.Local.json
-
-**Gitignored.** Developer-specific overrides for non-secret values (e.g., "I want to run the Orders module against a different dev DB"). Not for secrets (use User Secrets).
-
-Template ships an `appsettings.Local.example.json` committed as a reference; developers copy to `appsettings.Local.json` and modify.
 
 ### User Secrets
 
@@ -74,14 +67,14 @@ Use for:
 
 ### External secret store (production)
 
-The template **does not prescribe** a secret store. It documents integration for:
+The template **does not prescribe or pre-wire** a secret store. It documents integration for:
 
 - **Azure Key Vault** via `Azure.Extensions.AspNetCore.Configuration.Secrets`
 - **AWS Secrets Manager** via `Kralizek.Extensions.Configuration.AWSSecretsManager`
 - **HashiCorp Vault** via `VaultSharp` or community providers
 - **Kubernetes mounted secrets** via `AddKeyPerFile`
 
-Wiring example (Azure Key Vault, commented stub in `Program.cs`):
+Wiring example (Azure Key Vault, to add near the top of `Api/Program.cs` before options bind):
 
 ```csharp
 if (builder.Environment.IsProduction())
@@ -96,7 +89,7 @@ if (builder.Environment.IsProduction())
 }
 ```
 
-Teams uncomment, configure, and go.
+Teams add the provider package, register the provider, and keep strongly-typed options unchanged.
 
 ---
 
@@ -191,29 +184,29 @@ In dev, Aspire prompts for parameter values and persists them to user-secrets. I
 
 ### Development
 
-Symmetric key, auto-generated on first run. Stored in user-secrets:
+Symmetric key supplied through configuration, normally User Secrets in development:
 
 ```
-Jwt:SigningKey = <base64-encoded random>
 Jwt:Issuer = modulith-dev
 Jwt:Audience = modulith-dev
+Jwt:SigningKey = <at least 32 characters>
 ```
 
-A bootstrap helper generates the key if missing.
+`JwtOptions.SigningKey` is `[Required]` and `[MinLength(32)]`, so startup fails fast if the key is missing or too short.
 
 ### Production
 
-**Asymmetric** (RSA or ECDSA) recommended. Private key in secret store; public key distributed to token validators.
+The current template uses the same symmetric `Jwt:SigningKey` option for signing and validation. Store it in your production secret store and make it at least 32 characters:
 
 Configuration:
 
 ```
-Jwt:SigningKeyType = Rsa
-Jwt:PrivateKeyPem = <secret>
-Jwt:PublicKeyPem = <non-secret>
+Jwt:Issuer = <issuer>
+Jwt:Audience = <audience>
+Jwt:SigningKey = <secret, at least 32 characters>
 ```
 
-Rotation is not implemented in the template. An `ISigningKeyProvider` seam exists; rotation implementations are a team decision. Document the rotation procedure in your ops runbook.
+Asymmetric signing and key rotation are not implemented in the template. If your production posture requires RSA/ECDSA keys, introduce a signing-key abstraction, update both `JwtGenerator` and JWT bearer validation, and document the rotation procedure in your ops runbook.
 
 ### What NOT to do
 
@@ -304,7 +297,7 @@ Per-environment overrides in `appsettings.{Environment}.json`. OTLP endpoint dif
 
 ## Common mistakes
 
-- **Committing `appsettings.Local.json`.** Must be gitignored.
+- **Expecting `appsettings.Local.json` to load automatically.** It is gitignored, but the template does not add it as a config provider.
 - **Secrets in `appsettings.json`.** Always wrong.
 - **Raw `IConfiguration` access.** Arch test catches it; fix by adding an `Options` class.
 - **No `ValidateOnStart()`.** Misconfiguration fails at first request with a cryptic NRE instead of at boot.
@@ -319,9 +312,9 @@ Per-environment overrides in `appsettings.{Environment}.json`. OTLP endpoint dif
 - [ ] Every module has an `Options` class.
 - [ ] Every `Options` class has validation attributes + `ValidateOnStart`.
 - [ ] No raw `IConfiguration` injection (arch test passing).
-- [ ] `appsettings.Local.json` is in `.gitignore`.
+- [ ] Local-only settings are supplied through user-secrets or an explicitly registered local config provider.
 - [ ] `UserSecretsId` is set in `Api.csproj`.
-- [ ] Secret store wiring is configured for production (pick one and uncomment).
+- [ ] Secret store wiring is configured for production when production secrets should come from a provider.
 - [ ] JWT signing keys are not committed.
 - [ ] SMTP credentials are in secret store or Aspire parameters.
 

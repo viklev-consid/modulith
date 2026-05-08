@@ -20,8 +20,8 @@ These are constraints that architectural tests enforce. They are not suggestions
 
 1. **Modules communicate only through `.Contracts` projects.** A module may reference another module's `.Contracts` project to publish or subscribe to its public messages. A module may never reference another module's internal project.
 2. **Domain has no infrastructure dependencies.** Code under any `Domain/` folder must not reference EF Core, ASP.NET Core, Wolverine, FluentValidation, HybridCache, FeatureManagement, or any other infrastructure concern. Domain is pure C#.
-3. **Entities have no public setters.** State transitions happen through methods on aggregates. Factory methods (usually `Create`) return `Result<T>` and validate invariants.
-4. **Commands return `Result<T>`, not exceptions, for expected failures.** Exceptions are for bugs and infrastructure faults. Validation failures, missing entities, and business rule violations all return `Result`.
+3. **Entities have no public setters.** State transitions happen through methods on aggregates. Factory methods (usually `Create`) return `ErrorOr<T>` and validate invariants.
+4. **Commands return `ErrorOr<T>`, not exceptions, for expected failures.** Exceptions are for bugs and infrastructure faults. Validation failures, missing entities, and business rule violations all return `ErrorOr` failures.
 5. **Endpoints depend only on `IMessageBus`.** Endpoints do not depend on handlers, repositories, or domain services directly. They translate HTTP requests to commands and dispatch them.
 6. **Raw `IConfiguration` is not injected outside registration code.** All configuration access is through strongly-typed `IOptions<T>` with `ValidateOnStart()`.
 7. **`IFeatureManager` is not used in `Domain/` folders.** Feature flags live at the edges — endpoint routing, handler selection, infrastructure composition.
@@ -41,7 +41,7 @@ High-level:
 1. Identify the module the feature belongs to.
 2. Create a folder under that module's `Features/` directory, named for the feature.
 3. Create the six slice files: `{Name}.Request.cs`, `{Name}.Response.cs`, `{Name}.Command.cs` (or `Query`), `{Name}.Handler.cs`, `{Name}.Validator.cs`, `{Name}.Endpoint.cs`.
-4. The endpoint maps the `Request` to the `Command`, dispatches via `IMessageBus`, and maps the `Result<T>` to an HTTP response (success → DTO, failure → `ProblemDetails`).
+4. The endpoint maps the `Request` to the `Command`, dispatches via `IMessageBus`, and maps the `ErrorOr<T>` to an HTTP response (success → DTO, failure → `ProblemDetails`).
 5. Register the endpoint in the module's `MapEndpoints` extension.
 6. Add integration tests under the module's `IntegrationTests` project.
 
@@ -97,7 +97,7 @@ Mistakes you will make if you aren't warned.
 - **Don't edit `Directory.Packages.props` casually.** Package choices are deliberate and documented in ADRs. Adding a dependency requires an ADR or explicit instruction.
 - **Don't edit migrations after they're committed.** Create a new migration. Editing committed migrations breaks everyone else's database.
 - **Don't cache across module boundaries.** Each module uses its own cache key prefix (`{module}:*`). Never invalidate another module's cache keys.
-- **Don't throw for expected failures.** `Result.Fail(...)` for validation, missing entities, business rule violations. Exceptions are bugs or infrastructure.
+- **Don't throw for expected failures.** Return `Error.Validation(...)`, `Error.NotFound(...)`, `Error.Conflict(...)`, or another appropriate `ErrorOr` error for validation, missing entities, and business rule violations. Exceptions are bugs or infrastructure.
 - **Don't put business logic in handlers.** Handlers orchestrate; aggregates enforce invariants. If a handler has more than a few lines of branching, the logic belongs on the aggregate.
 - **Don't forget the outbox.** If a handler publishes integration events, the outbox ensures they're sent even on failure. Wolverine's `AutoApplyTransactions` handles this, but only if the handler is discovered correctly. Verify with an integration test.
 - **Don't make Wolverine handler types `internal`.** Wolverine requires handlers to be `public`, `concrete`, and closed. An `internal` handler compiles but throws `ArgumentOutOfRangeException: Handler types must be public` at startup. If a constructor parameter type is `internal`, make the type `public` — not the handler `internal`. Being `public` inside an internal project doesn't violate boundary rules; other modules still can't reference it.
@@ -141,9 +141,9 @@ Architectural tests are designed to produce specific, actionable failures. When 
 
 ---
 
-## How to respond to Result failures in handlers
+## How to respond to ErrorOr failures in handlers
 
-When a handler returns `Result.Fail(error)`, the endpoint converts it to a `ProblemDetails` response. You do not throw; you return. The conversion mapping is defined once, in the shared kernel. If you need a new error category, extend the shared error types — don't invent ad-hoc ones.
+When a handler returns an `ErrorOr<T>` failure, the endpoint converts it to a `ProblemDetails` response. You do not throw; you return. The conversion mapping is defined once, in shared HTTP extensions. If you need a new error category, use the appropriate `Error` factory rather than inventing ad-hoc response shapes.
 
 ---
 

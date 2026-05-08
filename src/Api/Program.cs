@@ -254,7 +254,7 @@ builder.UseWolverine(opts =>
 
     // InvalidOperationException in a message handler indicates a programming error or a
     // non-recoverable state violation (e.g. calling an EF Core operation on a disposed context,
-    // or a domain invariant raised unexpectedly as an exception rather than a Result). Retrying
+    // or a domain invariant raised unexpectedly as an exception rather than ErrorOr<T>). Retrying
     // is pointless and would only delay failure visibility. Move directly to the error queue so
     // the failure is surfaced immediately for operational triage.
     opts.OnException<InvalidOperationException>()

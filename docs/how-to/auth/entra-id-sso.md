@@ -71,9 +71,8 @@ Delete the following from the template (they're mutually exclusive with Entra-on
 
 - Local login/register endpoints in the Users module
 - Password hashing infrastructure (`IPasswordHasher`, related services)
-- `ISigningKeyProvider` and implementations — no longer issuing tokens
-- `/.well-known/openid-configuration/jwks` endpoint — Entra publishes its own
-- JWT-issuance-related options (`Auth:Signing:*`)
+- `IJwtGenerator` and local JWT issuance code — no longer issuing tokens
+- Local `Jwt:SigningKey` configuration — Entra publishes and rotates its own signing keys
 
 Keep: the `User` aggregate, the `Users` module, user profile endpoints. The aggregate still exists — it's just populated from Entra claims, not created by a register endpoint.
 
@@ -454,4 +453,3 @@ Trade-offs vs. Shape A:
 - Lower admin burden (no per-user role assignment for standard users).
 - Weaker access control by default — any tenant member can use the app. For a customer whose tenant contains only the people who should have access anyway, this is fine.
 - The ADR should note which shape you're on; switching later is cheap but worth recording.
-

@@ -241,8 +241,8 @@ Three to five paragraphs. Append detail as the module grows.
 
 Two projects under `tests/Modules/<Module>/`:
 
-- `Modulith.Modules.<Module>.UnitTests` — references the internal project + Shouldly
-- `Modulith.Modules.<Module>.IntegrationTests` — references the internal project + TestSupport + Testcontainers + Shouldly + Verify
+- `Modulith.Modules.<Module>.UnitTests` — references the internal project + xUnit
+- `Modulith.Modules.<Module>.IntegrationTests` — references the internal project + TestSupport + Testcontainers + xUnit
 
 Add `IntegrationTests` xUnit collection fixture:
 

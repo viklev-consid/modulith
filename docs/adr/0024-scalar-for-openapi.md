@@ -69,4 +69,4 @@ If a team needs Swashbuckle for internal reasons (custom filters, existing tooli
 
 ## Related
 
-- ADR-0022 (Testing): snapshot tests (Verify) capture the OpenAPI document shape for contract regression testing.
+- ADR-0022 (Testing): optional snapshot tests can capture the OpenAPI document shape for contract regression testing.

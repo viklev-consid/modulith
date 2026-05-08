@@ -10,7 +10,7 @@ Modulith uses four test layers. Each has a distinct purpose, scope, and speed pr
 
 **Scope:** Domain only. Aggregates, value objects, domain services.
 
-**Dependencies:** None outside the BCL and Shouldly. No mocking frameworks. No database. No ASP.NET.
+**Dependencies:** None outside the BCL and xUnit assertions. No mocking frameworks. No database. No ASP.NET.
 
 **Speed:** Milliseconds.
 
@@ -54,7 +54,7 @@ See [`adr/0015-architectural-tests.md`](../docs/adr/0015-architectural-tests.md)
 
 **Scope:** One module's slice end-to-end. HTTP → handler → DB → outbox.
 
-**Dependencies:** `WebApplicationFactory<Program>`, Testcontainers (Postgres), Shouldly, Verify, Bogus, WireMock.Net.
+**Dependencies:** `WebApplicationFactory<Program>`, Testcontainers (Postgres), xUnit assertions, Respawn.
 
 **Speed:** Seconds per test; the Testcontainers startup amortizes across the class.
 
@@ -73,24 +73,24 @@ See [`adr/0015-architectural-tests.md`](../docs/adr/0015-architectural-tests.md)
 
 **Test class = one database.** The fixture creates a container once per class, Respawn wipes between tests. Parallel at the class level. No shared state between classes.
 
-**Authenticated client helper lives in `TestSupport`.** A builder pattern: `_fixture.AuthenticatedClient().AsUser("alice").WithRoles("Admin").Build()`. Tests do not manually craft JWTs.
+**Authenticated client helpers live in `TestSupport`.** Use `CreateAuthenticatedClient(userId, email, displayName, role)` for synthetic JWTs, or `CreateAuthenticatedClientWithToken(accessToken)` when the test should authenticate with a token issued by the real login/register flow. Tests do not manually craft JWTs.
 
-**Use Verify for contract snapshots.** Response DTOs, OpenAPI documents, published event payloads. Catches accidental contract changes.
+**Snapshot testing is optional.** The template does not currently wire Verify; add it deliberately for response DTOs, OpenAPI documents, or published event payloads when snapshot review is worth the dependency.
 
-**Use WireMock.Net for external HTTP.** Any third-party API call is mocked at the HTTP level, not the client abstraction level.
+**Use HTTP-level fakes for external HTTP.** The template does not currently wire WireMock.Net; if a module calls a third-party API, add a module fixture that fakes HTTP at the transport boundary.
 
 ---
 
 ### 4. Smoke tests — `tests/Modulith.SmokeTests`
 
-**Scope:** The entire Aspire stack, exercised via real HTTP.
+**Scope:** The full API pipeline through `WebApplicationFactory`, backed by real Postgres and Mailpit containers.
 
-**Dependencies:** `Aspire.Hosting.Testing`, `HttpClient`, Shouldly.
+**Dependencies:** `WebApplicationFactory<Program>`, Testcontainers, `HttpClient`, xUnit assertions.
 
 **Speed:** Tens of seconds.
 
 **What belongs here:**
-- Can the stack boot?
+- Can the API pipeline boot?
 - Do the canonical happy paths work end-to-end through the real pipeline?
 - Can a notification actually be sent through Mailpit and retrieved?
 - Does the OpenAPI document generate and contain the expected versions?
@@ -106,13 +106,12 @@ Small number — 3 to 5 tests total. Runs on release branches, not every PR.
 
 ## Shared test infrastructure — `tests/Modulith.TestSupport`
 
-A shared project referenced by all test projects. Contents:
+A shared project referenced by all test projects. Current contents:
 
 - `ApiTestFixture` — base `WebApplicationFactory<Program>` with Testcontainers.
-- `AuthenticatedClientBuilder` — fluent API for building pre-authed `HttpClient`.
-- `TestDataBuilders/` — object mothers for common domain objects (`UserMother.Active()`, `OrderMother.PlacedWithItems(3)`).
-- `VerifySettings/` — shared Verify conventions.
-- `WireMockFixture` — shared WireMock setup helpers.
+- `CreateAnonymousClient()` / `CreateAuthenticatedClient(...)` — helpers for anonymous and JWT-backed `HttpClient` instances.
+- `CreateAuthenticatedClientWithToken(...)` — helper for tokens issued by the real auth flow.
+- `Fakes/` — fake and flaky email senders for tests that override notification delivery.
 - `TestClock` — controllable time source implementing the shared `IClock` abstraction.
 
 Without `TestSupport`, every module reinvents the harness. With it, adding a module takes an afternoon of tests, not a week.
@@ -124,18 +123,18 @@ Without `TestSupport`, every module reinvents the harness. With it, adding a mod
 | Concern | Library | Notes |
 |---|---|---|
 | Test framework | xUnit v3 | Modern lifecycle, better parallelism |
-| Assertions | Shouldly | Clear failure messages, stable API, no license drama |
-| Snapshot testing | Verify | For contracts, OpenAPI, event payloads |
-| Test data | Bogus | Fakes only; use object mothers for domain |
+| Assertions | xUnit | Current tests use built-in `Assert` APIs |
+| Snapshot testing | Verify | Optional; not currently referenced by test projects |
+| Test data | Bogus | Optional; not currently referenced by test projects |
 | Database | Testcontainers (Postgres) | Real Postgres, no in-memory |
 | Architectural tests | NetArchTest | Lightweight, readable |
-| HTTP mocking | WireMock.Net | For third-party API calls |
+| HTTP mocking | WireMock.Net | Optional; add fixture support in the module that needs it |
 | Message assertions | Wolverine `TrackActivity` | Assert published messages |
 
 **Not used:**
 - **AutoFixture** — fights rich domain models with private setters.
 - **Moq / NSubstitute** — minimal use. Unit tests don't need mocks; integration tests use real infrastructure.
-- **FluentAssertions** — licensing changed in v8. Shouldly is the cleaner default.
+- **FluentAssertions / Shouldly** — not currently part of the template. Add an assertion library only if xUnit assertions stop carrying their weight.
 - **SpecFlow / Reqnroll** — BDD overhead without BDD benefit for this use case.
 - **Stryker** — mutation testing is a specialized tool; not a template default.
 
@@ -191,7 +190,7 @@ Rules of thumb:
 
 **Test names describe the scenario and the expected outcome.** `PlacingOrderWithEmptyCart_ReturnsValidationFailure` is correct. `TestPlaceOrder` is not.
 
-**Failure messages are debugging aids.** Shouldly's defaults are good; when they aren't enough, add a message: `result.IsError.ShouldBeFalse("expected to succeed but got: " + string.Join(", ", result.Errors.Select(e => e.Description)))`.
+**Failure messages are debugging aids.** xUnit assertion overloads are enough for most tests; when they aren't, include the relevant details in the assertion message, especially `ErrorOr` failure descriptions.
 
 ---
 
