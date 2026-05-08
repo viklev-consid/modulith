@@ -64,11 +64,12 @@ This produces:
 - `src/Modules/Inventory/Modulith.Modules.Inventory/` (internal project)
 - `src/Modules/Inventory/Modulith.Modules.Inventory.Contracts/` with an `Events/` folder
 - Correct project references, csproj metadata, and namespace conventions
-- `InventoryModule.cs` with `AddInventoryModule`, `AddInventoryHandlers` (Wolverine), and `MapInventoryEndpoints` extensions
+- `InventoryModule.cs` with permissions, DbContext, health checks, telemetry, GDPR stubs, dev seeding, `AddInventoryHandlers` (Wolverine), and `MapInventoryEndpoints` extensions
 - `InventoryModuleInstaller.cs` implementing `IModuleInstaller` for API autodiscovery
 - `InventoryDbContext.cs` with the `inventory` schema
 - `InventoryRoutes.cs` with route prefix constants
 - `InventoryErrors.cs` stub for ErrorOr error definitions
+- `InventoryPermissions.cs`, `InventoryTelemetry.cs`, no-op GDPR exporter/eraser, and `InventoryDevSeeder.cs`
 
 Test projects, `CLAUDE.md`, `InventoryOptions.cs`, and domain/feature subfolders must be added manually after scaffolding.
 
@@ -89,7 +90,23 @@ Prefer the scaffold:
 dotnet new modulith-slice --module Orders --name CancelOrder
 ```
 
-This produces the six files (`Request`, `Response`, `Command`, `Handler`, `Validator`, `Endpoint`) with correct namespaces and stub content. The integration test must be written manually.
+This produces the six files (`Request`, `Response`, `Command`, `Handler`, `Validator`, `Endpoint`) with correct namespaces, permission-protected endpoint metadata, and stub content. `dotnet new modulith-command-slice` is the explicit equivalent for command/write slices.
+
+For read/query slices:
+
+```bash
+dotnet new modulith-query-slice --module Orders --name GetOrder
+```
+
+This produces `Response`, `Query`, `Handler`, and an authenticated `Endpoint` protected by the module's read permission. The integration test must be written manually.
+
+For an integration event/subscriber pair owned by a module:
+
+```bash
+dotnet new modulith-integration-pair --module Orders --name OrderPlaced
+```
+
+This produces `Orders.Contracts.Events.OrderPlacedV1` and `Integration/Subscribers/OnOrderPlacedHandler`. Register the handler in `AddOrdersHandlers`; if the subscriber consumes another module's event, move the subscriber to the consuming module and reference only the publisher's `.Contracts` project.
 
 After scaffolding:
 

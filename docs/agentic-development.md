@@ -44,17 +44,24 @@ The failure messages are written for agents. They are specific: type names, targ
 
 ### Self-scaffolding via `dotnet new` templates
 
-Two `dotnet new` item templates ship with Modulith:
+Several `dotnet new` item templates ship with Modulith:
 
 ```bash
-# Add a feature slice
+# Add a command/write feature slice
 dotnet new modulith-slice --module Orders --name CancelOrder
+dotnet new modulith-command-slice --module Orders --name CancelOrder
+
+# Add a query/read feature slice
+dotnet new modulith-query-slice --module Orders --name GetOrder
 
 # Add a new module
 dotnet new modulith-module --name Inventory
+
+# Add a versioned integration event plus subscriber stub
+dotnet new modulith-integration-pair --module Orders --name OrderPlaced
 ```
 
-These generate the exact file set with correct namespaces and placeholder registrations. Agents should prefer these to manual scaffolding — manual scaffolding is how small inconsistencies creep in.
+These generate the exact file set with correct namespaces, permission-aware endpoint stubs, telemetry hooks, health checks, GDPR stubs, dev seeding, and placeholder registrations where applicable. Agents should prefer these to manual scaffolding — manual scaffolding is how small inconsistencies creep in.
 
 ### Fast, specific feedback loops
 

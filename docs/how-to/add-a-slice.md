@@ -18,6 +18,8 @@ For the architectural reasoning, see [`adr/0002-vertical-slice-architecture.md`]
 
 ```bash
 dotnet new modulith-slice --module Orders --name CancelOrder
+# or explicitly:
+dotnet new modulith-command-slice --module Orders --name CancelOrder
 ```
 
 This produces six files under `src/Modules/Orders/Modulith.Modules.Orders/Features/CancelOrder/`:
@@ -29,7 +31,23 @@ This produces six files under `src/Modules/Orders/Modulith.Modules.Orders/Featur
 - `CancelOrder.Validator.cs`
 - `CancelOrder.Endpoint.cs`
 
-All with correct namespaces and stub content. The integration test file must be written manually — see Step 8 below.
+All with correct namespaces and stub content. Command endpoints require the module's write permission by default. The integration test file must be written manually — see Step 8 below.
+
+For a read/query slice:
+
+```bash
+dotnet new modulith-query-slice --module Orders --name GetOrder
+```
+
+This produces `GetOrder.Response.cs`, `GetOrder.Query.cs`, `GetOrder.Handler.cs`, and `GetOrder.Endpoint.cs`. Query endpoints require the module's read permission by default.
+
+For an integration event/subscriber pair owned by a module:
+
+```bash
+dotnet new modulith-integration-pair --module Orders --name OrderPlaced
+```
+
+This produces `OrderPlacedV1` in the module's `.Contracts/Events` project and `OnOrderPlacedHandler` under `Integration/Subscribers`. Register the subscriber in `AddOrdersHandlers` after filling in the behavior.
 
 ---
 

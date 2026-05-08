@@ -43,6 +43,11 @@ With the following files already populated:
 - `InventoryDbContext.cs` — inherits `ModuleDbContext`, `inventory` schema wired via `HasDefaultSchema`
 - `InventoryRoutes.cs` — route constants with `GroupTag` and `Prefix`
 - `InventoryErrors.cs` — stub static errors class using `ErrorOr`
+- `InventoryPermissions.cs` — read/write permission constants registered with RBAC
+- `InventoryTelemetry.cs` — ActivitySource, Meter, and standard command/event counters
+- `Gdpr/InventoryPersonalDataExporter.cs` and `Gdpr/InventoryPersonalDataEraser.cs` — no-op stubs to fill when the module owns personal data
+- `Seeding/InventoryDevSeeder.cs` — dev seeding hook registered only in Development
+- DbContext health check and OpenTelemetry registration in `InventoryModule.cs`
 - Correct csproj references and package list for both projects
 
 **Not produced by the scaffold — add manually after scaffolding:**
@@ -50,7 +55,7 @@ With the following files already populated:
 - Test projects (`UnitTests`, `IntegrationTests`) — see Step 10 below
 - `InventoryOptions.cs` — add if the module requires configuration (see Step 4 below)
 - `CLAUDE.md` for the module — see Step 9 below
-- `Domain/`, `Features/`, `Integration/`, `Seeding/`, `Persistence/Configurations/`, `Persistence/Migrations/` folders — create as you add content
+- `Domain/`, `Features/`, `Persistence/Configurations/`, `Persistence/Migrations/` folders — create as you add content
 
 ---
 

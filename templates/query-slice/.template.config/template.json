@@ -1,11 +1,11 @@
 {
   "$schema": "http://json.schemastore.org/template",
   "author": "Modulith",
-  "classifications": ["Modulith", "Slice", "Feature"],
-  "identity": "Modulith.Slice",
-  "name": "Modulith Feature Slice",
-  "shortName": "modulith-slice",
-  "description": "Scaffolds the six files of a command/write vertical feature slice inside an existing module.",
+  "classifications": ["Modulith", "Slice", "Feature", "Query"],
+  "identity": "Modulith.QuerySlice",
+  "name": "Modulith Query Slice",
+  "shortName": "modulith-query-slice",
+  "description": "Scaffolds a read/query vertical slice inside an existing module.",
   "sourceName": "FeatureName",
   "symbols": {
     "module": {
@@ -13,7 +13,7 @@
       "datatype": "string",
       "replaces": "ModuleName",
       "isRequired": true,
-      "description": "The PascalCase module name this slice belongs to (e.g. Catalog, Orders)."
+      "description": "The PascalCase module name this query slice belongs to (e.g. Catalog, Orders)."
     },
     "moduleNameLower": {
       "type": "derived",
