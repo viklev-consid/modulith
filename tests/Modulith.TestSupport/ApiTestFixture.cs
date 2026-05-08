@@ -1,9 +1,11 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using DotNet.Testcontainers.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
@@ -11,6 +13,7 @@ using Npgsql;
 using Respawn;
 using Respawn.Graph;
 using Testcontainers.PostgreSql;
+using Wolverine.Tracking;
 using Xunit;
 
 namespace Modulith.TestSupport;
@@ -134,36 +137,116 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
 
     public HttpClient CreateAnonymousClient() => CreateClient();
 
-    public HttpClient CreateAuthenticatedClient(Guid userId, string email, string displayName, string role = "user")
-    {
-        var token = GenerateTestToken(userId, email, displayName, role);
-        var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        return client;
-    }
+    public AuthenticatedClientBuilder CreateAuthenticatedClientBuilder() => new(this);
+
+    public HttpClient CreateAuthenticatedClient(Guid userId, string email, string displayName, string role = "user") =>
+        CreateAuthenticatedClientBuilder()
+            .WithUser(userId, email, displayName)
+            .WithRole(role)
+            .Build();
 
     /// <summary>Creates an authenticated client using an existing JWT (e.g. from a real login response).</summary>
     public HttpClient CreateAuthenticatedClientWithToken(string accessToken)
     {
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         return client;
     }
 
-    public static string GenerateTestToken(Guid userId, string email, string displayName, string role = "user")
+    public async Task<TResult> QueryDbAsync<TDbContext, TResult>(
+        Func<TDbContext, CancellationToken, Task<TResult>> query,
+        CancellationToken ct = default)
+        where TDbContext : DbContext
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
+        return await query(db, ct);
+    }
+
+    public async Task ExecuteDbAsync<TDbContext>(
+        Func<TDbContext, CancellationToken, Task> action,
+        CancellationToken ct = default)
+        where TDbContext : DbContext
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
+        await action(db, ct);
+    }
+
+    public async Task SeedDbAsync<TDbContext>(
+        Func<TDbContext, CancellationToken, Task> seed,
+        CancellationToken ct = default)
+        where TDbContext : DbContext
+    {
+        await ExecuteDbAsync<TDbContext>(async (db, token) =>
+        {
+            await seed(db, token);
+            await db.SaveChangesAsync(token);
+        }, ct);
+    }
+
+    public async Task SeedDbAsync<TDbContext, TEntity>(
+        TEntity entity,
+        CancellationToken ct = default)
+        where TDbContext : DbContext
+        where TEntity : class
+    {
+        await SeedDbAsync<TDbContext>(async (db, token) =>
+        {
+            await db.Set<TEntity>().AddAsync(entity, token);
+        }, ct);
+    }
+
+    public async Task SeedDbAsync<TDbContext, TEntity>(
+        IEnumerable<TEntity> entities,
+        CancellationToken ct = default)
+        where TDbContext : DbContext
+        where TEntity : class
+    {
+        await SeedDbAsync<TDbContext>(async (db, token) =>
+        {
+            await db.Set<TEntity>().AddRangeAsync(entities, token);
+        }, ct);
+    }
+
+    public Task<ITrackedSession> TrackWolverineActivityAsync(
+        Func<Task> action,
+        TimeSpan? timeout = null,
+        bool assertOnExceptions = true)
+    {
+        var configuration = ApplicationHost.TrackActivity()
+            .Timeout(timeout ?? TimeSpan.FromSeconds(10));
+
+        if (!assertOnExceptions)
+        {
+            configuration.DoNotAssertOnExceptionsDetected();
+        }
+
+        return configuration.ExecuteAndWaitAsync((Wolverine.IMessageContext _) => action());
+    }
+
+    public static string GenerateTestToken(
+        Guid userId,
+        string email,
+        string displayName,
+        string role = "user",
+        IEnumerable<Claim>? additionalClaims = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, email),
             new Claim(ClaimTypes.Name, displayName),
             new Claim(ClaimTypes.Role, role),
         };
+
+        if (additionalClaims is not null)
+        {
+            claims.AddRange(additionalClaims);
+        }
 
         var token = new JwtSecurityToken(
             issuer: TestJwtIssuer,

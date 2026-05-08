@@ -110,7 +110,12 @@ A shared project referenced by all test projects. Current contents:
 
 - `ApiTestFixture` — base `WebApplicationFactory<Program>` with Testcontainers.
 - `CreateAnonymousClient()` / `CreateAuthenticatedClient(...)` — helpers for anonymous and JWT-backed `HttpClient` instances.
+- `CreateAuthenticatedClientBuilder()` — fluent JWT client builder for tests that need custom claims.
 - `CreateAuthenticatedClientWithToken(...)` — helper for tokens issued by the real auth flow.
+- `QueryDbAsync<TDbContext, TResult>()` / `ExecuteDbAsync<TDbContext>()` / `SeedDbAsync<TDbContext>()` — scoped DbContext helpers.
+- `TrackWolverineActivityAsync(...)` — wrapper around Wolverine `TrackActivity()` with the repo default timeout.
+- `VerifyTestSettings` — shared snapshot settings that scrub volatile members.
+- `WireMockFixture` — lightweight HTTP fake for module fixtures that call third-party APIs.
 - `Fakes/` — fake and flaky email senders for tests that override notification delivery.
 - `TestClock` — controllable time source implementing the shared `IClock` abstraction.
 
@@ -124,11 +129,11 @@ Without `TestSupport`, every module reinvents the harness. With it, adding a mod
 |---|---|---|
 | Test framework | xUnit v3 | Modern lifecycle, better parallelism |
 | Assertions | xUnit | Current tests use built-in `Assert` APIs |
-| Snapshot testing | Verify | Optional; not currently referenced by test projects |
+| Snapshot testing | Verify | Use `VerifyTestSettings.Create()` for shared scrubbing defaults |
 | Test data | Bogus | Optional; not currently referenced by test projects |
 | Database | Testcontainers (Postgres) | Real Postgres, no in-memory |
 | Architectural tests | NetArchTest | Lightweight, readable |
-| HTTP mocking | WireMock.Net | Optional; add fixture support in the module that needs it |
+| HTTP mocking | WireMock.Net | Use `WireMockFixture` in the module fixture that needs it |
 | Message assertions | Wolverine `TrackActivity` | Assert published messages |
 
 **Not used:**
