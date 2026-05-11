@@ -35,6 +35,10 @@ public sealed class CreateInvitationHandler(
             return UsersErrors.EmailAlreadyRegistered;
         }
 
+        await db.UserInvitations
+            .Where(i => i.Email == email.Value && i.IsPending && i.ExpiresAt <= clock.UtcNow)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(i => i.IsPending, false), ct);
+
         var inviteResult = UserInvitation.Create(
             email,
             options.Value.Registration.InvitationTokenLifetime,

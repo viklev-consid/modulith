@@ -7,6 +7,7 @@ using Modulith.Modules.Users.Features.CreateInvitation;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Features.RevokeInvitation;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -59,6 +60,27 @@ public sealed class InvitationTests(UsersApiFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateInvitation_WhenPendingInvitationExpired_Returns201AndReplacesActiveSlot()
+    {
+        var admin = await RegisterAsync("admin@example.com", "Admin");
+        await SeedExpiredInvitationAsync("invitee@example.com");
+
+        var response = await AdminClient(admin.UserId, "admin@example.com")
+            .PostAsJsonAsync("/v1/users/invitations", new CreateInvitationRequest("invitee@example.com"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var invitations = await db.UserInvitations
+            .Where(i => i.Email == "invitee@example.com")
+            .ToListAsync();
+
+        Assert.Equal(2, invitations.Count);
+        Assert.Single(invitations, i => i.IsPending);
+    }
+
+    [Fact]
     public async Task RevokeInvitation_Admin_Returns200AndMarksInvitationRevoked()
     {
         var admin = await RegisterAsync("admin@example.com", "Admin");
@@ -91,4 +113,15 @@ public sealed class InvitationTests(UsersApiFixture fixture) : IAsyncLifetime
 
     private HttpClient UserClient(Guid userId, string email)
         => fixture.CreateAuthenticatedClient(userId, email, "User", "user");
+
+    private async Task SeedExpiredInvitationAsync(string email)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+        var (invitation, _) = UserInvitation.Create(Email.Create(email).Value, TimeSpan.FromTicks(1), clock).Value;
+        db.UserInvitations.Add(invitation);
+        await db.SaveChangesAsync();
+        await Task.Delay(10);
+    }
 }

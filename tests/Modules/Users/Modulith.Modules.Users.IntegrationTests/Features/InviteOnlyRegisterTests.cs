@@ -28,6 +28,17 @@ public sealed class InviteOnlyRegisterTests(InviteOnlyUsersApiFixture fixture) :
     }
 
     [Fact]
+    public async Task Register_WithoutInvitationForExistingEmail_ReturnsGenericRegistrationUnavailable()
+    {
+        await SeedUserAsync("alice@example.com");
+
+        var response = await client.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Register_WithValidInvitation_Returns201AndConsumesInvitation()
     {
         var (invitationId, token) = await SeedInvitationAsync("alice@example.com");
@@ -80,6 +91,15 @@ public sealed class InviteOnlyRegisterTests(InviteOnlyUsersApiFixture fixture) :
         db.UserInvitations.Add(invitation);
         await db.SaveChangesAsync();
         return (invitation.Id, token);
+    }
+
+    private async Task SeedUserAsync(string email)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var user = User.CreateWithPassword(Email.Create(email).Value, new PasswordHash("hashed-password"), "Existing").Value;
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
     }
 }
 

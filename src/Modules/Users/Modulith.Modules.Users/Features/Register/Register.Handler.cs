@@ -35,11 +35,6 @@ public sealed class RegisterHandler(
 
         var email = emailResult.Value;
 
-        if (await db.Users.AnyAsync(u => u.Email == email, ct))
-        {
-            return UsersErrors.EmailAlreadyRegistered;
-        }
-
         UserInvitation? invitation = null;
         var registration = options.Value.Registration;
         if (registration.Mode == RegistrationMode.Disabled)
@@ -59,6 +54,13 @@ public sealed class RegisterHandler(
             {
                 return UsersErrors.RegistrationUnavailable;
             }
+        }
+
+        if (await db.Users.AnyAsync(u => u.Email == email, ct))
+        {
+            return registration.Mode == RegistrationMode.InviteOnly
+                ? UsersErrors.RegistrationUnavailable
+                : UsersErrors.EmailAlreadyRegistered;
         }
 
         var passwordHash = new PasswordHash(passwordHasher.Hash(cmd.Password));
@@ -95,7 +97,9 @@ public sealed class RegisterHandler(
         {
             // A concurrent registration claimed the same email between our pre-check and commit.
             db.ChangeTracker.Clear();
-            return UsersErrors.EmailAlreadyRegistered;
+            return registration.Mode == RegistrationMode.InviteOnly
+                ? UsersErrors.RegistrationUnavailable
+                : UsersErrors.EmailAlreadyRegistered;
         }
 
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
