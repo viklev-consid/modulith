@@ -1,6 +1,11 @@
 # AGENTS.md - Notifications Module
 
-This module delivers transactional notifications to users and keeps a log of what was sent. It subscribes to integration events from other modules and sends email via `IEmailSender`.
+This module owns user notifications. It has two intentionally separate surfaces:
+
+- **Email notifications** for account/security/lifecycle communication such as password reset, password changed, email change, welcome, and external-login events.
+- **Bell notifications** for product activity shown in-app, such as replies, mentions, assignments, follows, approvals, and workflow updates. SSE is only a live transport for bell updates; it is not a notification channel.
+
+Do not automatically mirror email notifications into bell notifications. Account/security notifications are email-only unless a product decision explicitly says otherwise.
 
 For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 
@@ -13,6 +18,9 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 - **NotificationDeliveryStatus** - `Pending = 0`, `Sending = 2`, `Sent = 1`, `Failed = 3`.
 - **NotificationSendGuard** - scoped service in `Integration/Subscribers/` that owns atomic claim and recovery logic. Inject it into every notification handler.
 - **IConsentRegistry** - interface in `Shared.Infrastructure`, implemented by Users. Returns whether a user consented to a notification purpose.
+- **UserNotification** - persisted in-app/bell notification visible to one recipient.
+- **NotificationPreference** - per-user category settings for `Bell` and `Email`. Locked account/security defaults are not user-editable.
+- **NotificationRetentionPolicy** - calculates when bell notifications become eligible for pruning.
 
 ---
 
@@ -23,10 +31,15 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 3. `RetryableSmtpException` resets to `Pending` via `MarkReadyAsync`; `TerminalSmtpException` transitions to `Failed` via `MarkFailedAsync`.
 4. `IConsentRegistry` gates every notification type. Security notifications bypass consent because they are security-critical.
 5. Raw tokens from password reset, email change, and external-login events may be embedded in email links but must never be logged.
+6. Bell notifications are idempotent by `IdempotencyKey`. If a duplicate insert fails, detach the added entity before returning the existing row.
+7. Bell endpoints are current-user scoped under `/v1/me/...`; do not add `/users/{id}/notifications` without an explicit admin use case.
+8. Retention is stored per bell notification in `RetentionUntil`; cleanup deletes rows whose retention has elapsed.
 
 ---
 
 ## Adding a new notification type
+
+### Email notification
 
 1. Add an entry to the `NotificationType` enum.
 2. Add a template in `Templates/` with `Subject`, `HtmlBody`, and `PlainTextBody`.
@@ -38,6 +51,28 @@ Key handler rules:
 - Always detach the failed entity (`db.Entry(log).State = EntityState.Detached`) before the claim.
 - Never call `log.MarkSent()` directly; use `sendGuard.MarkSentAsync`.
 - Keep both `catch (RetryableSmtpException)` and `catch (TerminalSmtpException)` blocks, and pass the `leaseToken` from `TryClaimAsync`.
+
+### Bell notification
+
+Prefer product modules publishing their own integration event and the Notifications module subscribing to it. For simple reusable cases, other modules may invoke `CreateNotificationCommand` from `Modulith.Modules.Notifications.Contracts`.
+
+Bell notification rules:
+
+- Use `NotificationCategory.Product`, `Collaboration`, or `System` for product-facing activity.
+- `Account` and `Security` default to email-only and should not become bell notifications casually.
+- Store rendered `Title` and `Body`; historical bell items should remain stable even if source data changes later.
+- Provide a stable `IdempotencyKey` from the source event id or workflow id.
+- Use `NotificationChannel.Bell` only when the type really belongs in the in-app feed.
+
+User-facing bell endpoints:
+
+- `GET /v1/me/notifications`
+- `GET /v1/me/notifications/unread-count`
+- `PATCH /v1/me/notifications/{notificationId}/read`
+- `PATCH /v1/me/notifications/read-all`
+- `DELETE /v1/me/notifications/{notificationId}` archives/hides the row
+- `GET /v1/me/notifications/stream` streams SSE events
+- `GET|PUT /v1/me/notification-preferences`
 
 ---
 
@@ -53,3 +88,4 @@ Key handler rules:
 - Raw tokens arrive in `PasswordResetRequestedV1.RawToken`, `EmailChangeRequestedV1.RawToken`, and `ExternalLoginPendingV1.RawToken`. Embed them in email body links; never log them.
 - The `NotificationLog.IdempotencyKey` unique constraint makes duplicate detection race-safe. Catch `DbUpdateException.IsUniqueConstraintViolation()` rather than pre-checking with `AnyAsync`, then still fall through to `TryClaimAsync`.
 - Adding a subscriber for a new event requires registering the handler in `NotificationsModule.AddNotificationsHandlers`.
+- Adding a scheduled cleanup handler requires registering it in `AddNotificationsHandlers` and anchoring the TickerQ job in `AddNotificationsJobs`.

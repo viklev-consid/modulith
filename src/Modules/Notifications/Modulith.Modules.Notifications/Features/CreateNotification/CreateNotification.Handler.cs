@@ -79,6 +79,8 @@ public sealed class CreateNotificationHandler(
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
+            db.Entry(notification).State = EntityState.Detached;
+
             var existingId = await db.UserNotifications
                 .AsNoTracking()
                 .Where(n => n.IdempotencyKey == command.IdempotencyKey)
