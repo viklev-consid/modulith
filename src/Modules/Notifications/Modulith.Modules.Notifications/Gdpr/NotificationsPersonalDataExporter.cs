@@ -27,6 +27,37 @@ public sealed class NotificationsPersonalDataExporter(NotificationsDbContext db)
             }).ToList(),
         };
 
+        data["inAppNotifications"] = await db.UserNotifications
+            .Where(n => n.RecipientUserId == user.UserId)
+            .OrderByDescending(n => n.CreatedAt)
+            .Select(n => new
+            {
+                type = n.Type,
+                category = n.Category.ToString(),
+                severity = n.Severity.ToString(),
+                title = n.Title,
+                body = n.Body,
+                linkHref = n.LinkHref,
+                createdAt = n.CreatedAt,
+                readAt = n.ReadAt,
+                archivedAt = n.ArchivedAt,
+                expiresAt = n.ExpiresAt,
+                retentionUntil = n.RetentionUntil,
+            })
+            .ToListAsync(ct);
+
+        data["notificationPreferences"] = await db.NotificationPreferences
+            .Where(p => p.UserId == user.UserId)
+            .OrderBy(p => p.Category)
+            .Select(p => new
+            {
+                category = p.Category.ToString(),
+                bellEnabled = p.BellEnabled,
+                emailEnabled = p.EmailEnabled,
+                updatedAt = p.UpdatedAt,
+            })
+            .ToListAsync(ct);
+
         return new PersonalDataExport(user.UserId, "Notifications", data);
     }
 }
