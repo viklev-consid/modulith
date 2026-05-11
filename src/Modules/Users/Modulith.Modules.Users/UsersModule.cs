@@ -78,7 +78,7 @@ public static class UsersModule
         services.AddPermissions(UsersPermissions.All);
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddSingleton<IClock, SystemClock>();
-        services.AddScoped<AuditableEntitySaveChangesInterceptor>();
+        services.AddSingleton<AuditableEntitySaveChangesInterceptor>();
 
         services.AddDbContextWithWolverineIntegration<UsersDbContext>((sp, opts) =>
         {

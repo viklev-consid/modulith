@@ -28,7 +28,7 @@ public static class NotificationsModule
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddPermissions(NotificationsPermissions.All);
 
-        services.AddScoped<AuditableEntitySaveChangesInterceptor>();
+        services.AddSingleton<AuditableEntitySaveChangesInterceptor>();
 
         services.AddDbContext<NotificationsDbContext>((sp, opts) =>
         {
