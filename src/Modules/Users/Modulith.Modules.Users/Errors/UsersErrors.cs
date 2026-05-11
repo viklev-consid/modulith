@@ -28,6 +28,9 @@ internal static class UsersErrors
     public static readonly Error EmailAlreadyRegistered =
         Error.Conflict("Users.EmailAlreadyRegistered", "An account with this email address already exists.");
 
+    public static readonly Error RegistrationUnavailable =
+        Error.Validation("Users.Registration.Unavailable", "Registration is not available for this account.");
+
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("Users.InvalidCredentials", "The email address or password is incorrect.");
 
@@ -97,6 +100,21 @@ internal static class UsersErrors
 
     public static readonly Error MaxPendingLoginsReached =
         Error.Conflict("Users.ExternalLogin.MaxPendingReached", "Too many pending confirmation attempts for this email address. Please try again later.");
+
+    public static readonly Error InvitationLifetimeInvalid =
+        Error.Validation("Users.Invitation.LifetimeInvalid", "Invitation lifetime must be greater than zero.");
+
+    public static readonly Error InvitationInvalid =
+        Error.Validation("Users.Invitation.Invalid", "The invitation is invalid, expired, or has already been used.");
+
+    public static readonly Error InvitationAlreadyExists =
+        Error.Conflict("Users.Invitation.AlreadyExists", "An active invitation already exists for this email address.");
+
+    public static readonly Error InvitationAlreadyAccepted =
+        Error.Conflict("Users.Invitation.AlreadyAccepted", "The invitation has already been accepted.");
+
+    public static readonly Error InvitationAlreadyRevoked =
+        Error.Conflict("Users.Invitation.AlreadyRevoked", "The invitation has already been revoked.");
 
     public static readonly Error OnboardingRequired =
         Error.Unauthorized("Users.Onboarding.Required", "Account setup is not complete. Please complete onboarding first.");

@@ -15,7 +15,10 @@ namespace Modulith.Modules.Users.IntegrationTests;
 [CollectionDefinition("GoogleUsersModule")]
 public sealed class GoogleUsersModuleCollection : ICollectionFixture<GoogleUsersApiFixture> { }
 
-public sealed class GoogleUsersApiFixture : ApiTestFixture
+[CollectionDefinition("InviteOnlyGoogleUsersModule")]
+public sealed class InviteOnlyGoogleUsersModuleCollection : ICollectionFixture<InviteOnlyGoogleUsersApiFixture> { }
+
+public class GoogleUsersApiFixture : ApiTestFixture
 {
     public FakeGoogleIdTokenVerifier GoogleVerifier { get; } = new();
 
@@ -34,4 +37,13 @@ public sealed class GoogleUsersApiFixture : ApiTestFixture
     }
 
     protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "notifications"];
+}
+
+public sealed class InviteOnlyGoogleUsersApiFixture : GoogleUsersApiFixture
+{
+    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("Modules:Users:Registration:Mode", "InviteOnly");
+    }
 }

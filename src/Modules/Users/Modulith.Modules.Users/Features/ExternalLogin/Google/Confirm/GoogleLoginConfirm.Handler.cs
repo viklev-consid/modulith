@@ -73,7 +73,27 @@ public sealed class GoogleLoginConfirmHandler(
             return await LinkToExistingUserAsync(existingUser, pending, cmd, opts, now, ct);
         }
 
-        return await ProvisionNewUserAsync(email, pending, cmd, opts, now, ct);
+        UserInvitation? invitation = null;
+        if (opts.Registration.Mode == RegistrationMode.Disabled)
+        {
+            return UsersErrors.RegistrationUnavailable;
+        }
+
+        if (opts.Registration.Mode == RegistrationMode.InviteOnly)
+        {
+            if (string.IsNullOrWhiteSpace(cmd.InvitationToken))
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+
+            invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
+            if (invitation is null)
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+        }
+
+        return await ProvisionNewUserAsync(email, pending, cmd, opts, now, invitation, ct);
     }
 
     private async Task<ErrorOr<GoogleLoginConfirmResponse>> LinkToExistingUserAsync(
@@ -124,6 +144,7 @@ public sealed class GoogleLoginConfirmHandler(
         GoogleLoginConfirmCommand cmd,
         UsersOptions opts,
         DateTimeOffset now,
+        UserInvitation? invitation,
         CancellationToken ct)
     {
         var userResult = User.CreateExternal(email, pending.DisplayName, pending.Provider, pending.Subject, clock);
@@ -138,6 +159,15 @@ public sealed class GoogleLoginConfirmHandler(
         if (linkResult.IsError)
         {
             return linkResult.Errors;
+        }
+
+        if (invitation is not null)
+        {
+            var acceptResult = invitation.Accept(user.Id, email, clock);
+            if (acceptResult.IsError)
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
         }
 
         db.Users.Add(user);
@@ -222,6 +252,19 @@ public sealed class GoogleLoginConfirmHandler(
                 """)
             .Include(u => u.ExternalLogins)
             .FirstOrDefaultAsync(ct);
+
+    private async Task<UserInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)
+    {
+        var tokenHash = UserInvitation.HashRawValue(rawToken);
+
+        return await db.UserInvitations
+            .FromSqlInterpolated($"""
+                SELECT * FROM users.user_invitations
+                WHERE token_hash = {tokenHash}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(ct);
+    }
 
     private void DetachFailedProvisioningAttempt(User user, Consent consent)
     {

@@ -35,9 +35,32 @@ public sealed class RegisterHandler(
 
         var email = emailResult.Value;
 
+        UserInvitation? invitation = null;
+        var registration = options.Value.Registration;
+        if (registration.Mode == RegistrationMode.Disabled)
+        {
+            return UsersErrors.RegistrationUnavailable;
+        }
+
+        if (registration.Mode == RegistrationMode.InviteOnly)
+        {
+            if (string.IsNullOrWhiteSpace(cmd.InvitationToken))
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+
+            invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
+            if (invitation is null)
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+        }
+
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
         {
-            return UsersErrors.EmailAlreadyRegistered;
+            return registration.Mode == RegistrationMode.InviteOnly
+                ? UsersErrors.RegistrationUnavailable
+                : UsersErrors.EmailAlreadyRegistered;
         }
 
         var passwordHash = new PasswordHash(passwordHasher.Hash(cmd.Password));
@@ -48,6 +71,16 @@ public sealed class RegisterHandler(
         }
 
         var user = userResult.Value;
+
+        if (invitation is not null)
+        {
+            var acceptResult = invitation.Accept(user.Id, email, clock);
+            if (acceptResult.IsError)
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+        }
+
         db.Users.Add(user);
 
         // Grant default consents on registration.
@@ -64,7 +97,9 @@ public sealed class RegisterHandler(
         {
             // A concurrent registration claimed the same email between our pre-check and commit.
             db.ChangeTracker.Clear();
-            return UsersErrors.EmailAlreadyRegistered;
+            return registration.Mode == RegistrationMode.InviteOnly
+                ? UsersErrors.RegistrationUnavailable
+                : UsersErrors.EmailAlreadyRegistered;
         }
 
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
@@ -79,5 +114,18 @@ public sealed class RegisterHandler(
             accessTokenExpiresAt,
             rawRefreshToken,
             refreshToken.ExpiresAt);
+    }
+
+    private async Task<UserInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)
+    {
+        var tokenHash = UserInvitation.HashRawValue(rawToken);
+
+        return await db.UserInvitations
+            .FromSqlInterpolated($"""
+                SELECT * FROM users.user_invitations
+                WHERE token_hash = {tokenHash}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(ct);
     }
 }

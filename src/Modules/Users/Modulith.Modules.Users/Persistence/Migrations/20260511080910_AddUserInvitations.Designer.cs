@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Modulith.Modules.Users.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Modulith.Modules.Users.Persistence.Migrations
-{
-    [DbContext(typeof(UsersDbContext))]
-    partial class UsersDbContextModelSnapshot : ModelSnapshot
+namespace Modulith.Modules.Users.Persistence.Migrations;
+
+[DbContext(typeof(UsersDbContext))]
+    [Migration("20260511080910_AddUserInvitations")]
+    partial class AddUserInvitations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -474,10 +477,6 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("invited_by_user_id");
 
-                    b.Property<bool>("IsPending")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_pending");
-
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
@@ -498,7 +497,7 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("ix_user_invitations_email")
-                        .HasFilter("is_pending = true");
+                        .HasFilter("accepted_at IS NULL AND revoked_at IS NULL");
 
                     b.HasIndex("TokenHash")
                         .IsUnique()
@@ -564,4 +563,3 @@ namespace Modulith.Modules.Users.Persistence.Migrations
 #pragma warning restore 612, 618
         }
     }
-}

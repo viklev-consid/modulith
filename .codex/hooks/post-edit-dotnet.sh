@@ -7,6 +7,8 @@
 
 set -uo pipefail
 
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+
 input=$(cat)
 file=$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.path // empty')
 
@@ -15,7 +17,7 @@ if [[ -z "$file" || "$file" != *.cs ]]; then
   exit 0
 fi
 
-rel="${file#"$CLAUDE_PROJECT_DIR/"}"
+rel="${file#"$PROJECT_DIR/"}"
 if [[ "$rel" != src/* && "$rel" != tests/* ]]; then
   exit 0
 fi
@@ -23,7 +25,7 @@ fi
 # Find the nearest .csproj walking up from the file
 dir=$(dirname "$file")
 csproj=""
-while [[ "$dir" != "$CLAUDE_PROJECT_DIR" && "$dir" != "/" ]]; do
+while [[ "$dir" != "$PROJECT_DIR" && "$dir" != "/" ]]; do
   found=$(find "$dir" -maxdepth 1 -name "*.csproj" -print -quit 2>/dev/null || true)
   if [[ -n "$found" ]]; then
     csproj="$found"
@@ -40,14 +42,14 @@ msgs=()
 fail=0
 
 # 1. Format check (fast) — scoped to the project
-fmt_out=$(cd "$CLAUDE_PROJECT_DIR" && dotnet format "$csproj" --verify-no-changes --verbosity quiet 2>&1 || true)
+fmt_out=$(cd "$PROJECT_DIR" && dotnet format "$csproj" --verify-no-changes --verbosity quiet 2>&1 || true)
 if [[ $? -ne 0 ]] && printf '%s' "$fmt_out" | grep -q "error\|needs formatting"; then
   msgs+=("Format drift in $(basename "$csproj"). Run: dotnet format $csproj")
   fail=1
 fi
 
 # 2. Build — scoped
-build_out=$(cd "$CLAUDE_PROJECT_DIR" && dotnet build "$csproj" --nologo --verbosity quiet --no-restore 2>&1 || true)
+build_out=$(cd "$PROJECT_DIR" && dotnet build "$csproj" --nologo --verbosity quiet --no-restore 2>&1 || true)
 if printf '%s' "$build_out" | grep -qE "error [A-Z]+[0-9]+:"; then
   errors=$(printf '%s' "$build_out" | grep -E "error [A-Z]+[0-9]+:" | head -n 5)
   msgs+=("Build failed in $(basename "$csproj"):\n$errors")
@@ -56,9 +58,9 @@ fi
 
 # 3. Arch tests when domain or module-root files change
 if [[ "$rel" == */Domain/* || "$rel" =~ src/Modules/[^/]+/[^/]+\.cs$ ]]; then
-  arch_proj=$(find "$CLAUDE_PROJECT_DIR/tests" -name "*Architecture*.csproj" -print -quit 2>/dev/null || true)
+  arch_proj=$(find "$PROJECT_DIR/tests" -name "*Architecture*.csproj" -print -quit 2>/dev/null || true)
   if [[ -n "$arch_proj" ]]; then
-    arch_out=$(cd "$CLAUDE_PROJECT_DIR" && dotnet test "$arch_proj" --nologo --verbosity quiet --no-restore 2>&1 || true)
+    arch_out=$(cd "$PROJECT_DIR" && dotnet test "$arch_proj" --nologo --verbosity quiet --no-restore 2>&1 || true)
     if printf '%s' "$arch_out" | grep -qE "Failed!"; then
       failed=$(printf '%s' "$arch_out" | grep -E "Failed |^\s+X " | head -n 5)
       msgs+=("Architecture tests failed:\n$failed\nModule boundaries or domain purity rules are violated.")

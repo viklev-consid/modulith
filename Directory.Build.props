@@ -11,6 +11,8 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)</SolutionDir>
+    <SolutionName Condition="'$(SolutionName)' == ''">Modulith</SolutionName>
   </PropertyGroup>
 
   <ItemGroup>

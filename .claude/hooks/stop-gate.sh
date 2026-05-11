@@ -5,6 +5,8 @@
 
 set -uo pipefail
 
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+
 # Read input just to drain stdin (we don't use it)
 cat >/dev/null
 
@@ -14,13 +16,13 @@ if [[ "${CLAUDE_STOP_HOOK_ACTIVE:-0}" == "1" ]]; then
   exit 0
 fi
 
-arch_proj=$(find "$CLAUDE_PROJECT_DIR/tests" -name "*Architecture*.csproj" -print -quit 2>/dev/null || true)
+arch_proj=$(find "$PROJECT_DIR/tests" -name "*Architecture*.csproj" -print -quit 2>/dev/null || true)
 
 if [[ -z "$arch_proj" ]]; then
   exit 0
 fi
 
-out=$(cd "$CLAUDE_PROJECT_DIR" && dotnet test "$arch_proj" --nologo --verbosity quiet 2>&1)
+out=$(cd "$PROJECT_DIR" && dotnet test "$arch_proj" --nologo --verbosity quiet 2>&1)
 rc=$?
 
 if [[ $rc -ne 0 ]]; then

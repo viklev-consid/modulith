@@ -23,7 +23,7 @@ Those same properties also make the codebase easier for AI agents to work in. Cl
 - **Rich domain model** with invariants enforced via factory methods and private setters
 - **Result pattern** for expected failures, exceptions reserved for truly exceptional cases
 - **ProblemDetails** for all error responses via `IExceptionHandler`
-- **JWT bearer authentication** with a lightweight Users module (no ASP.NET Identity) — register, login, password reset, change password, email change with confirmation, refresh token rotation, logout, and logout-everywhere
+- **JWT bearer authentication** with a lightweight Users module (no ASP.NET Identity) — register, invite-only or disabled registration modes, login, password reset, change password, email change with confirmation, refresh token rotation, logout, and logout-everywhere
 - **Role-based access control (RBAC)** — `admin` / `user` roles, `PermissionCatalog` auto-discovers all `*Permissions` types from `*.Contracts` assemblies at startup, per-permission `AuthorizationPolicy` instances registered automatically, `PermissionClaimsTransformation` adds permission claims per request from the JWT role claim
 - **FluentValidation** for request validation
 - **Scalar** for OpenAPI documentation
@@ -58,6 +58,29 @@ dotnet run --project src/AppHost
 # Run the tests
 dotnet test
 ```
+
+## Common configuration
+
+Most module behavior is configured under `Modules:<ModuleName>`. The Users module defaults to open registration, but templates can switch account creation to invite-only or disable registration entirely:
+
+```json
+{
+  "Modules": {
+    "Users": {
+      "Registration": {
+        "Mode": "Open",
+        "InvitationTokenLifetime": "7.00:00:00"
+      }
+    }
+  }
+}
+```
+
+Supported `Modules:Users:Registration:Mode` values:
+
+- `Open` — anyone can register, and first-time external login can provision an account.
+- `InviteOnly` — password registration and first-time external-login provisioning require a valid invitation token.
+- `Disabled` — new account registration/provisioning is closed; existing users can still log in.
 
 ## Working with AI agents
 
