@@ -116,7 +116,7 @@ No foreign keys across modules. No navigation properties across modules. No `Inc
 
 If `Orders.Orders` has a `CustomerId`, it's a `Guid` column — not an FK to `Users.Users.Id`.
 
-Referential integrity is enforced at the application layer (by validating the reference exists when the order is placed). Periodic consistency checks (as a scheduled Wolverine job, if needed) can detect drift.
+Referential integrity is enforced at the application layer (by validating the reference exists when the order is placed). Periodic consistency checks (as a TickerQ recurring job that dispatches a Wolverine command, if needed) can detect drift.
 
 See [`adr/0023-per-module-dbcontext.md`](../adr/0023-per-module-dbcontext.md).
 

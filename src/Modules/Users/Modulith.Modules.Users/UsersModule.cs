@@ -43,6 +43,8 @@ using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
 using OpenTelemetry;
+using TickerQ.Utilities;
+using TickerQ.Utilities.Entities;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 
@@ -161,6 +163,15 @@ public static class UsersModule
         opts.Discovery.IncludeType<SetInitialPasswordHandler>();
         opts.Discovery.IncludeType<CompleteOnboardingHandler>();
 
+        return opts;
+    }
+
+    public static TickerOptionsBuilder<TimeTickerEntity, CronTickerEntity> AddUsersJobs(
+        this TickerOptionsBuilder<TimeTickerEntity, CronTickerEntity> opts)
+    {
+        // TickerQ discovers cron jobs from [TickerFunction] attributes. Keep this
+        // extension as the module-owned registration point for future job options.
+        _ = typeof(SweepExpiredTokensJob);
         return opts;
     }
 

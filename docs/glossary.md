@@ -144,6 +144,8 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **TestSupport.** A test project containing shared fixtures and helpers such as `ApiTestFixture`, anonymous/authenticated `HttpClient` helpers, fake email senders, and `TestClock`. Referenced by all module test projects.
 
+**TickerQ.** The recurring scheduler used for operator-visible cron jobs. TickerQ jobs should usually dispatch Wolverine commands so module behavior still flows through the normal handler pipeline.
+
 **Terms Acceptance.** An immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`). Created by the `CompleteOnboarding` slice, which writes a single ToS row keyed to the current `UsersOptions.TermsOfServiceVersion`. Keyed by `(UserId, Version)` with a unique constraint — re-submitting `CompleteOnboarding` when a row for the current version already exists is a no-op. Distinct from *Consent*, which gates optional processing (e.g. `marketing-emails`); terms acceptance is required for account activation.
 
 **Transport.** The layer that physically delivers a notification: `IEmailSender`, `ISmsSender`. Lives in `Shared.Infrastructure`. Distinct from orchestration (templates, preferences), which is the Notifications module's job.
@@ -158,4 +160,4 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Wire-stable.** Safe to serialize across module or HTTP boundaries without depending on internal types or semantics that may change freely. Integration events and public contracts must be wire-stable; domain events are not.
 
-**Wolverine.** The in-process message bus + durable outbox + background job scheduler used throughout. Replaces the combination of MediatR, Hangfire, and MassTransit.
+**Wolverine.** The in-process message bus + durable outbox + delayed-message mechanism used throughout. It remains the dispatch surface for endpoints, module commands, queries, and integration events.

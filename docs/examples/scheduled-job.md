@@ -1,29 +1,56 @@
-# Example: Scheduled Background Job
+# Example: Recurring Scheduled Job
 
-**Pattern:** Wolverine message that self-reschedules — runs once daily, re-enqueues itself for the next day.
+**Pattern:** TickerQ cron trigger dispatches a Wolverine command. TickerQ owns *when* the job runs; the module handler owns *what* the work means.
 
-**Source:** `src/Modules/Users/Modulith.Modules.Users/Jobs/SweepExpiredTokensHandler.cs`
+**Source:** `src/Modules/Users/Modulith.Modules.Users/Jobs/`
 
 ---
 
-## The job
+## The command
 
 ```csharp
-using Microsoft.EntityFrameworkCore;
-using Modulith.Modules.Users.Persistence;
-using Modulith.Shared.Kernel.Interfaces;
+namespace Modulith.Modules.Users.Jobs;
+
+/// <summary>Scheduled daily to delete expired tokens beyond the grace period.</summary>
+public sealed record SweepExpiredTokens;
+```
+
+`SweepExpiredTokens` is still a Wolverine message. Keeping the work behind `IMessageBus` means the job uses the same handler discovery, transaction middleware, instrumentation, and module conventions as HTTP-initiated commands.
+
+---
+
+## The TickerQ trigger
+
+```csharp
+using TickerQ.Utilities.Base;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Jobs;
 
-/// <summary>Scheduled daily to delete expired tokens beyond the grace period.</summary>
-public sealed record SweepExpiredTokens;        // message trigger — no payload needed
+public sealed class SweepExpiredTokensJob(IMessageBus bus)
+{
+    public const string Name = "users.sweep-expired-tokens";
+    public const string CronExpression = "0 0 3 * * *";
 
-public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock, IMessageBus bus)
+    [TickerFunction(Name, CronExpression)]
+    public async Task ExecuteAsync(TickerFunctionContext context, CancellationToken ct)
+    {
+        await bus.InvokeAsync(new SweepExpiredTokens(), ct);
+    }
+}
+```
+
+The TickerQ job is deliberately thin. It declares the stable operator-facing job name and schedule, then dispatches the application command.
+
+---
+
+## The handler
+
+```csharp
+public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock)
 {
     public async Task Handle(SweepExpiredTokens _, CancellationToken ct)
     {
-        // Retain tokens for 7 days past expiry for audit/forensics — then hard delete
         var cutoff = clock.UtcNow.AddDays(-7);
 
         await db.RefreshTokens
@@ -34,76 +61,53 @@ public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock, I
             .Where(t => t.ExpiresAt < cutoff)
             .ExecuteDeleteAsync(ct);
 
-        // Re-schedule for next day
-        await bus.PublishAsync(
-            new SweepExpiredTokens(),
-            new DeliveryOptions { ScheduledTime = clock.UtcNow.AddDays(1) });
+        await db.PendingEmailChanges
+            .Where(p => !db.SingleUseTokens.Any(t => t.Id == p.TokenId))
+            .ExecuteDeleteAsync(ct);
+
+        await db.PendingExternalLogins
+            .Where(p => p.ExpiresAt < clock.UtcNow || p.ConsumedAt != null)
+            .ExecuteDeleteAsync(ct);
     }
 }
 ```
 
----
-
-## Anatomy
-
-### Message trigger
-
-`SweepExpiredTokens` is a plain record — no payload, no return value. Wolverine matches it to the handler by convention.
-
-### `ExecuteDeleteAsync`
-
-Bulk-delete via EF Core's `ExecuteDeleteAsync` — translates to a single `DELETE WHERE` SQL statement. Never load entities into memory just to delete them in a background sweep.
-
-### Self-reschedule
-
-The handler publishes the next invocation before returning. `DeliveryOptions.ScheduledTime` tells Wolverine to enqueue the message for delivery at that time. The message goes through the durable outbox — it survives process restarts.
-
-Because the handler runs inside a Wolverine message transaction, the reschedule and the deletes are atomic: if the transaction rolls back, neither happens and the next scheduled delivery is the one already in the queue.
-
-### `IClock` instead of `DateTime.UtcNow`
-
-Always use `IClock.UtcNow`. Integration tests inject `TestClock` to control time and verify the sweep fires correctly at the boundary conditions.
-
-### Handler visibility
-
-`public sealed class` — Wolverine requires it.
+The handler does not reschedule itself. Recurrence belongs to TickerQ.
 
 ---
 
-## Seeding the first run
+## Module registration
 
-Register the initial schedule in the module seeder so it fires on the first deployment:
+`UsersModuleInstaller` participates in two separate registration flows:
 
 ```csharp
-// src/Modules/Users/Modulith.Modules.Users/Seeding/UsersModuleSeeder.cs
-public sealed class UsersModuleSeeder(IMessageBus bus, IClock clock) : IModuleSeeder
+public void ConfigureMessaging(WolverineOptions options)
 {
-    public async Task SeedAsync(CancellationToken ct)
-    {
-        // Seed users ...
+    options.AddUsersHandlers();
+}
 
-        // Kick off the daily token sweep if not already scheduled
-        await bus.PublishAsync(
-            new SweepExpiredTokens(),
-            new DeliveryOptions { ScheduledTime = clock.UtcNow.AddDays(1) });
-    }
+public void ConfigureJobs(TickerOptionsBuilder<TimeTickerEntity, CronTickerEntity> options)
+{
+    options.AddUsersJobs();
 }
 ```
 
-The sweep already reschedules itself after each run, so the seeder only needs to fire once. On re-deployment the job is already in the durable queue.
+Wolverine registration discovers the command handler. TickerQ discovers `[TickerFunction]` cron functions and exposes them in the jobs dashboard at `/admin/jobs`.
 
 ---
 
 ## When to use this pattern
 
-- Periodic maintenance tasks (token sweep, log rotation, report generation).
-- Tasks that must survive restarts — the durable outbox ensures delivery.
-- Tasks with simple recurrence logic — for complex cron-style schedules, prefer a dedicated Wolverine `ScheduledJob`.
+- Recurring maintenance work such as token cleanup, retention sweeps, report generation, or consistency checks.
+- Jobs operators should inspect, pause, or run from the TickerQ dashboard.
+- Work that benefits from the normal module handler pipeline.
+
+For delayed follow-up work that must be transactionally coupled to a business operation, use Wolverine delayed messages instead.
 
 ---
 
 ## Related
 
-- [`../adr/0003-wolverine-for-messaging.md`](../adr/0003-wolverine-for-messaging.md)
-- [`../adr/0026-module-seeders.md`](../adr/0026-module-seeders.md)
+- [`../how-to/add-scheduled-job.md`](../how-to/add-scheduled-job.md)
+- [`../how-to/cross-module-events.md`](../how-to/cross-module-events.md)
 - [`../how-to/write-integration-test.md`](../how-to/write-integration-test.md)

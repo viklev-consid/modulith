@@ -42,6 +42,9 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.7" />
     <PackageVersion Include="Npgsql" Version="10.0.2" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+    <PackageVersion Include="TickerQ" Version="10.1.1" />
+    <PackageVersion Include="TickerQ.Dashboard" Version="10.1.1" />
+    <PackageVersion Include="TickerQ.EntityFrameworkCore" Version="10.1.1" />
     <PackageVersion Include="WolverineFx" Version="5.32.1" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.32.1" />
     <PackageVersion Include="WolverineFx.Postgresql" Version="5.32.1" />

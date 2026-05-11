@@ -1,6 +1,6 @@
 ---
 name: wolverine-messaging
-description: Repo-specific guidance for using Wolverine in Modulith. Covers IMessageBus dispatch, handler registration, outbox semantics, subscriber design, scheduled jobs, and testing with TrackActivity.
+description: Repo-specific guidance for using Wolverine in Modulith. Covers IMessageBus dispatch, handler registration, outbox semantics, subscriber design, delayed messages, and testing with TrackActivity.
 ---
 
 # Wolverine Messaging
@@ -12,7 +12,7 @@ Typical triggers:
 - endpoint to handler dispatch through `IMessageBus`
 - publishing integration events
 - adding subscriber handlers in `Integration/`
-- adding a scheduled message or background job
+- adding a delayed message or the Wolverine handler behind a TickerQ scheduled job
 - testing message flows
 
 Do not use this skill when:
@@ -42,7 +42,8 @@ Use it for:
 - command dispatch with `InvokeAsync<T>()`
 - query dispatch with `InvokeAsync<T>()`
 - integration event publication with `PublishAsync(...)`
-- scheduled work via scheduled message publication
+- delayed follow-up work via scheduled message publication
+- recurring work by handling commands dispatched from TickerQ jobs
 
 Do not introduce MediatR, MassTransit, or Hangfire alongside Wolverine.
 
@@ -88,7 +89,7 @@ Do this for:
 - feature handlers
 - integration subscribers
 - internal publisher handlers that map domain events to integration events
-- scheduled job handlers
+- handlers invoked by scheduled jobs
 
 If the handler is not included, the behavior is not wired.
 
@@ -132,17 +133,20 @@ Follow these conventions instead:
 
 The outbox guarantees at-least-once producer delivery. It does not make subscribers idempotent.
 
-## Scheduled job rules
+## Scheduled and delayed work rules
 
-The repo's documented background-job pattern is a scheduled message, often self-rescheduling.
+TickerQ owns recurring cron-style jobs. Wolverine owns the command/message handler that performs module behavior.
 
 Prefer nearby examples over inventing new abstractions.
 
 Current documented pattern:
 
-- a record message acts as the trigger
+- a record message acts as the module command
+- a TickerQ job declares the schedule with `[TickerFunction]`
 - the handler does the maintenance work
-- it publishes the next scheduled occurrence using Wolverine delivery options
+- the TickerQ job dispatches the command through `IMessageBus`
+
+Use Wolverine scheduled/delayed messages only for one-off follow-up work that should stay transactionally coupled to a handler. Do not use self-rescheduling Wolverine messages as the default recurring-job pattern.
 
 If you need a more complex workflow such as a saga or state machine, stop and ask first. This repo does not yet codify a canonical saga pattern.
 

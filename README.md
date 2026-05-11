@@ -18,7 +18,8 @@ Those same properties also make the codebase easier for AI agents to work in. Cl
 
 - **Vertical slice architecture** with per-feature folders
 - **Modular boundaries** enforced at compile time and by architectural tests
-- **Wolverine** for in-process messaging, transactional outbox, and background jobs
+- **Wolverine** for in-process messaging, transactional outbox, delayed messages, and handler middleware
+- **TickerQ** for recurring scheduled jobs with an admin dashboard at `/admin/jobs`
 - **EF Core per module** with its own schema and migrations
 - **Rich domain model** with invariants enforced via factory methods and private setters
 - **Result pattern** for expected failures, exceptions reserved for truly exceptional cases
@@ -125,7 +126,7 @@ The `.claude/` directory ships an active harness for Claude Code, plus repo-loca
 - `rich-domain-model` — aggregates, value objects, typed IDs, and internal domain events
 - `testing-strategy` — choosing the correct test layer and using the shared test harness well
 - `ef-migration` — per-module migration workflow and destructive-change safety
-- `wolverine-messaging` — `IMessageBus`, outbox semantics, subscribers, and scheduled jobs
+- `wolverine-messaging` — `IMessageBus`, outbox semantics, subscribers, and delayed messages
 - `gdpr-primitives` — personal-data classification, export/erasure hooks, consent, and retention
 - `access-control` — endpoint-level authorization, `ICurrentUser`, and resource policies
 - `authorization-model` — the system RBAC model: roles, permissions, registration, and claim expansion
@@ -167,6 +168,7 @@ The structural choices reinforce each other:
 - [`docs/agentic-development.md`](docs/agentic-development.md) — how this template is set up for AI agent development
 - [`docs/adr/`](docs/adr/) — Architecture Decision Records explaining *why* each major decision was made
 - [`docs/how-to/`](docs/how-to/) — practical guides for common tasks
+- [`docs/how-to/add-scheduled-job.md`](docs/how-to/add-scheduled-job.md) — adding recurring TickerQ jobs that dispatch Wolverine commands
 - [`docs/examples/`](docs/examples/) — worked patterns extracted from real modules (query slice, command+event, cross-module subscriber, scheduled job, security-sensitive slice)
 - [`COMPLIANCE.md`](COMPLIANCE.md) — GDPR posture and compliance considerations
 - [`CONFIG.md`](CONFIG.md) — configuration hierarchy and secrets management

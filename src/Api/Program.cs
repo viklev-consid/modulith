@@ -25,6 +25,8 @@ using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
 using Scalar.AspNetCore;
+using TickerQ.Dashboard.DependencyInjection;
+using TickerQ.DependencyInjection;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.ErrorHandling;
@@ -201,7 +203,19 @@ builder.Services
     .AddFeatureManagement()
     .WithTargeting<CurrentUserTargetingContextAccessor>();
 
-// 12. Wolverine — messaging, outbox, background jobs
+// 12. TickerQ — recurring scheduled jobs and operator dashboard
+builder.Services.AddTickerQ(opts =>
+{
+    opts.AddDashboard(dashboard =>
+    {
+        dashboard.SetBasePath("/admin/jobs");
+        dashboard.WithHostAuthentication("Admin");
+    });
+
+    opts.ConfigureModuleJobs(modules);
+});
+
+// 13. Wolverine — messaging, outbox, delayed messages, and handler middleware
 builder.UseWolverine(opts =>
 {
     opts.PersistMessagesWithPostgresql(
@@ -302,6 +316,8 @@ else
 }
 
 app.UseHttpsRedirection();
+
+app.UseTickerQ();
 
 // 14. Module endpoint registrations
 app.MapModuleEndpoints(modules);
