@@ -34,7 +34,7 @@ Those same properties also make the codebase easier for AI agents to work in. Cl
 - **Built-in rate limiting** with tiered policies
 - **Microsoft.FeatureManagement** for feature flags
 - **Blob storage abstraction** with a local-disk reference implementation
-- **Notifications module** with Razor templates and Mailpit for dev
+- **Notifications module** with transactional email, product-facing bell notifications, SSE updates, user preferences, retention cleanup, Razor templates, and Mailpit for dev
 - **Audit module** consuming domain events for change history
 - **Per-module health checks** registered under the `ready` tag, visible in the Aspire dashboard
 - **Per-module OpenTelemetry activity sources** with full handler instrumentation
@@ -82,6 +82,8 @@ Supported `Modules:Users:Registration:Mode` values:
 - `Open` — anyone can register, and first-time external login can provision an account.
 - `InviteOnly` — password registration and first-time external-login provisioning require a valid invitation token.
 - `Disabled` — new account registration/provisioning is closed; existing users can still log in.
+
+The Notifications module separates account/security email from product-facing bell notifications. Password reset, password changed, email change, welcome, and external-login notifications stay email-first. Bell notifications are for in-app product activity such as replies, mentions, assignments, approvals, and workflow updates. The bell API is scoped to the current user under `/v1/me/notifications`, with unread counts, read/archive actions, SSE live updates, preferences under `/v1/me/notification-preferences`, and scheduled retention cleanup.
 
 ## Working with AI agents
 
