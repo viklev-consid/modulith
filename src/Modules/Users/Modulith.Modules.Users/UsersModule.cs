@@ -10,6 +10,7 @@ using Modulith.Modules.Users.Contracts.Authorization;
 using Modulith.Modules.Users.Features.ChangePassword;
 using Modulith.Modules.Users.Features.ChangeUserRole;
 using Modulith.Modules.Users.Features.ConfirmEmailChange;
+using Modulith.Modules.Users.Features.CreateInvitation;
 using Modulith.Modules.Users.Features.DeleteAccount;
 using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
@@ -29,6 +30,7 @@ using Modulith.Modules.Users.Features.RefreshToken;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Features.RequestEmailChange;
 using Modulith.Modules.Users.Features.ResetPassword;
+using Modulith.Modules.Users.Features.RevokeInvitation;
 using Modulith.Modules.Users.Gdpr;
 using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
@@ -56,6 +58,8 @@ public static class UsersModule
         services.AddOptions<UsersOptions>()
             .Bind(configuration.GetSection("Modules:Users"))
             .ValidateDataAnnotations()
+            .Validate(o => Enum.IsDefined(o.Registration.Mode), "Registration mode must be a valid value.")
+            .Validate(o => o.Registration.InvitationTokenLifetime > TimeSpan.Zero, "Invitation token lifetime must be greater than zero.")
             .ValidateOnStart();
 
         services.AddOptions<AdminBootstrapOptions>()
@@ -146,6 +150,8 @@ public static class UsersModule
         opts.Discovery.IncludeType<ChangeUserRoleHandler>();
         opts.Discovery.IncludeType<ListUsersHandler>();
         opts.Discovery.IncludeType<GetUserByIdHandler>();
+        opts.Discovery.IncludeType<CreateInvitationHandler>();
+        opts.Discovery.IncludeType<RevokeInvitationHandler>();
 
         // External login handlers — Phase 14
         opts.Discovery.IncludeType<GoogleLoginHandler>();
@@ -180,6 +186,8 @@ public static class UsersModule
         ChangeUserRoleEndpoint.Map(app);
         ListUsersEndpoint.Map(app);
         GetUserByIdEndpoint.Map(app);
+        CreateInvitationEndpoint.Map(app);
+        RevokeInvitationEndpoint.Map(app);
 
         // External login endpoints — Phase 14
         GoogleLoginEndpoint.Map(app);

@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Modulith.Modules.Users.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Modulith.Modules.Users.Persistence.Migrations
-{
-    [DbContext(typeof(UsersDbContext))]
-    partial class UsersDbContextModelSnapshot : ModelSnapshot
+namespace Modulith.Modules.Users.Persistence.Migrations;
+
+[DbContext(typeof(UsersDbContext))]
+    [Migration("20260511080910_AddUserInvitations")]
+    partial class AddUserInvitations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -560,4 +563,3 @@ namespace Modulith.Modules.Users.Persistence.Migrations
 #pragma warning restore 612, 618
         }
     }
-}

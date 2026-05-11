@@ -30,4 +30,21 @@ public sealed class UsersOptions
 
     [Required]
     public string PrivacyPolicyVersion { get; init; } = "1.0";
+
+    [Required]
+    public UsersRegistrationOptions Registration { get; init; } = new();
+}
+
+public sealed class UsersRegistrationOptions
+{
+    public RegistrationMode Mode { get; init; } = RegistrationMode.Open;
+
+    public TimeSpan InvitationTokenLifetime { get; init; } = TimeSpan.FromDays(7);
+}
+
+public enum RegistrationMode
+{
+    Open,
+    InviteOnly,
+    Disabled
 }

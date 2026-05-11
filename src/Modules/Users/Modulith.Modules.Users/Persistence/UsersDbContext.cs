@@ -14,6 +14,7 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : M
     public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
     public DbSet<PendingExternalLogin> PendingExternalLogins => Set<PendingExternalLogin>();
     public DbSet<TermsAcceptance> TermsAcceptances => Set<TermsAcceptance>();
+    public DbSet<UserInvitation> UserInvitations => Set<UserInvitation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

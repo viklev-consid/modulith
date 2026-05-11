@@ -19,7 +19,7 @@ internal static class RegisterEndpoint
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
-                var command = new RegisterCommand(request.Email, request.Password, request.DisplayName);
+                var command = new RegisterCommand(request.Email, request.Password, request.DisplayName, request.InvitationToken);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<RegisterResponse>>(command, ct);
                 return result.ToProblemDetailsOr(r => Results.Created($"/v1/users/{r.UserId}", r));
             })

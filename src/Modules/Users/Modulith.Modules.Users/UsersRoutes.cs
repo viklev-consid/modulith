@@ -11,6 +11,8 @@ internal static class UsersRoutes
     public const string List = Prefix;
     public const string ById = $"{Prefix}/{{userId:guid}}";
     public const string ChangeRole = $"{Prefix}/{{userId:guid}}/role";
+    public const string Invitations = $"{Prefix}/invitations";
+    public const string InvitationById = $"{Invitations}/{{invitationId:guid}}";
 
     // Auth flows — Phase 9.5
     public const string ForgotPassword = $"{Prefix}/password/forgot";

@@ -40,6 +40,27 @@ public sealed class RegisterHandler(
             return UsersErrors.EmailAlreadyRegistered;
         }
 
+        UserInvitation? invitation = null;
+        var registration = options.Value.Registration;
+        if (registration.Mode == RegistrationMode.Disabled)
+        {
+            return UsersErrors.RegistrationUnavailable;
+        }
+
+        if (registration.Mode == RegistrationMode.InviteOnly)
+        {
+            if (string.IsNullOrWhiteSpace(cmd.InvitationToken))
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+
+            invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
+            if (invitation is null)
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+        }
+
         var passwordHash = new PasswordHash(passwordHasher.Hash(cmd.Password));
         var userResult = User.CreateWithPassword(email, passwordHash, cmd.DisplayName);
         if (userResult.IsError)
@@ -48,6 +69,16 @@ public sealed class RegisterHandler(
         }
 
         var user = userResult.Value;
+
+        if (invitation is not null)
+        {
+            var acceptResult = invitation.Accept(user.Id, email, clock);
+            if (acceptResult.IsError)
+            {
+                return UsersErrors.RegistrationUnavailable;
+            }
+        }
+
         db.Users.Add(user);
 
         // Grant default consents on registration.
@@ -79,5 +110,18 @@ public sealed class RegisterHandler(
             accessTokenExpiresAt,
             rawRefreshToken,
             refreshToken.ExpiresAt);
+    }
+
+    private async Task<UserInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)
+    {
+        var tokenHash = UserInvitation.HashRawValue(rawToken);
+
+        return await db.UserInvitations
+            .FromSqlInterpolated($"""
+                SELECT * FROM users.user_invitations
+                WHERE token_hash = {tokenHash}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(ct);
     }
 }
