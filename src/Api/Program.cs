@@ -327,7 +327,8 @@ app.UseModules(modules);
 app.MapDeadLetterAdminEndpoints();
 
 // 15. Dev seeders (idempotent)
-if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
+var moduleSeedersEnabled = builder.Configuration.GetValue("Modules:Seeders:Enabled", true);
+if (moduleSeedersEnabled && (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test")))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var seeders = scope.ServiceProvider.GetServices<IModuleSeeder>();
