@@ -33,11 +33,14 @@ internal sealed class UserInvitationConfiguration : IEntityTypeConfiguration<Use
         builder.Property(i => i.UserAgent)
             .HasMaxLength(512);
 
+        builder.Property(i => i.IsPending)
+            .IsRequired();
+
         builder.HasIndex(i => i.TokenHash)
             .IsUnique();
 
         builder.HasIndex(i => i.Email)
-            .HasFilter("accepted_at IS NULL AND revoked_at IS NULL")
+            .HasFilter("is_pending = true")
             .IsUnique();
     }
 }

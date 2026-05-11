@@ -26,6 +26,7 @@ public sealed class UserInvitation : Entity<UserInvitationId>
         InvitedByUserId = invitedByUserId;
         CreatedFromIp = createdFromIp;
         UserAgent = userAgent;
+        IsPending = true;
     }
 
     private UserInvitation() : base(new UserInvitationId(Guid.Empty)) { }
@@ -40,6 +41,7 @@ public sealed class UserInvitation : Entity<UserInvitationId>
     public DateTimeOffset? AcceptedAt { get; private set; }
     public UserId? AcceptedUserId { get; private set; }
     public DateTimeOffset? RevokedAt { get; private set; }
+    public bool IsPending { get; private set; }
 
     public static ErrorOr<(UserInvitation invitation, string rawToken)> Create(
         Email email,
@@ -77,13 +79,14 @@ public sealed class UserInvitation : Entity<UserInvitationId>
             return UsersErrors.InvitationInvalid;
         }
 
-        if (!IsPending(clock))
+        if (!CanBeAccepted(clock))
         {
             return UsersErrors.InvitationInvalid;
         }
 
         AcceptedAt = clock.UtcNow;
         AcceptedUserId = userId;
+        IsPending = false;
         return Result.Success;
     }
 
@@ -100,11 +103,12 @@ public sealed class UserInvitation : Entity<UserInvitationId>
         }
 
         RevokedAt = clock.UtcNow;
+        IsPending = false;
         return Result.Success;
     }
 
-    public bool IsPending(IClock clock) =>
-        AcceptedAt is null && RevokedAt is null && ExpiresAt > clock.UtcNow;
+    public bool CanBeAccepted(IClock clock) =>
+        IsPending && ExpiresAt > clock.UtcNow;
 
     public static byte[] HashRawValue(string rawValue) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(rawValue));
