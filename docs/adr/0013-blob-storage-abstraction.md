@@ -65,7 +65,7 @@ Orphaned blobs are the canonical problem — upload succeeds, downstream DB save
 
 1. **Upload** completes. Blob exists, `BlobUploaded(BlobRef)` is published via outbox.
 2. **Domain operation** references the blob. When the aggregate is saved, `BlobCommitted(BlobRef)` is published.
-3. **Orphan sweeper** (scheduled Wolverine job) deletes blobs whose `BlobUploaded` has no corresponding `BlobCommitted` after N hours.
+3. **Orphan sweeper** (TickerQ recurring job that dispatches a Wolverine command) deletes blobs whose `BlobUploaded` has no corresponding `BlobCommitted` after N hours.
 
 This guarantees no stranded blobs regardless of where the operation fails.
 

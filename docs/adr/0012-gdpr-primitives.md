@@ -86,7 +86,7 @@ public interface IRetainable
 }
 ```
 
-A scheduled Wolverine job sweeps `IRetainable` entities past their retention period. The per-module implementation of the sweep is the module's responsibility (some anonymize, some delete, some archive).
+A TickerQ recurring job dispatches module-owned Wolverine commands to sweep `IRetainable` entities past their retention period. The per-module implementation of the sweep is the module's responsibility (some anonymize, some delete, some archive).
 
 ### 5. Documentation
 

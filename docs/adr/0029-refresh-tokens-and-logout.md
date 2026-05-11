@@ -107,7 +107,7 @@ These are handled inside the respective slices â€” not via integration events â€
 
 ### Sweeping expired tokens
 
-A scheduled Wolverine job runs daily, deleting records where `expires_at < now - <grace period>`. The grace period (e.g., 7 days past expiry) retains tokens briefly for audit/forensics.
+A TickerQ recurring job dispatches the module-owned Wolverine command daily, deleting records where `expires_at < now - <grace period>`. The grace period (e.g., 7 days past expiry) retains tokens briefly for audit/forensics.
 
 ### Device fingerprint
 

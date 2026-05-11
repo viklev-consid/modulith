@@ -8,7 +8,7 @@ This directory contains ADRs documenting every significant design decision in Mo
 |---|---|---|
 | [0001](0001-modular-monolith.md) | Modular Monolith Architecture | Accepted |
 | [0002](0002-vertical-slice-architecture.md) | Vertical Slice Architecture | Accepted |
-| [0003](0003-wolverine-for-messaging.md) | Wolverine for Messaging, Outbox, and Background Jobs | Accepted |
+| [0003](0003-wolverine-for-messaging.md) | Wolverine for Messaging, Outbox, and Delayed Messages | Accepted |
 | [0004](0004-result-pattern.md) | Result Pattern Over Exceptions | Accepted |
 | [0005](0005-module-communication-patterns.md) | Module Communication via Contracts Projects | Accepted |
 | [0006](0006-internal-vs-public-events.md) | Separate Internal Domain Events from Public Integration Events | Accepted |
@@ -36,6 +36,8 @@ This directory contains ADRs documenting every significant design decision in Mo
 | [0028](0028-auth-flows-baseline.md) | Baseline Authentication Flows | Accepted |
 | [0029](0029-refresh-tokens-and-logout.md) | Refresh Tokens for Logout and Session Management | Accepted |
 | [0030](0030-rbac.md) | Role-Based Access Control with Permission-Level Policies | Accepted |
+| [0031](0031-third-party-authentication.md) | Third-party Authentication | Accepted |
+| [0032](0032-tickerq-for-recurring-scheduled-jobs.md) | TickerQ for Recurring Scheduled Jobs | Accepted |
 
 ## Reading order
 
@@ -56,5 +58,6 @@ If you read more, add:
 10. [0027 — Agentic Development](0027-agentic-development-support.md)
 11. [0028 — Auth Flows Baseline](0028-auth-flows-baseline.md)
 12. [0029 — Refresh Tokens](0029-refresh-tokens-and-logout.md)
+13. [0032 — TickerQ for Recurring Jobs](0032-tickerq-for-recurring-scheduled-jobs.md)
 
 Everything else is domain-specific and can be read as needed.
