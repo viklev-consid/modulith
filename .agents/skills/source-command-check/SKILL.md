@@ -11,6 +11,8 @@ Use this skill when the user asks to run the migrated source command `check`.
 
 Run the local validation suite, scoped to what changed.
 
+Run every `dotnet` command outside the sandbox by setting `sandbox_permissions` to `require_escalated`. Use a concise justification that says the source check dotnet commands should run outside the sandbox.
+
 1. Find changed `.cs` files: `git diff --name-only HEAD` plus `git status --short`.
 2. From those, derive the set of affected `.csproj` paths (walk up from each file to the nearest `.csproj`).
 3. For each affected project:
