@@ -83,7 +83,7 @@ public sealed class CreateNotificationHandler(
 
             var existingId = await db.UserNotifications
                 .AsNoTracking()
-                .Where(n => n.IdempotencyKey == command.IdempotencyKey)
+                .Where(n => n.RecipientUserId == command.RecipientUserId && n.IdempotencyKey == command.IdempotencyKey)
                 .Select(n => (Guid?)n.Id.Value)
                 .SingleOrDefaultAsync(ct);
 

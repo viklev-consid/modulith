@@ -65,6 +65,6 @@ internal sealed class UserNotificationConfiguration : IEntityTypeConfiguration<U
         builder.HasIndex(n => new { n.RecipientUserId, n.ArchivedAt, n.CreatedAt });
         builder.HasIndex(n => n.RetentionUntil);
         builder.HasIndex(n => n.ExpiresAt);
-        builder.HasIndex(n => n.IdempotencyKey).IsUnique();
+        builder.HasIndex(n => new { n.RecipientUserId, n.IdempotencyKey }).IsUnique();
     }
 }

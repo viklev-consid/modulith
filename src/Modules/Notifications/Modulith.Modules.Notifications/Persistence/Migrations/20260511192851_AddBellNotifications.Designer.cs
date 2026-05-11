@@ -203,15 +203,15 @@ namespace Modulith.Modules.Notifications.Persistence.Migrations
                     b.HasIndex("ExpiresAt")
                         .HasDatabaseName("ix_user_notifications_expires_at");
 
-                    b.HasIndex("IdempotencyKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_user_notifications_idempotency_key");
-
                     b.HasIndex("RetentionUntil")
                         .HasDatabaseName("ix_user_notifications_retention_until");
 
                     b.HasIndex("RecipientUserId", "CreatedAt")
                         .HasDatabaseName("ix_user_notifications_recipient_user_id_created_at");
+
+                    b.HasIndex("RecipientUserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_notifications_recipient_user_id_idempotency_key");
 
                     b.HasIndex("RecipientUserId", "ArchivedAt", "CreatedAt")
                         .HasDatabaseName("ix_user_notifications_recipient_user_id_archived_at_created_at");

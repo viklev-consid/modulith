@@ -21,16 +21,26 @@ public sealed class InMemoryNotificationStreamPublisher : INotificationStreamPub
         });
     }
 
-    public async ValueTask PublishAsync(Guid userId, NotificationStreamEvent streamEvent, CancellationToken ct)
+    public ValueTask PublishAsync(Guid userId, NotificationStreamEvent streamEvent, CancellationToken ct)
     {
         if (!registrations.TryGetValue(userId, out var userRegistrations))
         {
-            return;
+            return ValueTask.CompletedTask;
         }
 
-        foreach (var registration in userRegistrations.Values)
+        foreach (var (registrationId, registration) in userRegistrations)
         {
-            await registration.Writer.WriteAsync(streamEvent, ct);
+            if (!registration.Writer.TryWrite(streamEvent))
+            {
+                userRegistrations.TryRemove(registrationId, out _);
+            }
         }
+
+        if (userRegistrations.IsEmpty)
+        {
+            registrations.TryRemove(userId, out _);
+        }
+
+        return ValueTask.CompletedTask;
     }
 }

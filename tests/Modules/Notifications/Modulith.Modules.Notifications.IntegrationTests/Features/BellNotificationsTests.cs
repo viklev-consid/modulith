@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Threading.Channels;
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,7 @@ using Modulith.Modules.Notifications.Features.ListMyNotifications;
 using Modulith.Modules.Notifications.Features.UpdateMyNotificationPreferences;
 using Modulith.Modules.Notifications.Jobs;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Notifications.Streaming;
 using Wolverine;
 
 namespace Modulith.Modules.Notifications.IntegrationTests.Features;
@@ -57,6 +59,41 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
 
         Assert.Equal(first, second);
         Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task CreateNotification_WithSameIdempotencyKeyForDifferentRecipients_CreatesOnePerRecipient()
+    {
+        var idempotencyKey = Guid.NewGuid();
+
+        var first = await CreateProductNotificationAsync(userId, "ticket.reply.created", idempotencyKey);
+        var second = await CreateProductNotificationAsync(otherUserId, "ticket.reply.created", idempotencyKey);
+
+        var count = await fixture.QueryDbAsync<NotificationsDbContext, int>(
+            (db, ct) => db.UserNotifications.CountAsync(n => n.IdempotencyKey == idempotencyKey, ct));
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.NotEqual(first, second);
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task StreamPublisher_WhenSubscriberIsClosed_DoesNotThrow()
+    {
+        var publisher = new InMemoryNotificationStreamPublisher();
+        var channel = Channel.CreateUnbounded<NotificationStreamEvent>();
+        var registration = new ChannelWriterRegistration(channel.Writer);
+        publisher.Subscribe(userId, registration);
+        channel.Writer.TryComplete();
+
+        var exception = await Record.ExceptionAsync(async () =>
+            await publisher.PublishAsync(
+                userId,
+                new NotificationStreamEvent("notification.created", "{}"),
+                CancellationToken.None));
+
+        Assert.Null(exception);
     }
 
     [Fact]

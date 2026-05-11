@@ -68,10 +68,10 @@ public partial class AddBellNotifications : Migration
             column: "expires_at");
 
         migrationBuilder.CreateIndex(
-            name: "ix_user_notifications_idempotency_key",
+            name: "ix_user_notifications_recipient_user_id_idempotency_key",
             schema: "notifications",
             table: "user_notifications",
-            column: "idempotency_key",
+            columns: new[] { "recipient_user_id", "idempotency_key" },
             unique: true);
 
         migrationBuilder.CreateIndex(
