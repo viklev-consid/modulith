@@ -4,6 +4,8 @@ using System.Threading.Channels;
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Modulith.Modules.Notifications;
 using Modulith.Modules.Notifications.Contracts.Commands;
 using Modulith.Modules.Notifications.Contracts.Dtos;
 using Modulith.Modules.Notifications.Domain;
@@ -81,7 +83,7 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
     [Fact]
     public async Task StreamPublisher_WhenSubscriberIsClosed_DoesNotThrow()
     {
-        var publisher = new InMemoryNotificationStreamPublisher();
+        var publisher = new InMemoryNotificationStreamPublisher(Options.Create(new NotificationsOptions()));
         var channel = Channel.CreateUnbounded<NotificationStreamEvent>();
         var registration = new ChannelWriterRegistration(channel.Writer);
         publisher.Subscribe(userId, registration);
@@ -94,6 +96,56 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
                 CancellationToken.None));
 
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void StreamPublisher_WhenUserHasMaximumActiveStreams_RejectsAdditionalSubscriptions()
+    {
+        var publisher = new InMemoryNotificationStreamPublisher(Options.Create(new NotificationsOptions
+        {
+            Stream = new NotificationsOptions.StreamOptions
+            {
+                MaxActiveStreamsPerUser = 1,
+                ChannelCapacity = 100,
+            },
+        }));
+        var firstChannel = Channel.CreateBounded<NotificationStreamEvent>(1);
+        var secondChannel = Channel.CreateBounded<NotificationStreamEvent>(1);
+        var first = new ChannelWriterRegistration(firstChannel.Writer);
+        var second = new ChannelWriterRegistration(secondChannel.Writer);
+
+        var firstSubscription = publisher.Subscribe(userId, first);
+        var secondSubscription = publisher.Subscribe(userId, second);
+
+        Assert.False(firstSubscription.IsError);
+        Assert.True(secondSubscription.IsError);
+        Assert.True(secondChannel.Reader.Completion.IsCompleted);
+
+        first.Dispose();
+    }
+
+    [Fact]
+    public void StreamPublisher_WhenSubscriptionIsDisposed_AllowsReplacementSubscription()
+    {
+        var publisher = new InMemoryNotificationStreamPublisher(Options.Create(new NotificationsOptions
+        {
+            Stream = new NotificationsOptions.StreamOptions
+            {
+                MaxActiveStreamsPerUser = 1,
+                ChannelCapacity = 100,
+            },
+        }));
+        var first = new ChannelWriterRegistration(Channel.CreateBounded<NotificationStreamEvent>(1).Writer);
+        var second = new ChannelWriterRegistration(Channel.CreateBounded<NotificationStreamEvent>(1).Writer);
+
+        var firstSubscription = publisher.Subscribe(userId, first);
+        first.Dispose();
+        var secondSubscription = publisher.Subscribe(userId, second);
+
+        Assert.False(firstSubscription.IsError);
+        Assert.False(secondSubscription.IsError);
+
+        second.Dispose();
     }
 
     [Fact]

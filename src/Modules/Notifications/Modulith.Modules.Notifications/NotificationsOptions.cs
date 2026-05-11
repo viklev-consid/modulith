@@ -6,6 +6,8 @@ public sealed class NotificationsOptions
 {
     public RetentionOptions Retention { get; init; } = new();
 
+    public StreamOptions Stream { get; init; } = new();
+
     public sealed class RetentionOptions
     {
         [Range(1, 3650)]
@@ -19,5 +21,14 @@ public sealed class NotificationsOptions
 
         [Range(1, 3650)]
         public int SecurityAndAccountDays { get; init; } = 365;
+    }
+
+    public sealed class StreamOptions
+    {
+        [Range(1, 10)]
+        public int MaxActiveStreamsPerUser { get; init; } = 3;
+
+        [Range(1, 1000)]
+        public int ChannelCapacity { get; init; } = 100;
     }
 }

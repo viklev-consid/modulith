@@ -23,6 +23,9 @@ internal static class NotificationsErrors
     public static readonly Error NotificationPreferenceInvalid =
         Error.Validation("Notifications.Preferences.Invalid", "The notification preference is invalid.");
 
+    public static readonly Error TooManyNotificationStreams =
+        Error.Conflict("Notifications.Stream.TooManyActiveStreams", "Too many notification streams are already active for this user.");
+
     // Idempotency
     public static readonly Error AlreadySent =
         Error.Conflict("Notifications.Notification.AlreadySent", "This notification has already been sent.");

@@ -47,5 +47,6 @@ internal static class StreamMyNotificationsEndpoint
         .WithSummary("Stream live in-app notification updates for the authenticated user.")
         .Produces(StatusCodes.Status200OK, contentType: "text/event-stream")
         .ProducesProblem(StatusCodes.Status401Unauthorized)
-        .RequireAuthorization();
+        .RequireAuthorization()
+        .RequireRateLimiting("read");
 }

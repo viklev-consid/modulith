@@ -39,6 +39,10 @@ public static class NotificationsModule
         services.AddOptions<NotificationsOptions>()
             .Bind(configuration.GetSection("Modules:Notifications"))
             .ValidateDataAnnotations()
+            .Validate(options => options.Stream.MaxActiveStreamsPerUser is >= 1 and <= 10,
+                "Notification stream max active streams per user must be between 1 and 10.")
+            .Validate(options => options.Stream.ChannelCapacity is >= 1 and <= 1000,
+                "Notification stream channel capacity must be between 1 and 1000.")
             .ValidateOnStart();
 
         services.AddOptions<SmtpOptions>()

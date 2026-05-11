@@ -1,8 +1,10 @@
+using ErrorOr;
+
 namespace Modulith.Modules.Notifications.Streaming;
 
 public interface INotificationStreamPublisher
 {
-    void Subscribe(Guid userId, ChannelWriterRegistration registration);
+    ErrorOr<Success> Subscribe(Guid userId, ChannelWriterRegistration registration);
 
     ValueTask PublishAsync(Guid userId, NotificationStreamEvent streamEvent, CancellationToken ct);
 }
