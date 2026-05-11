@@ -1,14 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
-using Wolverine;
 
 namespace Modulith.Modules.Users.Jobs;
 
 /// <summary>Scheduled daily to delete expired tokens beyond the grace period.</summary>
 public sealed record SweepExpiredTokens;
 
-public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock, IMessageBus bus)
+public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock)
 {
     public async Task Handle(SweepExpiredTokens _, CancellationToken ct)
     {
@@ -34,8 +33,5 @@ public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock, I
         await db.PendingExternalLogins
             .Where(p => p.ExpiresAt < clock.UtcNow || p.ConsumedAt != null)
             .ExecuteDeleteAsync(ct);
-
-        // Re-schedule for next day.
-        await bus.PublishAsync(new SweepExpiredTokens(), new DeliveryOptions { ScheduledTime = clock.UtcNow.AddDays(1) });
     }
 }

@@ -5,6 +5,7 @@ using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
@@ -14,6 +15,7 @@ using Modulith.Api.Infrastructure.FeatureFlags;
 using Modulith.Api.Infrastructure.Logging;
 using Modulith.Api.Infrastructure.Modules;
 using Modulith.Api.Infrastructure.OpenApi;
+using Modulith.Api.Infrastructure.Scheduling;
 using Modulith.Modules.Users.Security.Authorization;
 using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Blobs;
@@ -25,6 +27,9 @@ using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Infrastructure.Time;
 using Modulith.Shared.Kernel.Interfaces;
 using Scalar.AspNetCore;
+using TickerQ.Dashboard.DependencyInjection;
+using TickerQ.DependencyInjection;
+using TickerQ.EntityFrameworkCore.DependencyInjection;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.ErrorHandling;
@@ -201,7 +206,28 @@ builder.Services
     .AddFeatureManagement()
     .WithTargeting<CurrentUserTargetingContextAccessor>();
 
-// 12. Wolverine — messaging, outbox, background jobs
+// 12. TickerQ — recurring scheduled jobs and operator dashboard
+builder.Services.AddTickerQ(opts =>
+{
+    opts.AddOperationalStore(store =>
+    {
+        store.UseTickerQDbContext<TickerQOperationalDbContext>(
+            db => db.UseNpgsql(
+                builder.Configuration.GetConnectionString("db"),
+                npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", TickerQOperationalDbContext.Schema)),
+            TickerQOperationalDbContext.Schema);
+    });
+
+    opts.AddDashboard(dashboard =>
+    {
+        dashboard.SetBasePath("/admin/jobs");
+        dashboard.WithHostAuthentication("Admin");
+    });
+
+    opts.ConfigureModuleJobs(modules);
+});
+
+// 13. Wolverine — messaging, outbox, delayed messages, and handler middleware
 builder.UseWolverine(opts =>
 {
     opts.PersistMessagesWithPostgresql(
@@ -303,6 +329,14 @@ else
 
 app.UseHttpsRedirection();
 
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<TickerQOperationalDbContext>().Database.MigrateAsync();
+}
+
+app.UseTickerQ();
+
 // 14. Module endpoint registrations
 app.MapModuleEndpoints(modules);
 app.UseModules(modules);
@@ -311,7 +345,8 @@ app.UseModules(modules);
 app.MapDeadLetterAdminEndpoints();
 
 // 15. Dev seeders (idempotent)
-if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
+var moduleSeedersEnabled = builder.Configuration.GetValue("Modules:Seeders:Enabled", true);
+if (moduleSeedersEnabled && (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test")))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var seeders = scope.ServiceProvider.GetServices<IModuleSeeder>();

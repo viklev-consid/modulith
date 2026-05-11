@@ -65,6 +65,22 @@ Use for:
 - CI-specific values
 - Any ephemeral override
 
+### Development seeders
+
+Development seeders are enabled by default when the API runs in `Development` or `Test`:
+
+```json
+{
+  "Modules": {
+    "Seeders": {
+      "Enabled": true
+    }
+  }
+}
+```
+
+Set `Modules:Seeders:Enabled=false` in harnesses that migrate schemas after host construction and do not need sample data.
+
 ### External secret store (production)
 
 The template **does not prescribe or pre-wire** a secret store. It documents integration for:

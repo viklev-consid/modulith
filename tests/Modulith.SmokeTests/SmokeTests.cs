@@ -19,7 +19,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task StackBoots_HealthEndpointReturns200()
     {
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync("/alive");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -55,12 +55,15 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task WelcomeEmailArrivesInMailpit_AfterRegister()
     {
+        using var http = new HttpClient();
+        await http.DeleteAsync($"{fixture.MailpitApiUrl}/api/v1/messages");
+
+        const string email = "notify@example.com";
         await client.PostAsJsonAsync(
             "/v1/users/register",
-            new RegisterRequest("notify@example.com", "Password1!", "Notify User"));
+            new RegisterRequest(email, "Password1!", "Notify User"));
 
         // Wolverine processes UserRegisteredV1 asynchronously — poll for up to 10 s.
-        using var http = new HttpClient();
         MailpitMessagesResponse? result = null;
 
         for (var attempt = 0; attempt < 20; attempt++)
@@ -70,17 +73,18 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
             result = await http.GetFromJsonAsync<MailpitMessagesResponse>(
                 $"{fixture.MailpitApiUrl}/api/v1/messages");
 
-            if (result?.Messages?.Length > 0)
+            if (result?.Messages?.Any(IsWelcomeEmailForRegisteredUser) == true)
             {
                 break;
             }
         }
 
         Assert.NotNull(result);
-        Assert.True(result.Messages?.Length > 0, "Expected at least one email in Mailpit after registration.");
+        Assert.Contains(result.Messages ?? [], IsWelcomeEmailForRegisteredUser);
 
-        var msg = result.Messages![0];
-        Assert.Contains("notify@example.com", msg.To?.Select(t => t.Address) ?? []);
+        bool IsWelcomeEmailForRegisteredUser(MailpitMessage message) =>
+            string.Equals(message.Subject, "Welcome to Modulith!", StringComparison.Ordinal) &&
+            message.To?.Any(recipient => string.Equals(recipient.Address, email, StringComparison.OrdinalIgnoreCase)) == true;
     }
 
     // ── 10.1d ────────────────────────────────────────────────────────────────
@@ -93,7 +97,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("3.0.1", doc.GetProperty("openapi").GetString());
+        Assert.Equal("3.1.1", doc.GetProperty("openapi").GetString());
         Assert.True(doc.TryGetProperty("paths", out _), "OpenAPI document should contain paths.");
     }
 

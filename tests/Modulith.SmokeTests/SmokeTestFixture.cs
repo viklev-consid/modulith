@@ -40,6 +40,8 @@ public sealed class SmokeTestFixture : ApiTestFixture
         builder.UseSetting("Jwt:Issuer", TestJwtIssuer);
         builder.UseSetting("Jwt:Audience", TestJwtAudience);
         builder.UseSetting("Jwt:SigningKey", TestJwtKey);
+        builder.UseSetting("Modules:Users:Google:ClientId", "test-google-client-id");
+        builder.UseSetting("Modules:Seeders:Enabled", "false");
 
         // Point the real SmtpEmailSender at the Mailpit container.
         builder.UseSetting("Modules:Notifications:Smtp:Host", "127.0.0.1");

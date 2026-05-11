@@ -1,4 +1,6 @@
 using Modulith.Shared.Infrastructure.Modules;
+using TickerQ.Utilities;
+using TickerQ.Utilities.Entities;
 using Wolverine;
 
 namespace Modulith.Api.Infrastructure.Modules;
@@ -24,6 +26,18 @@ internal static class ModuleApplicationBuilderExtensions
         foreach (var module in modules)
         {
             module.ConfigureMessaging(options);
+        }
+
+        return options;
+    }
+
+    public static TickerOptionsBuilder<TimeTickerEntity, CronTickerEntity> ConfigureModuleJobs(
+        this TickerOptionsBuilder<TimeTickerEntity, CronTickerEntity> options,
+        IEnumerable<IModuleInstaller> modules)
+    {
+        foreach (var module in modules)
+        {
+            module.ConfigureJobs(options);
         }
 
         return options;

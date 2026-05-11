@@ -34,7 +34,7 @@ public static class CatalogModule
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddScoped<AuditableEntitySaveChangesInterceptor>();
+        services.AddSingleton<AuditableEntitySaveChangesInterceptor>();
         services.AddPermissions(CatalogPermissions.All);
 
         services.AddDbContext<CatalogDbContext>((sp, opts) =>

@@ -23,7 +23,8 @@ The architecture is designed to be easy to split into separate services later, b
 │  └────────────────────────────────────────────────────────────────┘  │
 │                                  │                                    │
 │                    Wolverine (in-process message bus)                │
-│                    + durable outbox + scheduled jobs                  │
+│                    + durable outbox + delayed messages                │
+│                    TickerQ recurring jobs + admin dashboard           │
 │                                  │                                    │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐          │
 │  │  Users   │   │ Catalog  │   │  Notifi- │   │  Audit   │   ...    │
@@ -123,6 +124,8 @@ Modulith.Modules.Orders/
 │   ├── OrdersDbContext.cs
 │   ├── Configurations/
 │   └── Migrations/
+├── Jobs/
+│   └── SweepExpiredTokensJob.cs       # TickerQ trigger + Wolverine command handler
 ├── Seeding/
 │   └── OrdersModuleSeeder.cs
 ├── OrdersModule.cs                    # AddOrdersModule / AddOrdersHandlers / MapOrdersEndpoints
@@ -234,6 +237,7 @@ The rule of thumb: if more than one module needs it and it has no domain meaning
 | GDPR (export/erase) | Per-module contracts | 0012 |
 | Blob storage | `IBlobStore` in `Shared.Infrastructure` | 0013 |
 | Notifications | Dedicated Notifications module | 0014 |
+| Recurring jobs | TickerQ triggers dispatch Wolverine commands | See `how-to/add-scheduled-job.md` |
 
 ---
 

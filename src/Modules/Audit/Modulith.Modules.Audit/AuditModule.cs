@@ -22,7 +22,7 @@ public static class AuditModule
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddScoped<AuditableEntitySaveChangesInterceptor>();
+        services.AddSingleton<AuditableEntitySaveChangesInterceptor>();
         services.AddPermissions(AuditPermissions.All);
 
         services.AddDbContext<AuditDbContext>((sp, opts) =>

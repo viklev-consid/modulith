@@ -39,7 +39,7 @@ A single generalized `SingleUseToken` value object handles both flows:
 - **Single-use**: `ConsumedAt` timestamp; verification fails if set.
 - **Bound to user**: `UserId` ties the token to its owner.
 
-Stored in a `user_tokens` table in the `users` schema. Expired or consumed tokens are swept by a scheduled Wolverine job (implements `IRetainable`, per ADR-0012).
+Stored in a `user_tokens` table in the `users` schema. Expired or consumed tokens are swept by a TickerQ recurring job that dispatches a Wolverine command (implements `IRetainable`, per ADR-0012 and ADR-0032).
 
 ### Password reset flow
 

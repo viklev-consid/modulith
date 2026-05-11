@@ -195,7 +195,7 @@ public sealed class NotificationLogEntry : Entity<Guid>, IRetainable
 }
 ```
 
-A scheduled Wolverine job sweeps `IRetainable` entities past their period. Each module implements its sweep logic (anonymize / delete / archive).
+A TickerQ recurring job dispatches module-owned Wolverine commands to sweep `IRetainable` entities past their period. Each module implements its sweep logic (anonymize / delete / archive).
 
 Don't set retention policies without legal input. The defaults ship for *illustration*, not compliance advice.
 

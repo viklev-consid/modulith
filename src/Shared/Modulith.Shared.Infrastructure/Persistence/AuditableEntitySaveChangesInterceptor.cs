@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Modulith.Shared.Kernel.Interfaces;
@@ -5,7 +7,7 @@ using Modulith.Shared.Kernel.Interfaces;
 namespace Modulith.Shared.Infrastructure.Persistence;
 
 public sealed class AuditableEntitySaveChangesInterceptor(
-    ICurrentUser currentUser,
+    IHttpContextAccessor httpContextAccessor,
     IClock clock)
     : SaveChangesInterceptor
 {
@@ -34,7 +36,7 @@ public sealed class AuditableEntitySaveChangesInterceptor(
         }
 
         var now = clock.UtcNow;
-        var actor = currentUser.Id;
+        var actor = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
 
         foreach (var entry in context.ChangeTracker.Entries<IAuditableEntity>())
         {

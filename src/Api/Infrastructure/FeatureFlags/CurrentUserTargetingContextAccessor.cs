@@ -1,10 +1,11 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.FeatureManagement.FeatureFilters;
-using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Api.Infrastructure.FeatureFlags;
 
-internal sealed class CurrentUserTargetingContextAccessor(ICurrentUser currentUser) : ITargetingContextAccessor
+internal sealed class CurrentUserTargetingContextAccessor(IHttpContextAccessor httpContextAccessor) : ITargetingContextAccessor
 {
     public ValueTask<TargetingContext> GetContextAsync() =>
-        new(new TargetingContext { UserId = currentUser.Id });
+        new(new TargetingContext { UserId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) });
 }

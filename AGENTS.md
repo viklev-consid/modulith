@@ -8,7 +8,7 @@ Scoped `AGENTS.md` files exist in subdirectories (`src/Modules/`, `tests/`, indi
 
 ## What this codebase is
 
-A modular monolith RESTful API in .NET 10 / C# 14, orchestrated by .NET Aspire 13.x. Each module is a vertical slice of business capability with its own domain, persistence, and endpoints. Modules communicate internally via Wolverine (in-process messaging + outbox + background jobs). Cross-module communication is strictly through public `.Contracts` projects — never across internal boundaries.
+A modular monolith RESTful API in .NET 10 / C# 14, orchestrated by .NET Aspire 13.x. Each module is a vertical slice of business capability with its own domain, persistence, and endpoints. Modules communicate internally via Wolverine (in-process messaging + outbox), with recurring scheduled jobs triggered by TickerQ and dispatched into module-owned Wolverine handlers. Cross-module communication is strictly through public `.Contracts` projects — never across internal boundaries.
 
 If you want the full picture, read `docs/architecture.md`. If you want the reasoning behind any specific decision, check `docs/adr/`.
 
