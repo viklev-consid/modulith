@@ -73,15 +73,18 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
             result = await http.GetFromJsonAsync<MailpitMessagesResponse>(
                 $"{fixture.MailpitApiUrl}/api/v1/messages");
 
-            if (result?.Messages?.Any(m => string.Equals(m.Subject, "Welcome to Modulith!", StringComparison.Ordinal)) == true)
+            if (result?.Messages?.Any(IsWelcomeEmailForRegisteredUser) == true)
             {
                 break;
             }
         }
 
         Assert.NotNull(result);
-        Assert.Contains(result.Messages ?? [], m =>
-            string.Equals(m.Subject, "Welcome to Modulith!", StringComparison.Ordinal));
+        Assert.Contains(result.Messages ?? [], IsWelcomeEmailForRegisteredUser);
+
+        bool IsWelcomeEmailForRegisteredUser(MailpitMessage message) =>
+            string.Equals(message.Subject, "Welcome to Modulith!", StringComparison.Ordinal) &&
+            message.To?.Any(recipient => string.Equals(recipient.Address, email, StringComparison.OrdinalIgnoreCase)) == true;
     }
 
     // ── 10.1d ────────────────────────────────────────────────────────────────
