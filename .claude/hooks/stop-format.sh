@@ -7,6 +7,8 @@
 
 set -uo pipefail
 
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+
 # Drain stdin
 cat >/dev/null
 
@@ -16,7 +18,7 @@ if [[ "${CLAUDE_STOP_FORMAT_RAN:-0}" == "1" ]]; then
 fi
 export CLAUDE_STOP_FORMAT_RAN=1
 
-cd "$CLAUDE_PROJECT_DIR" || exit 0
+cd "$PROJECT_DIR" || exit 0
 
 # --- Find changed .cs files (staged, unstaged, untracked) --------------------
 changed=$(

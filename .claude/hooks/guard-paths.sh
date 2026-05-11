@@ -8,6 +8,8 @@
 
 set -euo pipefail
 
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+
 input=$(cat)
 tool=$(printf '%s' "$input" | jq -r '.tool_name // empty')
 file=$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.path // empty')
@@ -18,7 +20,7 @@ if [[ -z "$file" ]]; then
 fi
 
 # Normalize to project-relative path
-rel="${file#"$CLAUDE_PROJECT_DIR/"}"
+rel="${file#"$PROJECT_DIR/"}"
 
 block() {
   # Exit code 2 feeds stderr back to Claude as a blocking error.
