@@ -11,9 +11,9 @@ internal static class ListUsersEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapGet(UsersRoutes.List,
-            async (IMessageBus bus, CancellationToken ct, int page = 1, int pageSize = 20) =>
+            async (IMessageBus bus, CancellationToken ct, int page = 1, int pageSize = 20, string? search = null) =>
             {
-                var query = new ListUsersQuery(page, pageSize);
+                var query = new ListUsersQuery(page, pageSize, search);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<ListUsersResponse>>(query, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })
