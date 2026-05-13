@@ -22,6 +22,7 @@ using Modulith.Modules.Users.Features.ExternalLogin.SetInitialPassword;
 using Modulith.Modules.Users.Features.ForgotPassword;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.GetUserById;
+using Modulith.Modules.Users.Features.ListInvitations;
 using Modulith.Modules.Users.Features.ListUsers;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Logout;
@@ -152,6 +153,7 @@ public static class UsersModule
         opts.Discovery.IncludeType<ChangeUserRoleHandler>();
         opts.Discovery.IncludeType<ListUsersHandler>();
         opts.Discovery.IncludeType<GetUserByIdHandler>();
+        opts.Discovery.IncludeType<ListInvitationsHandler>();
         opts.Discovery.IncludeType<CreateInvitationHandler>();
         opts.Discovery.IncludeType<RevokeInvitationHandler>();
 
@@ -197,6 +199,7 @@ public static class UsersModule
         ChangeUserRoleEndpoint.Map(app);
         ListUsersEndpoint.Map(app);
         GetUserByIdEndpoint.Map(app);
+        ListInvitationsEndpoint.Map(app);
         CreateInvitationEndpoint.Map(app);
         RevokeInvitationEndpoint.Map(app);
 

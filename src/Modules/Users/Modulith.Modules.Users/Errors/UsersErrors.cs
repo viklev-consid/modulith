@@ -116,6 +116,9 @@ internal static class UsersErrors
     public static readonly Error InvitationAlreadyRevoked =
         Error.Conflict("Users.Invitation.AlreadyRevoked", "The invitation has already been revoked.");
 
+    public static readonly Error InvitationStatusInvalid =
+        Error.Validation("Users.Invitation.StatusInvalid", "Invitation status must be pending, expired, revoked, accepted, or all.");
+
     public static readonly Error OnboardingRequired =
         Error.Unauthorized("Users.Onboarding.Required", "Account setup is not complete. Please complete onboarding first.");
 

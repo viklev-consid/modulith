@@ -20,6 +20,7 @@ internal static class GetAuditTrailEndpoint
                 IMessageBus bus,
                 CancellationToken ct,
                 Guid? actorId = null,
+                string? eventType = null,
                 int page = 1,
                 int pageSize = 20) =>
             {
@@ -39,7 +40,7 @@ internal static class GetAuditTrailEndpoint
                     return Results.Forbid();
                 }
 
-                var query = new GetAuditTrailQuery(targetId, page, pageSize);
+                var query = new GetAuditTrailQuery(targetId, page, pageSize, eventType);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetAuditTrailResponse>>(query, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })

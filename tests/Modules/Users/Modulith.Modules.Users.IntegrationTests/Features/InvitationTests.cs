@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.CreateInvitation;
+using Modulith.Modules.Users.Features.ListInvitations;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Features.RevokeInvitation;
 using Modulith.Modules.Users.Persistence;
@@ -43,6 +44,39 @@ public sealed class InvitationTests(UsersApiFixture fixture) : IAsyncLifetime
 
         var response = await UserClient(user.UserId, "user@example.com")
             .PostAsJsonAsync("/v1/users/invitations", new CreateInvitationRequest("invitee@example.com"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListInvitations_Admin_ReturnsPendingInvitations()
+    {
+        var admin = await RegisterAsync("admin@example.com", "Admin");
+        var client = AdminClient(admin.UserId, "admin@example.com");
+        var created = await client.PostAsJsonAsync("/v1/users/invitations", new CreateInvitationRequest("invitee@example.com"));
+        var createBody = (await created.Content.ReadFromJsonAsync<CreateInvitationResponse>())!;
+
+        var response = await client.GetAsync("/v1/users/invitations");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ListInvitationsResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(1, body.TotalCount);
+        var invitation = Assert.Single(body.Invitations);
+        Assert.Equal(createBody.InvitationId, invitation.InvitationId);
+        Assert.Equal("invitee@example.com", invitation.Email);
+        Assert.Equal("pending", invitation.Status);
+        Assert.Null(invitation.AcceptedAt);
+        Assert.Null(invitation.RevokedAt);
+    }
+
+    [Fact]
+    public async Task ListInvitations_RegularUser_Returns403()
+    {
+        var user = await RegisterAsync("user@example.com");
+
+        var response = await UserClient(user.UserId, "user@example.com")
+            .GetAsync("/v1/users/invitations");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

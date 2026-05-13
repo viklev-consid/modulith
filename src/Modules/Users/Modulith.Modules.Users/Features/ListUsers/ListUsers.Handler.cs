@@ -25,12 +25,26 @@ public sealed class ListUsersHandler(UsersDbContext db)
 
         var pagination = PageRequest.Of(query.Page, query.PageSize);
 
-        var total = await db.Users.CountAsync(ct);
-        var users = await db.Users
+        var usersQuery = db.Users.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var pattern = $"%{query.Search.Trim()}%";
+            usersQuery = db.Users
+                .FromSqlInterpolated($"""
+                    SELECT *
+                    FROM users.users
+                    WHERE email ILIKE {pattern} OR display_name ILIKE {pattern}
+                    """)
+                .AsNoTracking();
+        }
+
+        var total = await usersQuery.CountAsync(ct);
+        var users = await usersQuery
             .OrderBy(u => u.CreatedAt)
             .Skip(pagination.Offset)
             .Take(pagination.PageSize)
-            .Select(u => new ListUsersUserDto(u.Id.Value, u.Email.Value, u.DisplayName, u.Role.Name))
+            .Select(u => new ListUsersUserDto(u.Id.Value, u.Email.Value, u.DisplayName, u.Role.Name, u.CreatedAt))
             .ToListAsync(ct);
 
         return new ListUsersResponse(users, pagination.Page, pagination.PageSize, total);

@@ -122,6 +122,26 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task ListUsers_WithSearch_FiltersByEmailOrDisplayName()
+    {
+        var admin = await RegisterAsync("admin@example.com", "Admin");
+        var alice = await RegisterAsync("alice@example.com", "Alice Wonderland");
+        await RegisterAsync("bob@example.com", "Bob Builder");
+
+        var response = await AdminClient(admin.UserId, "admin@example.com")
+            .GetAsync("/v1/users?search=wonder");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ListUsersResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(1, body.TotalCount);
+        var user = Assert.Single(body.Users);
+        Assert.Equal(alice.UserId, user.UserId);
+        Assert.Equal("alice@example.com", user.Email);
+        Assert.NotEqual(default, user.CreatedAt);
+    }
+
+    [Fact]
     public async Task ListUsers_RegularUser_Returns403()
     {
         var user = await RegisterAsync("user@example.com");
@@ -149,6 +169,9 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
         Assert.Equal(target.UserId, body.UserId);
         Assert.Equal("target@example.com", body.Email);
         Assert.Equal("user", body.Role);
+        Assert.True(body.HasPassword);
+        Assert.True(body.HasCompletedOnboarding);
+        Assert.Empty(body.LinkedProviders);
     }
 
     [Fact]
