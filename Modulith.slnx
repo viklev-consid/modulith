@@ -6,6 +6,9 @@
   <Folder Name="/src/AppHost/">
     <Project Path="src/AppHost/Modulith.AppHost.csproj" />
   </Folder>
+  <Folder Name="/src/MigrationService/">
+    <Project Path="src/MigrationService/Modulith.MigrationService.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/" />
     <Folder Name="/src/Modules/Audit/">
       <Project Path="src/Modules/Audit/Modulith.Modules.Audit/Modulith.Modules.Audit.csproj" />

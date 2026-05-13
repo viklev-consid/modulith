@@ -9,11 +9,16 @@ var redis = builder.AddRedis("cache");
 
 var mailpit = builder.AddMailPit("mailpit");
 
+var migrations = builder.AddProject<Projects.Modulith_MigrationService>("migrations")
+    .WithReference(postgres)
+    .WaitFor(postgres);
+
 _ = builder.AddProject<Projects.Modulith_Api>("api")
     .WithReference(postgres)
     .WithReference(redis)
     .WithReference(mailpit)
     .WaitFor(postgres)
-    .WaitFor(redis);
+    .WaitFor(redis)
+    .WaitForCompletion(migrations);
 
 await builder.Build().RunAsync();

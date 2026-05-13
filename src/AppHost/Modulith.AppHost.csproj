@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.2.1">
+<Project Sdk="Aspire.AppHost.Sdk/13.3.0">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Api\Modulith.Api.csproj" />
+    <ProjectReference Include="..\MigrationService\Modulith.MigrationService.csproj" />
   </ItemGroup>
 
 </Project>
