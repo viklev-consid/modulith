@@ -16,6 +16,9 @@ internal static class AuditErrors
     public static readonly Error PageSizeInvalid =
         Error.Validation("Audit.Query.PageSizeInvalid", $"Page size must be between 1 and {PageRequest.MaxPageSize}.");
 
+    public static readonly Error EventTypeInvalid =
+        Error.Validation("Audit.Query.EventTypeInvalid", "Event type must be 128 characters or fewer.");
+
     // Entry lookup
     public static readonly Error EntryNotFound =
         Error.NotFound("Audit.Entry.NotFound", "Audit entry was not found.");

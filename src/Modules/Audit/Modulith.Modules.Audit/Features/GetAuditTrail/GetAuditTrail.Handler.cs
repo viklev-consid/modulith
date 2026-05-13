@@ -25,12 +25,24 @@ public sealed class GetAuditTrailHandler(AuditDbContext db)
             return AuditErrors.PageSizeInvalid;
         }
 
+        var eventType = query.EventType?.Trim();
+        if (eventType?.Length > 128)
+        {
+            return AuditErrors.EventTypeInvalid;
+        }
+
         var pagination = PageRequest.Of(query.Page, query.PageSize);
 
         var baseQuery = db.AuditEntries
             .AsNoTracking()
-            .Where(e => e.ActorId == query.UserId)
-            .OrderByDescending(e => e.OccurredAt);
+            .Where(e => e.ActorId == query.UserId);
+
+        if (!string.IsNullOrWhiteSpace(eventType))
+        {
+            baseQuery = baseQuery.Where(e => e.EventType == eventType);
+        }
+
+        baseQuery = baseQuery.OrderByDescending(e => e.OccurredAt);
 
         var total = await baseQuery.CountAsync(ct);
 

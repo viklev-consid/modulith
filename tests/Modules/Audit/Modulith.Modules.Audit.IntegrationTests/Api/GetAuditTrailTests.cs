@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Contracts.Queries;
+using Modulith.Modules.Audit.Domain;
 using Modulith.Modules.Audit.Persistence;
 
 namespace Modulith.Modules.Audit.IntegrationTests.Api;
@@ -100,5 +101,39 @@ public sealed class GetAuditTrailTests(AuditCrossModuleFixture fixture) : IAsync
         Assert.NotNull(body);
         Assert.True(body.Total >= 1);
         Assert.All(body.Entries, e => Assert.Equal(targetId, e.ActorId));
+    }
+
+    [Fact]
+    public async Task GetAuditTrail_WithEventType_FiltersEntries()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        await SeedAuditEntriesAsync(userId);
+        var client = fixture.CreateAuthenticatedClient(userId, "owner@example.com", "Owner", "user");
+
+        // Act
+        var response = await client.GetAsync($"/v1/audit/trail?actorId={userId}&eventType=user.logged_in");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GetAuditTrailResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(1, body.Total);
+        var entry = Assert.Single(body.Entries);
+        Assert.Equal("user.logged_in", entry.EventType);
+        Assert.Equal(userId, entry.ActorId);
+    }
+
+    private async Task SeedAuditEntriesAsync(Guid userId)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var now = DateTimeOffset.UtcNow;
+
+        db.AuditEntries.AddRange(
+            AuditEntry.Create("user.registered", userId, "User", userId, "{}", now.AddMinutes(-1)),
+            AuditEntry.Create("user.logged_in", userId, "User", userId, "{}", now));
+
+        await db.SaveChangesAsync();
     }
 }
