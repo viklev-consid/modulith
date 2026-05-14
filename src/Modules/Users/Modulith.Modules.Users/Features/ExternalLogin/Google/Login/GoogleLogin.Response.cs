@@ -6,4 +6,7 @@ public sealed record GoogleLoginResponse(
     string? AccessToken = null,
     DateTimeOffset? AccessTokenExpiresAt = null,
     string? RefreshToken = null,
-    DateTimeOffset? RefreshTokenExpiresAt = null);
+    DateTimeOffset? RefreshTokenExpiresAt = null,
+    bool RequiresTwoFactor = false,
+    string? TwoFactorChallengeToken = null,
+    DateTimeOffset? TwoFactorChallengeExpiresAt = null);

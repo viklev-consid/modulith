@@ -125,6 +125,28 @@ internal static class UsersErrors
     public static readonly Error TermsNotAccepted =
         Error.Validation("Users.Onboarding.TermsNotAccepted", "Terms of service must be accepted.");
 
+    // Two-factor authentication
+    public static readonly Error TwoFactorRequired =
+        Error.Unauthorized("Users.TwoFactor.Required", "Two-factor authentication is required to complete sign-in.");
+
+    public static readonly Error TwoFactorAlreadyEnabled =
+        Error.Conflict("Users.TwoFactor.AlreadyEnabled", "Two-factor authentication is already enabled.");
+
+    public static readonly Error TwoFactorNotEnabled =
+        Error.Conflict("Users.TwoFactor.NotEnabled", "Two-factor authentication is not enabled.");
+
+    public static readonly Error TwoFactorSetupNotFound =
+        Error.NotFound("Users.TwoFactor.SetupNotFound", "Two-factor setup was not found.");
+
+    public static readonly Error TwoFactorSecretInvalid =
+        Error.Validation("Users.TwoFactor.SecretInvalid", "The two-factor secret is invalid.");
+
+    public static readonly Error TwoFactorCodeInvalid =
+        Error.Validation("Users.TwoFactor.CodeInvalid", "The two-factor code is invalid.");
+
+    public static readonly Error RecoveryCodeInvalid =
+        Error.Validation("Users.TwoFactor.RecoveryCodeInvalid", "The recovery code is invalid.");
+
     // Pagination
     public static readonly Error PageInvalid =
         Error.Validation("Users.Query.PageInvalid", $"Page number must be between 1 and {Shared.Kernel.Pagination.PageRequest.MaxPage}.");

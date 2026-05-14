@@ -16,6 +16,8 @@ public sealed class LoginHandler(
     IPasswordHasher passwordHasher,
     IJwtGenerator jwtGenerator,
     IRefreshTokenIssuer refreshTokenIssuer,
+    ITwoFactorRequirementEvaluator twoFactorRequirementEvaluator,
+    ITwoFactorChallengeIssuer twoFactorChallengeIssuer,
     IOptions<UsersOptions> options,
     IMessageBus bus,
     IClock clock)
@@ -40,6 +42,18 @@ public sealed class LoginHandler(
         if (user.PasswordHash is null || !passwordHasher.Verify(cmd.Password, user.PasswordHash.Value))
         {
             return UsersErrors.InvalidCredentials;
+        }
+
+        if (await twoFactorRequirementEvaluator.IsRequiredAsync(user, ct))
+        {
+            var (challenge, rawChallengeToken) = twoFactorChallengeIssuer.Issue(user.Id, cmd.IpAddress);
+            db.PendingTwoFactorChallenges.Add(challenge);
+            await db.SaveChangesAsync(ct);
+
+            return new LoginResponse(
+                RequiresTwoFactor: true,
+                TwoFactorChallengeToken: rawChallengeToken,
+                TwoFactorChallengeExpiresAt: challenge.ExpiresAt);
         }
 
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);

@@ -17,6 +17,8 @@ public sealed class GoogleLoginHandler(
     IGoogleIdTokenVerifier verifier,
     IJwtGenerator jwtGenerator,
     IRefreshTokenIssuer refreshTokenIssuer,
+    ITwoFactorRequirementEvaluator twoFactorRequirementEvaluator,
+    ITwoFactorChallengeIssuer twoFactorChallengeIssuer,
     IOptions<UsersOptions> options,
     IMessageBus bus,
     IClock clock)
@@ -62,6 +64,19 @@ public sealed class GoogleLoginHandler(
                 if (user is null)
                 {
                     return UsersErrors.UserNotFound;
+                }
+
+                if (await twoFactorRequirementEvaluator.IsRequiredAsync(user, ct))
+                {
+                    var (challenge, rawChallengeToken) = twoFactorChallengeIssuer.Issue(user.Id, cmd.IpAddress);
+                    db.PendingTwoFactorChallenges.Add(challenge);
+                    await db.SaveChangesAsync(ct);
+
+                    return new GoogleLoginResponse(
+                        IsPending: false,
+                        RequiresTwoFactor: true,
+                        TwoFactorChallengeToken: rawChallengeToken,
+                        TwoFactorChallengeExpiresAt: challenge.ExpiresAt);
                 }
 
                 var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);

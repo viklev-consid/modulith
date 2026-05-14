@@ -15,6 +15,9 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : M
     public DbSet<PendingExternalLogin> PendingExternalLogins => Set<PendingExternalLogin>();
     public DbSet<TermsAcceptance> TermsAcceptances => Set<TermsAcceptance>();
     public DbSet<UserInvitation> UserInvitations => Set<UserInvitation>();
+    public DbSet<TwoFactorCredential> TwoFactorCredentials => Set<TwoFactorCredential>();
+    public DbSet<RecoveryCode> RecoveryCodes => Set<RecoveryCode>();
+    public DbSet<PendingTwoFactorChallenge> PendingTwoFactorChallenges => Set<PendingTwoFactorChallenge>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

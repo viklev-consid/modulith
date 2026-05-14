@@ -33,5 +33,9 @@ public sealed class SweepExpiredTokensHandler(UsersDbContext db, IClock clock)
         await db.PendingExternalLogins
             .Where(p => p.ExpiresAt < clock.UtcNow || p.ConsumedAt != null)
             .ExecuteDeleteAsync(ct);
+
+        await db.PendingTwoFactorChallenges
+            .Where(p => p.ExpiresAt < clock.UtcNow || p.ConsumedAt != null)
+            .ExecuteDeleteAsync(ct);
     }
 }
