@@ -69,6 +69,9 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnUserProvisionedFromExternalHandler>();
         opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         opts.Discovery.IncludeType<OnRefreshTokenReuseDetectedHandler>();
+        opts.Discovery.IncludeType<OnTwoFactorEnabledHandler>();
+        opts.Discovery.IncludeType<OnTwoFactorDisabledHandler>();
+        opts.Discovery.IncludeType<OnRecoveryCodesRegeneratedHandler>();
         return opts;
     }
 

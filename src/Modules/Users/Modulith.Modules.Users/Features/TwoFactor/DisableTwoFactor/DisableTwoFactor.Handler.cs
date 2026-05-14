@@ -61,7 +61,7 @@ public sealed class DisableTwoFactorHandler(
         await tokenRevoker.RevokeAllForUserAsync(userId, ct);
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new TwoFactorDisabledV1(userId.Value, TwoFactorMethod.Totp.ToString(), Guid.NewGuid()));
+        await bus.PublishAsync(new TwoFactorDisabledV1(userId.Value, user.Email.Value, TwoFactorMethod.Totp.ToString(), Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(TwoFactorDisabledV1)));
 
         return new DisableTwoFactorResponse();

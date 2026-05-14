@@ -51,6 +51,8 @@ public sealed class LoginHandler(
             await db.SaveChangesAsync(ct);
 
             return new LoginResponse(
+                UserId: user.Id.Value,
+                AccessToken: string.Empty,
                 RequiresTwoFactor: true,
                 TwoFactorChallengeToken: rawChallengeToken,
                 TwoFactorChallengeExpiresAt: challenge.ExpiresAt);

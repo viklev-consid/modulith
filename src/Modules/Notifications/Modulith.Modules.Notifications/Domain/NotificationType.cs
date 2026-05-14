@@ -12,4 +12,7 @@ public enum NotificationType
     ExternalLoginPendingExistingUser = 8,
     ExternalLoginLinked = 9,
     ExternalLoginUnlinked = 10,
+    TwoFactorEnabled = 11,
+    TwoFactorDisabled = 12,
+    RecoveryCodesRegenerated = 13,
 }

@@ -13,7 +13,7 @@ internal static class DisableTwoFactorEndpoint
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapDelete(UsersRoutes.TwoFactor,
             async (
-                DisableTwoFactorRequest request,
+                [Microsoft.AspNetCore.Mvc.FromBody] DisableTwoFactorRequest request,
                 [Microsoft.AspNetCore.Mvc.FromServices] IValidator<DisableTwoFactorRequest> validator,
                 [Microsoft.AspNetCore.Mvc.FromServices] ICurrentUser currentUser,
                 IMessageBus bus,

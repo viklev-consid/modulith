@@ -26,6 +26,12 @@ public sealed class ConfirmTotpHandler(
     private async Task<ErrorOr<ConfirmTotpResponse>> HandleCoreAsync(ConfirmTotpCommand cmd, CancellationToken ct)
     {
         var userId = new UserId(cmd.UserId);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+        {
+            return UsersErrors.UserNotFound;
+        }
+
         var credential = await db.TwoFactorCredentials
             .FirstOrDefaultAsync(c => c.UserId == userId && c.Method == TwoFactorMethod.Totp, ct);
 
@@ -79,7 +85,7 @@ public sealed class ConfirmTotpHandler(
         await tokenRevoker.RevokeAllForUserAsync(userId, ct, except: keepId);
         await db.SaveChangesAsync(ct);
 
-        await bus.PublishAsync(new TwoFactorEnabledV1(userId.Value, TwoFactorMethod.Totp.ToString(), Guid.NewGuid()));
+        await bus.PublishAsync(new TwoFactorEnabledV1(userId.Value, user.Email.Value, TwoFactorMethod.Totp.ToString(), Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(TwoFactorEnabledV1)));
 
         return new ConfirmTotpResponse(rawCodes);

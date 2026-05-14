@@ -25,6 +25,12 @@ public sealed class RegenerateRecoveryCodesHandler(
     private async Task<ErrorOr<RegenerateRecoveryCodesResponse>> HandleCoreAsync(RegenerateRecoveryCodesCommand cmd, CancellationToken ct)
     {
         var userId = new UserId(cmd.UserId);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+        {
+            return UsersErrors.UserNotFound;
+        }
+
         var credential = await db.TwoFactorCredentials
             .FirstOrDefaultAsync(c => c.UserId == userId && c.Method == TwoFactorMethod.Totp, ct);
 
@@ -59,7 +65,7 @@ public sealed class RegenerateRecoveryCodesHandler(
         }
 
         await db.SaveChangesAsync(ct);
-        await bus.PublishAsync(new RecoveryCodesRegeneratedV1(userId.Value, Guid.NewGuid()));
+        await bus.PublishAsync(new RecoveryCodesRegeneratedV1(userId.Value, user.Email.Value, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(RecoveryCodesRegeneratedV1)));
 
         return new RegenerateRecoveryCodesResponse(rawCodes);

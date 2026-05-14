@@ -3,15 +3,15 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Modulith.Modules.Users.Persistence.Migrations
+namespace Modulith.Modules.Users.Persistence.Migrations;
+
+/// <inheritdoc />
+public partial class AddTwoFactorAuthentication : Migration
 {
     /// <inheritdoc />
-    public partial class AddTwoFactorAuthentication : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.CreateTable(
+        migrationBuilder.CreateTable(
                 name: "pending_two_factor_challenges",
                 schema: "users",
                 columns: table => new
@@ -99,22 +99,21 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                 table: "two_factor_credentials",
                 columns: new[] { "user_id", "method" },
                 unique: true);
-        }
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropTable(
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(
                 name: "pending_two_factor_challenges",
                 schema: "users");
 
-            migrationBuilder.DropTable(
+        migrationBuilder.DropTable(
                 name: "recovery_codes",
                 schema: "users");
 
-            migrationBuilder.DropTable(
+        migrationBuilder.DropTable(
                 name: "two_factor_credentials",
                 schema: "users");
-        }
     }
 }

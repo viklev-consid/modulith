@@ -93,6 +93,9 @@ public static class NotificationsModule
         opts.Discovery.IncludeType<OnExternalLoginPendingHandler>();
         opts.Discovery.IncludeType<OnExternalLoginLinkedHandler>();
         opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
+        opts.Discovery.IncludeType<OnTwoFactorEnabledHandler>();
+        opts.Discovery.IncludeType<OnTwoFactorDisabledHandler>();
+        opts.Discovery.IncludeType<OnRecoveryCodesRegeneratedHandler>();
         opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         opts.Discovery.IncludeType<CreateNotificationHandler>();
         opts.Discovery.IncludeType<ListMyNotificationsHandler>();

@@ -1,11 +1,11 @@
 namespace Modulith.Modules.Users.Features.Login;
 
 public sealed record LoginResponse(
-    Guid? UserId = null,
-    string? AccessToken = null,
+    Guid UserId,
+    string AccessToken,
     DateTimeOffset? AccessTokenExpiresAt = null,
-    string? RefreshToken = null,
+    string RefreshToken = "",
     DateTimeOffset? RefreshTokenExpiresAt = null,
     bool RequiresTwoFactor = false,
-    string? TwoFactorChallengeToken = null,
+    string TwoFactorChallengeToken = "",
     DateTimeOffset? TwoFactorChallengeExpiresAt = null);
