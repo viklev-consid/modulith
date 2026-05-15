@@ -128,6 +128,22 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         return Result.Success;
     }
 
+    public ErrorOr<Success> UpdateProfile(string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return UsersErrors.DisplayNameEmpty;
+        }
+
+        if (displayName.Length > 100)
+        {
+            return UsersErrors.DisplayNameTooLong;
+        }
+
+        DisplayName = displayName.Trim();
+        return Result.Success;
+    }
+
     /// <summary>
     /// Updates the password. Used by ChangePassword and ResetPassword flows.
     /// For external-only users setting their first password, use SetInitialPassword instead.

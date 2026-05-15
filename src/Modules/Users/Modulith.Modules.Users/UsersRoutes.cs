@@ -7,6 +7,7 @@ internal static class UsersRoutes
     public const string Register = $"{Prefix}/register";
     public const string Login = $"{Prefix}/login";
     public const string Me = $"{Prefix}/me";
+    public const string Profile = $"{Me}/profile";
     public const string PersonalData = $"{Me}/personal-data";
     public const string List = Prefix;
     public const string ById = $"{Prefix}/{{userId:guid}}";

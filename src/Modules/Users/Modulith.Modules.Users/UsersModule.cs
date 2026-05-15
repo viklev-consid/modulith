@@ -37,6 +37,7 @@ using Modulith.Modules.Users.Features.TwoFactor.ConfirmTotp;
 using Modulith.Modules.Users.Features.TwoFactor.DisableTwoFactor;
 using Modulith.Modules.Users.Features.TwoFactor.RegenerateRecoveryCodes;
 using Modulith.Modules.Users.Features.TwoFactor.SetupTotp;
+using Modulith.Modules.Users.Features.UpdateProfile;
 using Modulith.Modules.Users.Gdpr;
 using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
@@ -145,6 +146,7 @@ public static class UsersModule
         opts.Discovery.IncludeType<LoginHandler>();
         opts.Discovery.IncludeType<LoginTwoFactorHandler>();
         opts.Discovery.IncludeType<GetCurrentUserHandler>();
+        opts.Discovery.IncludeType<UpdateProfileHandler>();
         opts.Discovery.IncludeType<ExportPersonalDataHandler>();
         opts.Discovery.IncludeType<DeleteAccountHandler>();
 
@@ -199,6 +201,7 @@ public static class UsersModule
         LoginEndpoint.Map(app);
         LoginTwoFactorEndpoint.Map(app);
         GetCurrentUserEndpoint.Map(app);
+        UpdateProfileEndpoint.Map(app);
         ExportPersonalDataEndpoint.Map(app);
         DeleteAccountEndpoint.Map(app);
 
