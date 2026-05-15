@@ -117,6 +117,7 @@ builder.Services.AddOpenApi(opts =>
 {
     opts.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
     opts.AddOperationTransformer<AuthorizationOperationTransformer>();
+    opts.AddSchemaTransformer<LoginResponseStatusSchemaTransformer>();
 });
 
 // 7. Module registration
