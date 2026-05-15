@@ -10,4 +10,5 @@ public sealed record GetCurrentUserResponse(
     string PermissionsVersion,
     bool HasPassword,
     bool HasCompletedOnboarding,
+    bool TwoFactorEnabled,
     IReadOnlyCollection<string> LinkedProviders);
