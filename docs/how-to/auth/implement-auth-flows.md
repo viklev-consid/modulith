@@ -2,7 +2,7 @@
 
 The Users module ships with a baseline set of authentication flows: password reset, password change, email change, logout, and refresh token rotation. This guide walks through their shape and the security invariants to preserve when modifying them.
 
-For the decisions, see [`../adr/0028-auth-flows-baseline.md`](../adr/0028-auth-flows-baseline.md) and [`../adr/0029-refresh-tokens-and-logout.md`](../adr/0029-refresh-tokens-and-logout.md).
+For the decisions, see [`../../adr/0028-auth-flows-baseline.md`](../../adr/0028-auth-flows-baseline.md), [`../../adr/0029-refresh-tokens-and-logout.md`](../../adr/0029-refresh-tokens-and-logout.md), and [`../../adr/0033-two-factor-authentication.md`](../../adr/0033-two-factor-authentication.md).
 
 ---
 
@@ -21,6 +21,11 @@ For the decisions, see [`../adr/0028-auth-flows-baseline.md`](../adr/0028-auth-f
 | ConfirmEmailChange | `POST /v1/users/me/email/confirm` | authenticated | `auth` |
 | ForgotPassword | `POST /v1/users/password/forgot` | public | `auth` |
 | ResetPassword | `POST /v1/users/password/reset` | public | `auth` |
+| LoginTwoFactor | `POST /v1/users/login/2fa` | public challenge | `auth` |
+| SetupTotp | `POST /v1/users/me/2fa/totp/setup` | authenticated | `auth` |
+| ConfirmTotp | `POST /v1/users/me/2fa/totp/confirm` | authenticated | `auth` |
+| DisableTwoFactor | `DELETE /v1/users/me/2fa` | authenticated | `auth` |
+| RegenerateRecoveryCodes | `POST /v1/users/me/2fa/recovery-codes/regenerate` | authenticated | `auth` |
 
 \*Refresh endpoint is technically public because the access token has expired; authentication happens via the refresh token itself.
 
@@ -250,6 +255,50 @@ internal sealed class ChangePasswordHandler
 - Current password is required. Prevents a stolen session from locking the real user out by changing the password silently.
 - Constant-time password verification (BCrypt does this by default; don't roll your own comparison).
 - The user's current session is preserved (their refresh token stays valid); all other sessions are revoked.
+
+---
+
+## Two-factor authentication
+
+Two-factor authentication is optional per user. The implementation is TOTP-based and designed so a future policy layer can require 2FA for selected users, roles, tenants, or operations without reshaping the login flow.
+
+### Setup flow
+
+1. `POST /v1/users/me/2fa/totp/setup` creates or replaces an unconfirmed TOTP credential and returns:
+   - the base32 secret, for manual authenticator entry
+   - the `otpauth://` URI, for QR-code provisioning
+2. `POST /v1/users/me/2fa/totp/confirm` verifies a 6-digit TOTP code, enables the credential, generates recovery codes, and returns the raw recovery-code batch exactly once.
+3. Enabling 2FA revokes other refresh-token sessions while preserving the current session.
+
+Recovery codes are high-entropy, single-use values stored only as SHA-256 hashes. User input is normalized to lowercase before hashing, so uppercase recovery-code entry works.
+
+### Login flow
+
+`POST /v1/users/login` returns one of two shapes:
+
+- `status: "authenticated"` with `session`, when no local 2FA challenge is required.
+- `status: "twoFactorRequired"` with `challenge`, when the user has enabled TOTP.
+
+Linked Google login uses the same local 2FA gate: a successful Google identity check may still return `twoFactorRequired` instead of issuing tokens. Clients must branch on `status`, not on HTTP status alone.
+
+The client completes the challenge with `POST /v1/users/login/2fa` using the opaque challenge token and either:
+
+- a 6-digit TOTP code, or
+- a recovery code in the generated `xxxxx-xxxxx-xxxxx-xxxxx` shape.
+
+The challenge token is random, hashed at rest, short-lived, and consumed on success. Invalid attempts increment an attempt counter; at the cap the challenge is consumed. The response intentionally stays opaque around the lockout transition and returns the same invalid-code error instead of revealing the attempt budget. The pending challenge row uses Postgres `xmin` optimistic concurrency so parallel failed attempts do not silently undercount.
+
+### Disable and regenerate
+
+`DELETE /v1/users/me/2fa` requires the current password plus a valid TOTP or recovery code. Disabling removes all recovery codes and preserves the current refresh-token session while revoking the other active sessions.
+
+`POST /v1/users/me/2fa/recovery-codes/regenerate` requires the current password plus a valid TOTP code. Old recovery codes are deleted only after verification succeeds; a failed regeneration attempt does not burn the existing batch.
+
+### Operational notes
+
+TOTP secrets are protected with ASP.NET Core Data Protection, not stored in plaintext. Production deployments must persist and share the Data Protection key ring across API instances; losing that key ring makes existing TOTP secrets undecryptable. See [`../../../CONFIG.md`](../../../CONFIG.md#data-protection-key-ring).
+
+The relevant settings are documented in [`../../../CONFIG.md`](../../../CONFIG.md#users-two-factor-settings): challenge lifetime, recovery-code count, TOTP drift, and TOTP issuer.
 
 ---
 
@@ -641,9 +690,10 @@ public async Task PasswordReset_RevokesAllRefreshTokens()
 
 ## Related
 
-- [`../adr/0007-no-aspnet-identity.md`](../adr/0007-no-aspnet-identity.md)
-- [`../adr/0028-auth-flows-baseline.md`](../adr/0028-auth-flows-baseline.md)
-- [`../adr/0029-refresh-tokens-and-logout.md`](../adr/0029-refresh-tokens-and-logout.md)
-- [`../adr/0018-rate-limiting.md`](../adr/0018-rate-limiting.md)
-- [`../adr/0014-notifications-architecture.md`](../adr/0014-notifications-architecture.md)
-- [`handle-failures.md`](handle-failures.md)
+- [`../../adr/0007-no-aspnet-identity.md`](../../adr/0007-no-aspnet-identity.md)
+- [`../../adr/0028-auth-flows-baseline.md`](../../adr/0028-auth-flows-baseline.md)
+- [`../../adr/0029-refresh-tokens-and-logout.md`](../../adr/0029-refresh-tokens-and-logout.md)
+- [`../../adr/0033-two-factor-authentication.md`](../../adr/0033-two-factor-authentication.md)
+- [`../../adr/0018-rate-limiting.md`](../../adr/0018-rate-limiting.md)
+- [`../../adr/0014-notifications-architecture.md`](../../adr/0014-notifications-architecture.md)
+- [`../handle-failures.md`](../handle-failures.md)

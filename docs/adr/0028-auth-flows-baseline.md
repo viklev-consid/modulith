@@ -4,6 +4,8 @@
 
 Accepted
 
+Note: the two-factor-authentication extension point described in this ADR was later implemented by [ADR-0033](0033-two-factor-authentication.md). The rest of this ADR remains the baseline auth-flow decision record.
+
 ## Context
 
 ADR-0007 established that the Users module is a lightweight custom aggregate rather than ASP.NET Identity. That ADR intentionally kept the initial scope small — register, login, get-current-user — and deferred most authentication-adjacent flows as "extension points."

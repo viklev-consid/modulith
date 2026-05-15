@@ -242,6 +242,28 @@ The Users module protects TOTP authenticator secrets with ASP.NET Core Data Prot
 
 If the key ring is lost or an instance cannot read it, existing TOTP secrets cannot be decrypted and affected users will be unable to complete two-factor authentication. Configure a production key-ring store such as a mounted volume, Redis/blob storage, or a cloud KMS-backed provider before enabling horizontal scale or ephemeral deployments.
 
+### Users two-factor settings
+
+Two-factor authentication settings live under `Modules:Users:`:
+
+```json
+{
+  "Modules": {
+    "Users": {
+      "TwoFactorChallengeLifetime": "00:05:00",
+      "RecoveryCodeCount": 10,
+      "TotpAllowedTimeStepDrift": 1,
+      "TotpIssuer": "Modulith"
+    }
+  }
+}
+```
+
+- `TwoFactorChallengeLifetime` controls how long a pending login challenge can be completed after password or Google sign-in succeeds. The default is 5 minutes.
+- `RecoveryCodeCount` controls how many single-use recovery codes are issued on TOTP confirmation and regeneration. The default is 10.
+- `TotpAllowedTimeStepDrift` controls the accepted TOTP clock drift in 30-second steps. The default is 1, accepting the previous, current, and next time step. Keep this small.
+- `TotpIssuer` is the issuer shown in authenticator apps through the `otpauth://` provisioning URI. Set this to your product or tenant-facing name before production use.
+
 ---
 
 ## Connection strings
