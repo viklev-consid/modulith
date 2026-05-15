@@ -24,7 +24,7 @@ Those same properties also make the codebase easier for AI agents to work in. Cl
 - **Rich domain model** with invariants enforced via factory methods and private setters
 - **Result pattern** for expected failures, exceptions reserved for truly exceptional cases
 - **ProblemDetails** for all error responses via `IExceptionHandler`
-- **JWT bearer authentication** with a lightweight Users module (no ASP.NET Identity) — register, invite-only or disabled registration modes, login, password reset, change password, email change with confirmation, refresh token rotation, logout, and logout-everywhere
+- **JWT bearer authentication** with a lightweight Users module (no ASP.NET Identity) — register, invite-only or disabled registration modes, login, optional TOTP two-factor authentication, password reset, change password, email change with confirmation, refresh token rotation, logout, and logout-everywhere
 - **Role-based access control (RBAC)** — `admin` / `user` roles, `PermissionCatalog` auto-discovers all `*Permissions` types from `*.Contracts` assemblies at startup, per-permission `AuthorizationPolicy` instances registered automatically, `PermissionClaimsTransformation` adds permission claims per request from the JWT role claim
 - **FluentValidation** for request validation
 - **Scalar** for OpenAPI documentation
@@ -44,20 +44,124 @@ Those same properties also make the codebase easier for AI agents to work in. Cl
 
 ## Quick start
 
+### Prerequisites
+
+- .NET 10 SDK
+- Docker Desktop, Colima, Podman, or another local container runtime supported by Aspire
+- HTTPS development certificates:
+
 ```bash
-# Clone and enter the directory
+dotnet dev-certs https --trust
+```
+
+### 1. Clone and build
+
+```bash
 git clone <your-fork> my-api
 cd my-api
 
-# Restore and build
 dotnet restore
 dotnet build
+```
 
-# Run the full stack (Postgres, Redis, Mailpit, API) via Aspire
+### 2. Configure local development secrets
+
+The API validates configuration at startup. For a fresh clone, set these values in the API project's user-secrets store:
+
+```bash
+dotnet user-secrets set "Jwt:SigningKey" "local-dev-signing-key-change-me-32chars-minimum" --project src/Api
+dotnet user-secrets set "Modules:Users:Google:ClientId" "local-dev-google-client-id" --project src/Api
+```
+
+Notes:
+
+- `Jwt:SigningKey` must be at least 32 characters.
+- `Modules:Users:Google:ClientId` is required because the Google login verifier is configured at startup. Use a real Google OAuth client id only if you want to exercise Google login locally; otherwise a non-empty placeholder is enough to boot.
+- The default dev admin is configured in `src/Api/appsettings.Development.json`. Override it with user-secrets only if you want a different seeded admin:
+
+```bash
+dotnet user-secrets set "Modules:Users:Dev:AdminEmail" "admin@example.test" --project src/Api
+dotnet user-secrets set "Modules:Users:Dev:AdminDisplayName" "Admin" --project src/Api
+```
+
+### 3. Run the full local stack
+
+Start the Aspire app host:
+
+```bash
 dotnet run --project src/AppHost
+```
 
-# Run the tests
+On the first run, Aspire may prompt for the `db-password` parameter. Choose any strong local password; Aspire stores it in local user secrets for the AppHost.
+
+The AppHost starts:
+
+- Postgres
+- pgAdmin
+- Redis
+- Mailpit
+- the migration service
+- the API
+
+Open the Aspire dashboard from the URL printed in the terminal. From there, use the `api` resource endpoint and append `/scalar/v1` to open Scalar API docs. When running the API directly from its launch profile, Scalar is usually available at:
+
+```text
+http://localhost:5125/scalar/v1
+```
+
+Mailpit is linked from the Aspire dashboard. Use it to inspect development emails such as password reset, email change, welcome, Google login confirmation, and 2FA security notifications.
+
+### 4. Sign in with seeded users
+
+Development seeders run automatically in `Development` unless disabled with `Modules:Seeders:Enabled=false`.
+
+Seeded admin:
+
+| Email | Password | Role |
+|---|---|---|
+| `admin@example.test` | `Admin1!Admin1!` | `admin` |
+
+Seeded regular users:
+
+| Email | Password | Role |
+|---|---|---|
+| `alice@example.com` | `Password1!` | `user` |
+| `bob@example.com` | `Password1!` | `user` |
+| `charlie@example.com` | `Password1!` | `user` |
+| `diana@example.com` | `Password1!` | `user` |
+| `eve@example.com` | `Password1!` | `user` |
+| `frank@example.com` | `Password1!` | `user` |
+| `grace@example.com` | `Password1!` | `user` |
+| `henry@example.com` | `Password1!` | `user` |
+
+To authorize in Scalar:
+
+1. Call `POST /v1/users/login` with:
+
+```json
+{
+  "email": "admin@example.test",
+  "password": "Admin1!Admin1!"
+}
+```
+
+2. Copy `session.accessToken` from the response.
+3. Click **Authorize** in Scalar.
+4. Enter the token as a bearer token.
+
+Seeded users do not have two-factor authentication enabled. If you enable 2FA for a seeded account, later logins return `status: "twoFactorRequired"` with a challenge instead of a session until you complete `POST /v1/users/login/2fa`.
+
+### 5. Run tests
+
+```bash
 dotnet test
+```
+
+Useful faster checks while developing:
+
+```bash
+dotnet test --filter "Category!=Integration&Category!=Smoke"
+dotnet test tests/Modules/Users/Modulith.Modules.Users.IntegrationTests
 ```
 
 ## Common configuration

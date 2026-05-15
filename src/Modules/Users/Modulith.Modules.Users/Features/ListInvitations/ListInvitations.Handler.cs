@@ -9,11 +9,11 @@ namespace Modulith.Modules.Users.Features.ListInvitations;
 
 public sealed class ListInvitationsHandler(UsersDbContext db, IClock clock)
 {
-    private const string Pending = "pending";
-    private const string Expired = "expired";
-    private const string Revoked = "revoked";
-    private const string Accepted = "accepted";
-    private const string All = "all";
+    private const string pending = "pending";
+    private const string expired = "expired";
+    private const string revoked = "revoked";
+    private const string accepted = "accepted";
+    private const string all = "all";
 
     public async Task<ErrorOr<ListInvitationsResponse>> Handle(ListInvitationsQuery query, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(ListInvitationsHandler), () => HandleCoreAsync(query, ct));
@@ -31,10 +31,10 @@ public sealed class ListInvitationsHandler(UsersDbContext db, IClock clock)
         }
 
         var normalizedStatus = string.IsNullOrWhiteSpace(query.Status)
-            ? Pending
+            ? pending
             : query.Status.Trim().ToLowerInvariant();
 
-        if (normalizedStatus is not (Pending or Expired or Revoked or Accepted or All))
+        if (normalizedStatus is not (pending or expired or revoked or accepted or all))
         {
             return UsersErrors.InvitationStatusInvalid;
         }
@@ -45,10 +45,10 @@ public sealed class ListInvitationsHandler(UsersDbContext db, IClock clock)
 
         invitationsQuery = normalizedStatus switch
         {
-            Pending => invitationsQuery.Where(i => i.IsPending && i.ExpiresAt > now),
-            Expired => invitationsQuery.Where(i => i.IsPending && i.ExpiresAt <= now),
-            Revoked => invitationsQuery.Where(i => i.RevokedAt != null),
-            Accepted => invitationsQuery.Where(i => i.AcceptedAt != null),
+            pending => invitationsQuery.Where(i => i.IsPending && i.ExpiresAt > now),
+            expired => invitationsQuery.Where(i => i.IsPending && i.ExpiresAt <= now),
+            revoked => invitationsQuery.Where(i => i.RevokedAt != null),
+            accepted => invitationsQuery.Where(i => i.AcceptedAt != null),
             _ => invitationsQuery
         };
 
@@ -90,14 +90,14 @@ public sealed class ListInvitationsHandler(UsersDbContext db, IClock clock)
     {
         if (acceptedAt is not null)
         {
-            return Accepted;
+            return accepted;
         }
 
         if (revokedAt is not null)
         {
-            return Revoked;
+            return revoked;
         }
 
-        return expiresAt <= now ? Expired : Pending;
+        return expiresAt <= now ? expired : pending;
     }
 }

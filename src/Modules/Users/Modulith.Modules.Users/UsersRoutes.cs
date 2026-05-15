@@ -23,6 +23,11 @@ internal static class UsersRoutes
     public const string RefreshToken = $"{Prefix}/token/refresh";
     public const string Logout = $"{Prefix}/logout";
     public const string LogoutAll = $"{Prefix}/logout/all";
+    public const string LoginTwoFactor = $"{Login}/2fa";
+    public const string TwoFactor = $"{Me}/2fa";
+    public const string SetupTotp = $"{TwoFactor}/totp/setup";
+    public const string ConfirmTotp = $"{TwoFactor}/totp/confirm";
+    public const string RegenerateRecoveryCodes = $"{TwoFactor}/recovery-codes/regenerate";
 
     // External login — Phase 14
     public const string GoogleLogin = $"{Prefix}/auth/google/login";

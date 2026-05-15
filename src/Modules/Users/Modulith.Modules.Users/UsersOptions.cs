@@ -25,6 +25,17 @@ public sealed class UsersOptions
     [Range(1, 20)]
     public int MaxPendingExternalLoginsPerEmail { get; init; } = 5;
 
+    public TimeSpan TwoFactorChallengeLifetime { get; init; } = TimeSpan.FromMinutes(5);
+
+    [Range(1, 20)]
+    public int RecoveryCodeCount { get; init; } = 10;
+
+    [Range(0, 2)]
+    public int TotpAllowedTimeStepDrift { get; init; } = 1;
+
+    [Required]
+    public string TotpIssuer { get; init; } = "Modulith";
+
     [Required]
     public string TermsOfServiceVersion { get; init; } = "1.0";
 

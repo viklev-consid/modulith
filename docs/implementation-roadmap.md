@@ -767,7 +767,7 @@ Replace the Phase 4 stub `src/Modules/Users/CLAUDE.md` with the version shipped 
 
 The extension points in `src/Modules/Users/CLAUDE.md` are deliberate non-goals:
 
-- Two-factor authentication
+- Two-factor authentication (later implemented; see `docs/adr/0033-two-factor-authentication.md`)
 - Email confirmation as an access gate
 - Account lockout
 - Breach password check
@@ -775,7 +775,7 @@ The extension points in `src/Modules/Users/CLAUDE.md` are deliberate non-goals:
 - Multi-tenancy / organization membership
 - Admin impersonation
 
-These are extension points documented with suggested shapes but not implemented. Adding any of them is a separate, deliberate decision.
+These are extension points documented with suggested shapes for this phase. Two-factor authentication was later implemented as a separate, deliberate decision; see `docs/adr/0033-two-factor-authentication.md`.
 
 ---
 

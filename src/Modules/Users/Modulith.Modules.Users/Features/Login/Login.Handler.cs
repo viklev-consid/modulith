@@ -16,6 +16,8 @@ public sealed class LoginHandler(
     IPasswordHasher passwordHasher,
     IJwtGenerator jwtGenerator,
     IRefreshTokenIssuer refreshTokenIssuer,
+    ITwoFactorRequirementEvaluator twoFactorRequirementEvaluator,
+    ITwoFactorChallengeIssuer twoFactorChallengeIssuer,
     IOptions<UsersOptions> options,
     IMessageBus bus,
     IClock clock)
@@ -42,6 +44,15 @@ public sealed class LoginHandler(
             return UsersErrors.InvalidCredentials;
         }
 
+        if (await twoFactorRequirementEvaluator.IsRequiredAsync(user, ct))
+        {
+            var (challenge, rawChallengeToken) = twoFactorChallengeIssuer.Issue(user.Id, cmd.IpAddress);
+            db.PendingTwoFactorChallenges.Add(challenge);
+            await db.SaveChangesAsync(ct);
+
+            return LoginResponse.TwoFactorRequired(new LoginChallengeResponse(rawChallengeToken, challenge.ExpiresAt));
+        }
+
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
 
         await db.SaveChangesAsync(ct);
@@ -56,11 +67,11 @@ public sealed class LoginHandler(
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
 
-        return new LoginResponse(
+        return LoginResponse.Authenticated(new LoginSessionResponse(
             user.Id.Value,
             accessToken,
             accessTokenExpiresAt,
             rawRefreshToken,
-            refreshToken.ExpiresAt);
+            refreshToken.ExpiresAt));
     }
 }

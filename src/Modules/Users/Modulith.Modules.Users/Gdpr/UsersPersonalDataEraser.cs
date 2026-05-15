@@ -26,6 +26,18 @@ public sealed class UsersPersonalDataEraser(UsersDbContext db) : IPersonalDataEr
             .Where(p => p.UserId == userId)
             .ExecuteDeleteAsync(ct);
 
+        affected += await db.TwoFactorCredentials
+            .Where(c => c.UserId == userId)
+            .ExecuteDeleteAsync(ct);
+
+        affected += await db.RecoveryCodes
+            .Where(c => c.UserId == userId)
+            .ExecuteDeleteAsync(ct);
+
+        affected += await db.PendingTwoFactorChallenges
+            .Where(c => c.UserId == userId)
+            .ExecuteDeleteAsync(ct);
+
         // PendingExternalLogins are keyed by email, not UserId (pre-account records).
         // Find and delete by email if we still have the user record.
         var dbUserForEmail = await db.Users.FindAsync([userId], ct);

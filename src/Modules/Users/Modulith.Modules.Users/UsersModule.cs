@@ -25,6 +25,7 @@ using Modulith.Modules.Users.Features.GetUserById;
 using Modulith.Modules.Users.Features.ListInvitations;
 using Modulith.Modules.Users.Features.ListUsers;
 using Modulith.Modules.Users.Features.Login;
+using Modulith.Modules.Users.Features.LoginTwoFactor;
 using Modulith.Modules.Users.Features.Logout;
 using Modulith.Modules.Users.Features.LogoutAll;
 using Modulith.Modules.Users.Features.RefreshToken;
@@ -32,6 +33,10 @@ using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Features.RequestEmailChange;
 using Modulith.Modules.Users.Features.ResetPassword;
 using Modulith.Modules.Users.Features.RevokeInvitation;
+using Modulith.Modules.Users.Features.TwoFactor.ConfirmTotp;
+using Modulith.Modules.Users.Features.TwoFactor.DisableTwoFactor;
+using Modulith.Modules.Users.Features.TwoFactor.RegenerateRecoveryCodes;
+using Modulith.Modules.Users.Features.TwoFactor.SetupTotp;
 using Modulith.Modules.Users.Gdpr;
 using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
@@ -97,6 +102,10 @@ public static class UsersModule
         services.AddScoped<IRefreshTokenIssuer, RefreshTokenIssuer>();
         services.AddScoped<IRefreshTokenRevoker, RefreshTokenRevoker>();
         services.AddScoped<ISingleUseTokenService, SingleUseTokenService>();
+        services.AddScoped<ITotpService, TotpService>();
+        services.AddScoped<ITotpSecretProtector, DataProtectionTotpSecretProtector>();
+        services.AddScoped<ITwoFactorRequirementEvaluator, TwoFactorRequirementEvaluator>();
+        services.AddScoped<ITwoFactorChallengeIssuer, TwoFactorChallengeIssuer>();
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
@@ -134,6 +143,7 @@ public static class UsersModule
     {
         opts.Discovery.IncludeType<RegisterHandler>();
         opts.Discovery.IncludeType<LoginHandler>();
+        opts.Discovery.IncludeType<LoginTwoFactorHandler>();
         opts.Discovery.IncludeType<GetCurrentUserHandler>();
         opts.Discovery.IncludeType<ExportPersonalDataHandler>();
         opts.Discovery.IncludeType<DeleteAccountHandler>();
@@ -165,6 +175,12 @@ public static class UsersModule
         opts.Discovery.IncludeType<SetInitialPasswordHandler>();
         opts.Discovery.IncludeType<CompleteOnboardingHandler>();
 
+        // Two-factor authentication
+        opts.Discovery.IncludeType<SetupTotpHandler>();
+        opts.Discovery.IncludeType<ConfirmTotpHandler>();
+        opts.Discovery.IncludeType<DisableTwoFactorHandler>();
+        opts.Discovery.IncludeType<RegenerateRecoveryCodesHandler>();
+
         return opts;
     }
 
@@ -181,6 +197,7 @@ public static class UsersModule
     {
         RegisterEndpoint.Map(app);
         LoginEndpoint.Map(app);
+        LoginTwoFactorEndpoint.Map(app);
         GetCurrentUserEndpoint.Map(app);
         ExportPersonalDataEndpoint.Map(app);
         DeleteAccountEndpoint.Map(app);
@@ -210,6 +227,12 @@ public static class UsersModule
         UnlinkGoogleLoginEndpoint.Map(app);
         SetInitialPasswordEndpoint.Map(app);
         CompleteOnboardingEndpoint.Map(app);
+
+        // Two-factor authentication
+        SetupTotpEndpoint.Map(app);
+        ConfirmTotpEndpoint.Map(app);
+        DisableTwoFactorEndpoint.Map(app);
+        RegenerateRecoveryCodesEndpoint.Map(app);
 
         return app;
     }

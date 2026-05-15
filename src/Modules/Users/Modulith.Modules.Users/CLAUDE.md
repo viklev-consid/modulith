@@ -19,6 +19,9 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - **ExternalLogin** — entity linking a `(Provider, Subject)` pair to a `User`. Owned by the `User` aggregate via `_externalLogins`. Unique constraint on `(provider, subject)` across all users.
 - **ExternalLoginProvider** — enum (`Google`).
 - **PendingExternalLogin** — pre-account record created during the email-loop for unlinked Google accounts. Identified by a random 256-bit token, stored as SHA-256 hash. Not linked to a `User` (may precede account creation). Single-use via `Consume(IClock)`; expires after `PendingExternalLoginLifetime`.
+- **TwoFactorCredential** — per-user local 2FA credential. The shipped method is TOTP. The protected secret is encrypted with ASP.NET Core Data Protection.
+- **RecoveryCode** — hashed, single-use fallback code for 2FA login and disable flows.
+- **PendingTwoFactorChallenge** — short-lived login challenge issued after password or linked Google login succeeds for a 2FA-enabled user. The raw token is returned once and stored only as SHA-256.
 - **TermsAcceptance** — immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`). `CompleteOnboarding` writes a single ToS row keyed to the current `UsersOptions.TermsOfServiceVersion`. Keyed by `(UserId, Version)`, unique constraint.
 
 ---
@@ -47,6 +50,16 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `POST /v1/users/me/onboarding` — requires `acceptTerms: true`; optional `acceptMarketingEmails: bool`. Records ToS acceptance, optionally grants `marketing-emails` consent, marks `HasCompletedOnboarding = true`.
 - `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` — verifies Google ID tokens via JWKS (cached in `IMemoryCache`). Fail-closed: returns `ExternalAuthUnavailable` if JWKS cannot be fetched.
 - `GoogleAuthOptions` — bound from `Modules:Users:Google:`. `ClientId` is `[Required]`. `JwksUri` defaults to `https://www.googleapis.com/oauth2/v3/certs`. `JwksCacheDuration` defaults to 60 minutes.
+
+**Two-factor authentication — TOTP (shipped):**
+
+- Optional per user. Future policy enforcement should plug in through `ITwoFactorRequirementEvaluator` rather than changing the login response shape.
+- `POST /v1/users/me/2fa/totp/setup` returns a base32 secret and `otpauth://` URI for authenticator app provisioning.
+- `POST /v1/users/me/2fa/totp/confirm` verifies a 6-digit TOTP code, enables the credential, and returns recovery codes once.
+- `POST /v1/users/login` and linked-user `POST /v1/users/auth/google/login` return `status = twoFactorRequired` with an opaque challenge token when local 2FA is enabled, instead of issuing tokens immediately.
+- `POST /v1/users/login/2fa` exchanges a valid challenge plus TOTP or recovery code for access and refresh tokens.
+- `DELETE /v1/users/me/2fa` requires current password plus TOTP or recovery code; it disables 2FA, removes recovery codes, and preserves the current refresh-token session while revoking the other sessions.
+- `POST /v1/users/me/2fa/recovery-codes/regenerate` requires current password plus TOTP; it replaces the recovery-code batch only after verification succeeds.
 
 **RBAC (shipped — Phase 13):**
 
@@ -79,14 +92,19 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 5. `SingleUseToken` values are stored as SHA-256 hashes. Raw tokens exist only in HTTP responses (to Notifications) and in email bodies. Never logged, never persisted in plaintext.
 6. `RefreshToken` values are stored as SHA-256 hashes with the same discipline.
 7. Password comparison uses constant-time equality (BCrypt's default).
-8. Enumeration is not possible via `POST /v1/users/password/forgot` or `POST /v1/users/me/email/request` responses — they return identical success shapes regardless of whether the email is known/available.
-9. Security-sensitive events revoke refresh tokens:
+8. TOTP secrets are protected with ASP.NET Core Data Protection. Production deployments must persist and share the Data Protection key ring across API instances.
+9. Recovery codes and pending 2FA challenge tokens are stored as SHA-256 hashes. Raw values are returned only at creation time.
+10. Pending 2FA challenges expire, are consumed on success, and are consumed after the failed-attempt cap. Lockout errors intentionally remain opaque.
+11. Pending 2FA challenge rows use Postgres `xmin` optimistic concurrency for failed-attempt counting.
+12. Enumeration is not possible via `POST /v1/users/password/forgot` or `POST /v1/users/me/email/request` responses — they return identical success shapes regardless of whether the email is known/available.
+13. Security-sensitive events revoke refresh tokens:
    - **Password reset** → revoke all.
    - **Password change** → revoke all except the one on the current request.
    - **Email change confirmation** → revoke all.
-10. Refresh-token reuse (presenting an already-rotated token) triggers full chain revocation and forced re-login.
-11. Email change alerts are sent to the **old** email address after completion, defense-in-depth against silent account takeover.
-12. Rate limits: `auth` policy on all credential-handling endpoints; `write` policy on session-ending endpoints (see the slice table below).
+   - **2FA enable / disable** → revoke all except the one on the current request.
+14. Refresh-token reuse (presenting an already-rotated token) triggers full chain revocation and forced re-login.
+15. Email change alerts are sent to the **old** email address after completion, defense-in-depth against silent account takeover.
+16. Rate limits: `auth` policy on all credential-handling endpoints; `write` policy on session-ending endpoints (see the slice table below).
 
 ---
 
@@ -124,6 +142,11 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 | UnlinkGoogleLogin | `DELETE /v1/users/me/auth/google/unlink` | authenticated | `write` |
 | SetInitialPassword | `POST /v1/users/me/password/initial` | authenticated | `auth` |
 | CompleteOnboarding | `POST /v1/users/me/onboarding` | authenticated | `write` |
+| LoginTwoFactor | `POST /v1/users/login/2fa` | public challenge | `auth` |
+| SetupTotp | `POST /v1/users/me/2fa/totp/setup` | authenticated | `auth` |
+| ConfirmTotp | `POST /v1/users/me/2fa/totp/confirm` | authenticated | `auth` |
+| DisableTwoFactor | `DELETE /v1/users/me/2fa` | authenticated | `auth` |
+| RegenerateRecoveryCodes | `POST /v1/users/me/2fa/recovery-codes/regenerate` | authenticated | `auth` |
 
 ---
 
@@ -134,6 +157,10 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `IRefreshTokenIssuer` — issues and rotates `RefreshToken` entities. Handles device fingerprinting (UA + IP, opaque) for session context.
 - `ISingleUseTokenService` — creates and verifies `SingleUseToken` instances for password reset and email change.
 - `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` — verifies Google ID tokens against Google's JWKS endpoint. JWKS is cached in `IMemoryCache` (`GoogleAuthOptions.JwksCacheDuration`, default 60 min). Returns `ExternalAuthUnavailable` if JWKS fetch fails (fail-closed). **Must be `public` interface** — Wolverine handler discovery requires all injected types to be public.
+- `ITotpService` / `TotpService` — generates TOTP secrets, builds provisioning URIs, and verifies 6-digit TOTP codes with configured time-step drift.
+- `ITotpSecretProtector` / `DataProtectionTotpSecretProtector` — protects TOTP secrets at rest with ASP.NET Core Data Protection.
+- `ITwoFactorChallengeIssuer` / `TwoFactorChallengeIssuer` — issues pending 2FA challenges after first-factor success.
+- `ITwoFactorRequirementEvaluator` / `TwoFactorRequirementEvaluator` — policy-ready hook for deciding whether a user must complete 2FA before token issuance.
 
 ---
 
@@ -166,6 +193,13 @@ public sealed class UsersOptions
     public TimeSpan PendingExternalLoginLifetime { get; init; } = TimeSpan.FromMinutes(15);
     [Range(1, 20)]
     public int MaxPendingExternalLoginsPerEmail { get; init; } = 5;
+    public TimeSpan TwoFactorChallengeLifetime { get; init; } = TimeSpan.FromMinutes(5);
+    [Range(1, 20)]
+    public int RecoveryCodeCount { get; init; } = 10;
+    [Range(0, 2)]
+    public int TotpAllowedTimeStepDrift { get; init; } = 1;
+    [Required]
+    public string TotpIssuer { get; init; } = "Modulith";
     [Required]
     public string TermsOfServiceVersion { get; init; } = "1.0";
     [Required]
@@ -196,6 +230,9 @@ In `Modulith.Modules.Users.Contracts/Events/`:
 - `ExternalLoginUnlinkedV1` — carries `Email`, `Provider`
 - `UserProvisionedFromExternalV1` — raised when a new user is created via Google confirm
 - `UserOnboardingCompletedV1` — raised when `CompleteOnboarding` is accepted
+- `TwoFactorEnabledV1` — carries `Email` and method for audit/notification subscribers
+- `TwoFactorDisabledV1` — carries `Email` and method for audit/notification subscribers
+- `RecoveryCodesRegeneratedV1` — carries `Email` for audit/notification subscribers
 
 Handlers for these events live in consuming modules (Notifications, Audit, any others). Users does not know who subscribes.
 
@@ -215,8 +252,12 @@ Handlers for these events live in consuming modules (Notifications, Audit, any o
 - **Don't return specific errors from `RequestEmailChange` when the target email is taken.** Same response as success.
 - **Don't distinguish "invalid token" from "expired token"** in reset/confirm error responses. Use a single `InvalidOrExpiredToken` error — otherwise it's an oracle for token validity.
 - **Never log raw tokens.** Serilog destructuring masks properties matching token-related patterns, but don't rely on that — never include a raw token in a log call in the first place.
+- **Never log TOTP secrets or recovery codes.** Setup and recovery-code responses contain raw secrets by design. Keep them out of explicit log calls and request-body logging.
 - **Never use `DateTime.UtcNow`.** Use `IClock`. Tests need control over time, and security invariants (token expiry) need deterministic verification.
 - **Compare hashes with `CryptographicOperations.FixedTimeEquals`** when doing application-level equality checks on token hashes or password hashes. (DB-level lookups via B-tree seek are fine; the timing attack surface is application-code comparison.)
+- **Do not reveal the 2FA failed-attempt cap.** Failed challenge attempts should return the code error even when the attempt consumes the challenge at the cap. The next request naturally sees an invalid/expired challenge.
+- **Do not remove `xmin` from `PendingTwoFactorChallenge`.** Failed-attempt counting is security-sensitive; optimistic concurrency prevents parallel requests from silently undercounting.
+- **Do not lower-case recovery codes at generation time only.** User input is normalized before hashing so uppercase entry succeeds.
 - **`MaxActiveRefreshTokensPerUser` enforcement.** When at the limit, the oldest active token is revoked on login to make room. Unbounded session counts would grow the `refresh_tokens` table without limit.
 - **`IGoogleIdTokenVerifier` must be `public`.** Wolverine handler discovery requires all constructor-injected types to be public-visible. `GoogleIdentity` (the return type) must also be `public` for the same reason.
 - **Don't put PII in `PendingExternalLogin.Email`.** The email is needed to dispatch the notification but is not personal data in the same sense as a user profile — it's a transient pre-account record keyed by the Google identity, not the user's stored email. The sweep job removes it after expiry.
@@ -232,19 +273,6 @@ Handlers for these events live in consuming modules (Notifications, Audit, any o
 ## Explicitly out of scope (extension points)
 
 The following are deliberately not shipped. Each is documented here with the shape a team would use to add it. **Do not implement these without an explicit request.**
-
-### Two-factor authentication
-
-**Not shipped because:** 2FA correctness is subtle (recovery flows, device trust, admin reset procedures). Modern best practice is shifting toward WebAuthn/passkeys, and shipping TOTP bakes in an older pattern. Real requirements vary.
-
-**Extension shape:**
-
-- Add `TwoFactorMethod` entity (one-to-many with User): `Method` (TOTP/WebAuthn), `SecretOrCredential`, `EnabledAt`, `LastUsedAt`.
-- Add `BackupCode` entity: hashed, single-use, bound to user.
-- Slices: `EnrollTwoFactor`, `VerifyEnrollment`, `DisableTwoFactor`, `GenerateBackupCodes`, `VerifyTwoFactor`.
-- Modify Login slice: if user has active 2FA, issue a short-lived *challenge* token instead of an access token. Client completes with `VerifyTwoFactor` to exchange challenge + code for access + refresh.
-- Add `RequireTwoFactor` authorization policy for sensitive endpoints.
-- Libraries: `Otp.NET` for TOTP, `Fido2NetLib` for WebAuthn.
 
 ### Email confirmation as an access gate
 
