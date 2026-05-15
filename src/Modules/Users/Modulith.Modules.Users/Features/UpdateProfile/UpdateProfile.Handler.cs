@@ -1,12 +1,14 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
+using Wolverine;
 
 namespace Modulith.Modules.Users.Features.UpdateProfile;
 
-public sealed class UpdateProfileHandler(UsersDbContext db)
+public sealed class UpdateProfileHandler(UsersDbContext db, IMessageBus bus)
 {
     public async Task<ErrorOr<UpdateProfileResponse>> Handle(UpdateProfileCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(UpdateProfileHandler), () => HandleCoreAsync(cmd, ct));
@@ -19,6 +21,7 @@ public sealed class UpdateProfileHandler(UsersDbContext db)
             return UsersErrors.UserNotFound;
         }
 
+        var oldDisplayName = user.DisplayName;
         var updateResult = user.UpdateProfile(cmd.DisplayName);
         if (updateResult.IsError)
         {
@@ -26,6 +29,16 @@ public sealed class UpdateProfileHandler(UsersDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
+
+        if (!string.Equals(oldDisplayName, user.DisplayName, StringComparison.Ordinal))
+        {
+            await bus.PublishAsync(new UserProfileUpdatedV1(
+                user.Id.Value,
+                oldDisplayName,
+                user.DisplayName,
+                Guid.NewGuid()));
+            UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserProfileUpdatedV1)));
+        }
 
         return new UpdateProfileResponse(
             user.Id.Value,

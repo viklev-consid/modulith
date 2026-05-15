@@ -39,6 +39,7 @@ internal static class UpdateProfileEndpoint
         .Produces<UpdateProfileResponse>()
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound)
         .RequireAuthorization()
         .RequireRateLimiting("write");
 }

@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.LoginTwoFactor;
@@ -11,6 +9,7 @@ using Modulith.Modules.Users.Features.TwoFactor.DisableTwoFactor;
 using Modulith.Modules.Users.Features.TwoFactor.RegenerateRecoveryCodes;
 using Modulith.Modules.Users.Features.TwoFactor.SetupTotp;
 using Modulith.Modules.Users.Domain;
+using Modulith.Modules.Users.IntegrationTests.Support;
 using Modulith.Modules.Users.Persistence;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
@@ -359,57 +358,9 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
             confirmation.RecoveryCodes);
     }
 
-    private static string CurrentTotp(string secret) => Totp(secret, DateTimeOffset.UtcNow);
+    private static string CurrentTotp(string secret) => TotpTestHelper.Current(secret);
 
-    private static string NextTotp(string secret) => Totp(secret, DateTimeOffset.UtcNow.AddSeconds(30));
-
-    private static string Totp(string secret, DateTimeOffset timestamp)
-    {
-        var secretBytes = Base32Decode(secret);
-        var timeStep = timestamp.ToUnixTimeSeconds() / 30;
-        Span<byte> counter = stackalloc byte[8];
-        BitConverter.TryWriteBytes(counter, timeStep);
-        if (BitConverter.IsLittleEndian)
-        {
-            counter.Reverse();
-        }
-
-#pragma warning disable CA5350
-        using var hmac = new HMACSHA1(secretBytes);
-#pragma warning restore CA5350
-        var hash = hmac.ComputeHash(counter.ToArray());
-        var offset = hash[^1] & 0x0f;
-        var binary =
-            ((hash[offset] & 0x7f) << 24)
-            | ((hash[offset + 1] & 0xff) << 16)
-            | ((hash[offset + 2] & 0xff) << 8)
-            | (hash[offset + 3] & 0xff);
-
-        return (binary % 1_000_000).ToString("D6", System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    private static byte[] Base32Decode(string value)
-    {
-        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-        var bytes = new List<byte>();
-        var bitBuffer = 0;
-        var bitCount = 0;
-
-        foreach (var c in value.Trim().ToUpperInvariant())
-        {
-            var index = alphabet.IndexOf(c, StringComparison.Ordinal);
-            bitBuffer = (bitBuffer << 5) | index;
-            bitCount += 5;
-
-            if (bitCount >= 8)
-            {
-                bytes.Add((byte)((bitBuffer >> (bitCount - 8)) & 0xff));
-                bitCount -= 8;
-            }
-        }
-
-        return bytes.ToArray();
-    }
+    private static string NextTotp(string secret) => TotpTestHelper.Next(secret);
 
     private sealed record EnabledTwoFactor(
         Guid UserId,

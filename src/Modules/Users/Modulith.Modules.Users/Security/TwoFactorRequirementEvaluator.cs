@@ -7,10 +7,8 @@ namespace Modulith.Modules.Users.Security;
 internal sealed class TwoFactorRequirementEvaluator(UsersDbContext db) : ITwoFactorRequirementEvaluator
 {
     public async Task<bool> IsRequiredAsync(User user, CancellationToken ct) =>
-        await db.TwoFactorCredentials.AnyAsync(c =>
-            c.UserId == user.Id &&
-            c.Method == TwoFactorMethod.Totp &&
-            c.ConfirmedAt != null &&
-            c.DisabledAt == null,
-            ct);
+        await db.TwoFactorCredentials
+            .Where(c => c.UserId == user.Id && c.Method == TwoFactorMethod.Totp)
+            .WhereActive()
+            .AnyAsync(ct);
 }

@@ -56,19 +56,16 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         string displayName,
         Role? initialRole = null)
     {
-        if (string.IsNullOrWhiteSpace(displayName))
+        var nameResult = NormalizeDisplayName(displayName);
+        if (nameResult.IsError)
         {
-            return UsersErrors.DisplayNameEmpty;
+            return nameResult.Errors;
         }
 
-        if (displayName.Length > 100)
-        {
-            return UsersErrors.DisplayNameTooLong;
-        }
-
+        var normalizedName = nameResult.Value;
         var role = initialRole ?? Role.User;
-        var user = new User(UserId.New(), email, passwordHash, displayName.Trim(), role, hasCompletedOnboarding: true);
-        user.RaiseEvent(new UserRegistered(user.Id, email.Value, displayName.Trim()));
+        var user = new User(UserId.New(), email, passwordHash, normalizedName, role, hasCompletedOnboarding: true);
+        user.RaiseEvent(new UserRegistered(user.Id, email.Value, normalizedName));
         return user;
     }
 
@@ -85,20 +82,17 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         IClock clock,
         Role? initialRole = null)
     {
-        if (string.IsNullOrWhiteSpace(displayName))
+        var nameResult = NormalizeDisplayName(displayName);
+        if (nameResult.IsError)
         {
-            return UsersErrors.DisplayNameEmpty;
+            return nameResult.Errors;
         }
 
-        if (displayName.Length > 100)
-        {
-            return UsersErrors.DisplayNameTooLong;
-        }
-
+        var normalizedName = nameResult.Value;
         var role = initialRole ?? Role.User;
-        var user = new User(UserId.New(), email, passwordHash: null, displayName.Trim(), role, hasCompletedOnboarding: false);
+        var user = new User(UserId.New(), email, passwordHash: null, normalizedName, role, hasCompletedOnboarding: false);
         var now = clock.UtcNow;
-        user.RaiseEvent(new UserProvisionedFromExternal(user.Id, provider, subject, email.Value, displayName.Trim(), now));
+        user.RaiseEvent(new UserProvisionedFromExternal(user.Id, provider, subject, email.Value, normalizedName, now));
         return user;
     }
 
@@ -130,18 +124,38 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 
     public ErrorOr<Success> UpdateProfile(string displayName)
     {
+        var nameResult = NormalizeDisplayName(displayName);
+        if (nameResult.IsError)
+        {
+            return nameResult.Errors;
+        }
+
+        var normalized = nameResult.Value;
+        if (string.Equals(normalized, DisplayName, StringComparison.Ordinal))
+        {
+            return Result.Success;
+        }
+
+        var oldDisplayName = DisplayName;
+        DisplayName = normalized;
+        RaiseEvent(new UserProfileUpdated(Id, oldDisplayName, normalized));
+        return Result.Success;
+    }
+
+    private static ErrorOr<string> NormalizeDisplayName(string displayName)
+    {
         if (string.IsNullOrWhiteSpace(displayName))
         {
             return UsersErrors.DisplayNameEmpty;
         }
 
-        if (displayName.Length > 100)
+        var trimmed = displayName.Trim();
+        if (trimmed.Length > 100)
         {
             return UsersErrors.DisplayNameTooLong;
         }
 
-        DisplayName = displayName.Trim();
-        return Result.Success;
+        return trimmed;
     }
 
     /// <summary>

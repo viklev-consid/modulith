@@ -42,12 +42,9 @@ public sealed class LoginTwoFactorHandler(
         }
 
         var credential = await db.TwoFactorCredentials
-            .FirstOrDefaultAsync(c =>
-                c.UserId == user.Id &&
-                c.Method == TwoFactorMethod.Totp &&
-                c.ConfirmedAt != null &&
-                c.DisabledAt == null,
-                ct);
+            .Where(c => c.UserId == user.Id && c.Method == TwoFactorMethod.Totp)
+            .WhereActive()
+            .FirstOrDefaultAsync(ct);
 
         if (credential is null)
         {

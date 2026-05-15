@@ -133,6 +133,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 | RefreshToken | `POST /v1/users/token/refresh` | refresh-token-authed | `auth` |
 | Logout | `POST /v1/users/logout` | authenticated | `write` |
 | LogoutAll | `POST /v1/users/logout/all` | authenticated | `write` |
+| UpdateProfile | `PATCH /v1/users/me/profile` | authenticated | `write` |
 | ChangeUserRole | `PUT /v1/users/{userId}/role` | `users.roles.write` | `write` |
 | ListUsers | `GET /v1/users` | `users.users.read` | `read` |
 | GetUserById | `GET /v1/users/{userId}` | `users.users.read` | `read` |
@@ -229,6 +230,7 @@ In `Modulith.Modules.Users.Contracts/Events/`:
 - `ExternalLoginLinkedV1` — carries `Email` (for Notifications cross-module use), `Provider`, `Subject`, `LinkedAt`
 - `ExternalLoginUnlinkedV1` — carries `Email`, `Provider`
 - `UserProvisionedFromExternalV1` — raised when a new user is created via Google confirm
+- `UserProfileUpdatedV1` — carries old and new `DisplayName` for audit/notification subscribers
 - `UserOnboardingCompletedV1` — raised when `CompleteOnboarding` is accepted
 - `TwoFactorEnabledV1` — carries `Email` and method for audit/notification subscribers
 - `TwoFactorDisabledV1` — carries `Email` and method for audit/notification subscribers
