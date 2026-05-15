@@ -113,6 +113,47 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task LoginTwoFactor_WithUppercaseRecoveryCode_AcceptsCode()
+    {
+        var setup = await EnableTwoFactorAsync("uppercase-recovery@example.com");
+        var challenge = await LoginForChallengeAsync("uppercase-recovery@example.com");
+
+        var response = await client.PostAsJsonAsync("/v1/users/login/2fa",
+            new LoginTwoFactorRequest(challenge.Challenge!.ChallengeToken, setup.RecoveryCodes[0].ToUpperInvariant()));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LoginTwoFactor_WithExpiredChallenge_Returns400()
+    {
+        await EnableTwoFactorAsync("expired-challenge@example.com");
+        var challenge = await LoginForChallengeAsync("expired-challenge@example.com");
+
+        await fixture.ExecuteDbAsync<UsersDbContext>((db, ct) =>
+            db.PendingTwoFactorChallenges
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.ExpiresAt, DateTimeOffset.UtcNow.AddMinutes(-1)), ct));
+
+        var response = await client.PostAsJsonAsync("/v1/users/login/2fa",
+            new LoginTwoFactorRequest(challenge.Challenge!.ChallengeToken, "000000"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LoginTwoFactor_WithWrongUsersChallenge_Returns400()
+    {
+        await EnableTwoFactorAsync("challenge-owner@example.com");
+        var other = await EnableTwoFactorAsync("challenge-code-owner@example.com");
+        var challenge = await LoginForChallengeAsync("challenge-owner@example.com");
+
+        var response = await client.PostAsJsonAsync("/v1/users/login/2fa",
+            new LoginTwoFactorRequest(challenge.Challenge!.ChallengeToken, other.RecoveryCodes[0]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task LoginTwoFactor_InvalidAttempts_ConsumeChallengeAfterMaxAttempts()
     {
         var setup = await EnableTwoFactorAsync("attempts@example.com");
@@ -126,6 +167,8 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
                 new LoginTwoFactorRequest(challenge!.Challenge!.ChallengeToken, "000000"));
 
             Assert.Equal(HttpStatusCode.BadRequest, attempt.StatusCode);
+            var body = await attempt.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("Users.Token.InvalidOrExpired", body, StringComparison.Ordinal);
         }
 
         var validAfterLock = await client.PostAsJsonAsync("/v1/users/login/2fa",
@@ -202,7 +245,38 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DisableTwoFactor_WithValidPasswordAndCode_DisablesAndRevokesSessions()
+    public async Task RegenerateRecoveryCodes_WhenCodeInvalid_KeepsPreviousBatch()
+    {
+        var setup = await EnableTwoFactorAsync("regenerate-failure@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(setup.AccessToken);
+        var oldCode = setup.RecoveryCodes[0];
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/2fa/recovery-codes/regenerate",
+            new RegenerateRecoveryCodesRequest("Password1!", "000000"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var challenge = await LoginForChallengeAsync("regenerate-failure@example.com");
+        var oldCodeLogin = await client.PostAsJsonAsync("/v1/users/login/2fa",
+            new LoginTwoFactorRequest(challenge.Challenge!.ChallengeToken, oldCode));
+
+        Assert.Equal(HttpStatusCode.OK, oldCodeLogin.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmTotp_WhenAlreadyEnabled_Returns409()
+    {
+        var setup = await EnableTwoFactorAsync("already-enabled@example.com");
+        var auth = fixture.CreateAuthenticatedClientWithToken(setup.AccessToken);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/2fa/totp/confirm",
+            new ConfirmTotpRequest(NextTotp(setup.Secret)));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DisableTwoFactor_WithValidPasswordAndCode_DisablesAndKeepsCurrentSession()
     {
         var setup = await EnableTwoFactorAsync("disable@example.com");
         var auth = fixture.CreateAuthenticatedClientWithToken(setup.AccessToken);
@@ -222,7 +296,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
                 .SingleAsync(ct));
 
         Assert.False(state.Enabled);
-        Assert.Equal(0, state.ActiveRefreshTokens);
+        Assert.Equal(1, state.ActiveRefreshTokens);
     }
 
     [Fact]
