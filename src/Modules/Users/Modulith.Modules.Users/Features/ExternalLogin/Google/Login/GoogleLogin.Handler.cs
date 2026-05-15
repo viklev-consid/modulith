@@ -72,11 +72,7 @@ public sealed class GoogleLoginHandler(
                     db.PendingTwoFactorChallenges.Add(challenge);
                     await db.SaveChangesAsync(ct);
 
-                    return new GoogleLoginResponse(
-                        IsPending: false,
-                        RequiresTwoFactor: true,
-                        TwoFactorChallengeToken: rawChallengeToken,
-                        TwoFactorChallengeExpiresAt: challenge.ExpiresAt);
+                    return GoogleLoginResponse.TwoFactorRequired(new GoogleLoginChallengeResponse(rawChallengeToken, challenge.ExpiresAt));
                 }
 
                 var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
@@ -89,13 +85,12 @@ public sealed class GoogleLoginHandler(
                 var expiresAt = clock.UtcNow.AddMinutes(opts.AccessTokenLifetimeMinutes);
                 var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
 
-                return new GoogleLoginResponse(
-                    IsPending: false,
+                return GoogleLoginResponse.Authenticated(new GoogleLoginSessionResponse(
                     UserId: user.Id.Value,
                     AccessToken: accessToken,
                     AccessTokenExpiresAt: expiresAt,
                     RefreshToken: rawRefreshToken,
-                    RefreshTokenExpiresAt: refreshToken.ExpiresAt);
+                    RefreshTokenExpiresAt: refreshToken.ExpiresAt));
             }
 
             // Unlink completed before we acquired the lock — fall through to the email loop.
@@ -133,7 +128,7 @@ public sealed class GoogleLoginHandler(
                 "Google", normalizedEmail, identity.Name, isExistingUserNow, refreshedRawToken, Guid.NewGuid()));
             UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginPendingV1)));
 
-            return new GoogleLoginResponse(IsPending: true);
+            return GoogleLoginResponse.PendingExternalConfirmation();
         }
 
         // Step 2: Enforce per-email cap across all subjects to prevent subject-cycling abuse.
@@ -175,13 +170,13 @@ public sealed class GoogleLoginHandler(
             // Treat as success — that request will publish the event and send the email.
             // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
             db.ChangeTracker.Clear();
-            return new GoogleLoginResponse(IsPending: true);
+            return GoogleLoginResponse.PendingExternalConfirmation();
         }
 
         await bus.PublishAsync(new ExternalLoginPendingV1(
             "Google", normalizedEmail, identity.Name, isExistingUser, rawToken, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(ExternalLoginPendingV1)));
 
-        return new GoogleLoginResponse(IsPending: true);
+        return GoogleLoginResponse.PendingExternalConfirmation();
     }
 }

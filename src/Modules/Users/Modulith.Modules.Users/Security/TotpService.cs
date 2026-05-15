@@ -26,7 +26,7 @@ internal sealed class TotpService(IClock clock) : ITotpService
 
     public TotpVerificationResult Verify(string secret, string code, int allowedTimeStepDrift)
     {
-        if (string.IsNullOrWhiteSpace(code) || code.Length is < 6 or > 8 || !code.All(char.IsDigit))
+        if (string.IsNullOrWhiteSpace(code) || code.Length != 6 || !code.All(char.IsDigit))
         {
             return new TotpVerificationResult(false, 0);
         }
@@ -45,7 +45,7 @@ internal sealed class TotpService(IClock clock) : ITotpService
             var expected = ComputeCode(secretBytes, step);
             if (CryptographicOperations.FixedTimeEquals(
                 Encoding.ASCII.GetBytes(expected),
-                Encoding.ASCII.GetBytes(code.PadLeft(digits, '0'))))
+                Encoding.ASCII.GetBytes(code)))
             {
                 return new TotpVerificationResult(true, step);
             }

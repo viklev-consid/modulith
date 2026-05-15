@@ -31,7 +31,7 @@ internal static class RegenerateRecoveryCodesEndpoint
                 }
 
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<RegenerateRecoveryCodesResponse>>(
-                    new RegenerateRecoveryCodesCommand(userId, request.Code),
+                    new RegenerateRecoveryCodesCommand(userId, request.CurrentPassword, request.Code),
                     ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })

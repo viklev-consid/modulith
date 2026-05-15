@@ -231,6 +231,17 @@ Asymmetric signing and key rotation are not implemented in the template. If your
 - Don't log keys (Serilog destructuring masks properties named `*Key`, `*Secret`, but belt-and-braces).
 - Don't use `DataProtection` for JWT signing — that's for cookies and antiforgery.
 
+### Data Protection key ring
+
+The Users module protects TOTP authenticator secrets with ASP.NET Core Data Protection. In production, the Data Protection key ring is part of the authentication system's durable state:
+
+- Persist the key ring outside the app container or process filesystem.
+- Share the same key ring across all API instances.
+- Back up the key ring with the same care as other authentication secrets.
+- Rotate keys using the normal Data Protection lifecycle; do not delete old active keys while users still have TOTP enabled.
+
+If the key ring is lost or an instance cannot read it, existing TOTP secrets cannot be decrypted and affected users will be unable to complete two-factor authentication. Configure a production key-ring store such as a mounted volume, Redis/blob storage, or a cloud KMS-backed provider before enabling horizontal scale or ephemeral deployments.
+
 ---
 
 ## Connection strings

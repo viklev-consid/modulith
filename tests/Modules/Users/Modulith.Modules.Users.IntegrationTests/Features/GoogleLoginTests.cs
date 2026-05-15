@@ -11,6 +11,7 @@ using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
 using Modulith.TestSupport;
 using Wolverine.Tracking;
@@ -86,9 +87,54 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<GoogleLoginResponse>();
         Assert.NotNull(body);
-        Assert.False(body.IsPending);
-        Assert.NotNull(body.AccessToken);
-        Assert.NotNull(body.RefreshToken);
+        Assert.Equal(GoogleLoginResponseStatus.Authenticated, body.Status);
+        Assert.NotNull(body.Session);
+        Assert.NotEmpty(body.Session.AccessToken);
+        Assert.NotEmpty(body.Session.RefreshToken);
+    }
+
+    [Fact]
+    public async Task GoogleLogin_WhenLinkedUserHasTwoFactorEnabled_ReturnsChallenge()
+    {
+        const string email = "fastpath2fa@example.com";
+        const string subject = "sub-fastpath-2fa";
+
+        await client.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest(email, "Password1!", "Alice"));
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+            var secretProtector = scope.ServiceProvider.GetRequiredService<ITotpSecretProtector>();
+            var emailVal = Email.Create(email).Value;
+            var user = await db.Users
+                .Include(u => u.ExternalLogins)
+                .FirstAsync(u => u.Email == emailVal);
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+
+            var credential = TwoFactorCredential.CreateTotp(
+                user.Id,
+                secretProtector.Protect("JBSWY3DPEHPK3PXP"),
+                clock).Value;
+            credential.Confirm(clock);
+            db.TwoFactorCredentials.Add(credential);
+
+            await db.SaveChangesAsync();
+        }
+
+        fixture.GoogleVerifier.SetIdentity(subject, email, "Alice");
+
+        var response = await client.PostAsJsonAsync("/v1/users/auth/google/login",
+            new GoogleLoginRequest("any-id-token"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GoogleLoginResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(GoogleLoginResponseStatus.TwoFactorRequired, body.Status);
+        Assert.NotNull(body.Challenge);
+        Assert.NotEmpty(body.Challenge.ChallengeToken);
+        Assert.Null(body.Session);
     }
 
     [Fact]

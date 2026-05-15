@@ -5,9 +5,9 @@ using Modulith.Shared.Kernel.Interfaces;
 namespace Modulith.Modules.Users.Security;
 
 internal sealed class TwoFactorChallengeIssuer(
-    UsersOptionsAccessor optionsAccessor,
+    IOptions<UsersOptions> options,
     IClock clock) : ITwoFactorChallengeIssuer
 {
     public (PendingTwoFactorChallenge challenge, string rawValue) Issue(UserId userId, string? ipAddress) =>
-        PendingTwoFactorChallenge.Create(userId, optionsAccessor.Value.TwoFactorChallengeLifetime, clock, ipAddress);
+        PendingTwoFactorChallenge.Create(userId, options.Value.TwoFactorChallengeLifetime, clock, ipAddress);
 }

@@ -106,7 +106,6 @@ public static class UsersModule
         services.AddScoped<ITotpSecretProtector, DataProtectionTotpSecretProtector>();
         services.AddScoped<ITwoFactorRequirementEvaluator, TwoFactorRequirementEvaluator>();
         services.AddScoped<ITwoFactorChallengeIssuer, TwoFactorChallengeIssuer>();
-        services.AddScoped<UsersOptionsAccessor>();
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();

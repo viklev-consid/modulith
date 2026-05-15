@@ -6,6 +6,6 @@ internal sealed class ConfirmTotpValidator : AbstractValidator<ConfirmTotpReques
 {
     public ConfirmTotpValidator()
     {
-        RuleFor(x => x.Code).NotEmpty().Matches("^[0-9]{6,8}$");
+        RuleFor(x => x.Code).NotEmpty().Matches("^[0-9]{6}$");
     }
 }

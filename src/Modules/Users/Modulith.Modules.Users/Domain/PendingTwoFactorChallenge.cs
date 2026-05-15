@@ -7,8 +7,10 @@ using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.Domain;
 
-public sealed class PendingTwoFactorChallenge : Entity<PendingTwoFactorChallengeId>, IAuditableEntity, IRetainable
+public sealed class PendingTwoFactorChallenge : Entity<PendingTwoFactorChallengeId>, IAuditableEntity
 {
+    public const int MaxAttempts = 5;
+
     private PendingTwoFactorChallenge(
         PendingTwoFactorChallengeId id,
         UserId userId,
@@ -32,13 +34,11 @@ public sealed class PendingTwoFactorChallenge : Entity<PendingTwoFactorChallenge
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? ConsumedAt { get; private set; }
+    public int AttemptCount { get; private set; }
     public string? IpAddress { get; private set; }
     public string? CreatedBy { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public string? UpdatedBy { get; private set; }
-
-    public TimeSpan RetentionPeriod => TimeSpan.FromDays(7);
-    public DateTimeOffset RetentionStartsAt => ExpiresAt;
 
     public static (PendingTwoFactorChallenge challenge, string rawValue) Create(
         UserId userId,
@@ -58,6 +58,23 @@ public sealed class PendingTwoFactorChallenge : Entity<PendingTwoFactorChallenge
     }
 
     public bool IsValid(IClock clock) => ConsumedAt is null && ExpiresAt > clock.UtcNow;
+
+    public ErrorOr<Success> RecordFailedAttempt(IClock clock)
+    {
+        if (!IsValid(clock))
+        {
+            return UsersErrors.InvalidOrExpiredToken;
+        }
+
+        AttemptCount++;
+        if (AttemptCount >= MaxAttempts)
+        {
+            ConsumedAt = clock.UtcNow;
+            return UsersErrors.InvalidOrExpiredToken;
+        }
+
+        return UsersErrors.TwoFactorCodeInvalid;
+    }
 
     public ErrorOr<Success> Consume(IClock clock)
     {

@@ -28,7 +28,7 @@ internal static class GoogleLoginEndpoint
                 var ua = httpContext.Request.Headers.UserAgent.ToString();
                 var command = new GoogleLoginCommand(request.IdToken, ip, ua);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GoogleLoginResponse>>(command, ct);
-                return result.ToProblemDetailsOr(r => r.IsPending
+                return result.ToProblemDetailsOr(r => string.Equals(r.Status, GoogleLoginResponseStatus.PendingExternalConfirmation, StringComparison.Ordinal)
                     ? Results.Accepted(value: new GoogleLoginPendingResponse())
                     : Results.Ok(r));
             })

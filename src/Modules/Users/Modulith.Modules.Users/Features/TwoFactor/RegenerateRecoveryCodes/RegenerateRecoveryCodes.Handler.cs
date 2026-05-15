@@ -13,6 +13,7 @@ namespace Modulith.Modules.Users.Features.TwoFactor.RegenerateRecoveryCodes;
 
 public sealed class RegenerateRecoveryCodesHandler(
     UsersDbContext db,
+    IPasswordHasher passwordHasher,
     ITotpService totpService,
     ITotpSecretProtector secretProtector,
     IOptions<UsersOptions> options,
@@ -29,6 +30,11 @@ public sealed class RegenerateRecoveryCodesHandler(
         if (user is null)
         {
             return UsersErrors.UserNotFound;
+        }
+
+        if (user.PasswordHash is null || !passwordHasher.Verify(cmd.CurrentPassword, user.PasswordHash.Value))
+        {
+            return UsersErrors.CurrentPasswordIncorrect;
         }
 
         var credential = await db.TwoFactorCredentials

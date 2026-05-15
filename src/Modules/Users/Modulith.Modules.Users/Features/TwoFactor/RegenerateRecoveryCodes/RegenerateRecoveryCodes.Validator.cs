@@ -6,6 +6,7 @@ internal sealed class RegenerateRecoveryCodesValidator : AbstractValidator<Regen
 {
     public RegenerateRecoveryCodesValidator()
     {
-        RuleFor(x => x.Code).NotEmpty();
+        RuleFor(x => x.CurrentPassword).NotEmpty();
+        RuleFor(x => x.Code).NotEmpty().Matches("^[0-9]{6}$");
     }
 }

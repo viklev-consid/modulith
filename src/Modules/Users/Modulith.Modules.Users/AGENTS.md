@@ -78,7 +78,8 @@ Sensitive values, especially `JwtOptions.SigningKey`, live in user-secrets or a 
 
 - Shared JWT options: `JwtOptions`, bound from `Jwt:`.
 - Google options: `GoogleAuthOptions`, bound from `Modules:Users:Google:`. `ClientId` is required. `JwksUri` defaults to Google's OAuth cert endpoint. `JwksCacheDuration` defaults to 60 minutes.
-- Users options: `UsersOptions`, bound from `Modules:Users:`. Includes access-token lifetime, refresh-token lifetime, session cap, password policy, token lifetimes, pending external-login lifetime, and legal document versions.
+- Users options: `UsersOptions`, bound from `Modules:Users:`. Includes access-token lifetime, refresh-token lifetime, session cap, password policy, token lifetimes, pending external-login lifetime, two-factor settings, and legal document versions.
+- TOTP secrets are protected with ASP.NET Core Data Protection. Production deployments must persist and share the Data Protection key ring across API instances; losing the key ring makes existing TOTP secrets undecryptable.
 
 ---
 

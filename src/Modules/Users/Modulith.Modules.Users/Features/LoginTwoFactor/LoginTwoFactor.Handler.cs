@@ -57,6 +57,13 @@ public sealed class LoginTwoFactorHandler(
         var verifyResult = await VerifyCodeAsync(user.Id, credential, cmd.Code, ct);
         if (verifyResult.IsError)
         {
+            var attemptResult = challenge.RecordFailedAttempt(clock);
+            await db.SaveChangesAsync(ct);
+            if (attemptResult.IsError && attemptResult.FirstError == UsersErrors.InvalidOrExpiredToken)
+            {
+                return attemptResult.Errors;
+            }
+
             return verifyResult.Errors;
         }
 
@@ -93,7 +100,7 @@ public sealed class LoginTwoFactorHandler(
         string code,
         CancellationToken ct)
     {
-        if (code.Contains('-', StringComparison.Ordinal))
+        if (IsRecoveryCode(code))
         {
             var hash = RecoveryCode.HashRawValue(code);
             var recoveryCode = await db.RecoveryCodes.FirstOrDefaultAsync(c =>
@@ -121,5 +128,12 @@ public sealed class LoginTwoFactorHandler(
         }
 
         return credential.MarkAcceptedTimeStep(verification.TimeStep);
+    }
+
+    private static bool IsRecoveryCode(string code)
+    {
+        var parts = code.Split('-', StringSplitOptions.None);
+        return parts.Length == 4
+            && parts.All(p => p.Length == 5 && p.All(Uri.IsHexDigit));
     }
 }

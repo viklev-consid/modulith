@@ -28,6 +28,7 @@ internal sealed class PendingTwoFactorChallengeConfiguration : IEntityTypeConfig
         builder.Property(c => c.CreatedAt).IsRequired();
         builder.Property(c => c.ExpiresAt).IsRequired();
         builder.Property(c => c.ConsumedAt);
+        builder.Property(c => c.AttemptCount).IsRequired();
         builder.Property(c => c.IpAddress).HasMaxLength(64);
         builder.Property(c => c.CreatedBy).HasMaxLength(100);
         builder.Property(c => c.UpdatedAt);

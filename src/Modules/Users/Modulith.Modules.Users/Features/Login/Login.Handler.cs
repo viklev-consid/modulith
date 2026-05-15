@@ -50,12 +50,7 @@ public sealed class LoginHandler(
             db.PendingTwoFactorChallenges.Add(challenge);
             await db.SaveChangesAsync(ct);
 
-            return new LoginResponse(
-                UserId: user.Id.Value,
-                AccessToken: string.Empty,
-                RequiresTwoFactor: true,
-                TwoFactorChallengeToken: rawChallengeToken,
-                TwoFactorChallengeExpiresAt: challenge.ExpiresAt);
+            return LoginResponse.TwoFactorRequired(new LoginChallengeResponse(rawChallengeToken, challenge.ExpiresAt));
         }
 
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
@@ -72,11 +67,11 @@ public sealed class LoginHandler(
         var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
 
-        return new LoginResponse(
+        return LoginResponse.Authenticated(new LoginSessionResponse(
             user.Id.Value,
             accessToken,
             accessTokenExpiresAt,
             rawRefreshToken,
-            refreshToken.ExpiresAt);
+            refreshToken.ExpiresAt));
     }
 }
