@@ -30,9 +30,12 @@ internal static class DisableTwoFactorEndpoint
                     return Results.Unauthorized();
                 }
 
-                var result = await bus.InvokeAsync<ErrorOr.ErrorOr<DisableTwoFactorResponse>>(
-                    new DisableTwoFactorCommand(userId, request.CurrentPassword, request.Code),
-                    ct);
+                var command = new DisableTwoFactorCommand(
+                    userId,
+                    request.CurrentPassword,
+                    request.Code,
+                    currentUser.ActiveRefreshTokenId);
+                var result = await bus.InvokeAsync<ErrorOr.ErrorOr<DisableTwoFactorResponse>>(command, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })
         .WithName("DisableTwoFactor")

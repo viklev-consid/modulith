@@ -58,7 +58,14 @@ public sealed class DisableTwoFactorHandler(
         }
 
         await db.RecoveryCodes.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
-        await tokenRevoker.RevokeAllForUserAsync(userId, ct);
+
+        RefreshTokenId? keepId = null;
+        if (cmd.ActiveRefreshTokenId is not null && Guid.TryParse(cmd.ActiveRefreshTokenId, out var parsed))
+        {
+            keepId = new RefreshTokenId(parsed);
+        }
+
+        await tokenRevoker.RevokeAllForUserAsync(userId, ct, except: keepId);
         await db.SaveChangesAsync(ct);
 
         await bus.PublishAsync(new TwoFactorDisabledV1(userId.Value, user.Email.Value, TwoFactorMethod.Totp.ToString(), Guid.NewGuid()));
@@ -75,7 +82,7 @@ public sealed class DisableTwoFactorHandler(
     {
         if (IsRecoveryCode(code))
         {
-            var hash = RecoveryCode.HashRawValue(code);
+            var hash = RecoveryCode.HashRawValue(NormalizeRecoveryCode(code));
             var recoveryCode = await db.RecoveryCodes.FirstOrDefaultAsync(c =>
                 c.UserId == userId &&
                 c.CodeHash == hash &&
@@ -109,4 +116,7 @@ public sealed class DisableTwoFactorHandler(
         return parts.Length == 4
             && parts.All(p => p.Length == 5 && p.All(Uri.IsHexDigit));
     }
+
+    private static string NormalizeRecoveryCode(string code) =>
+        code.ToLowerInvariant();
 }

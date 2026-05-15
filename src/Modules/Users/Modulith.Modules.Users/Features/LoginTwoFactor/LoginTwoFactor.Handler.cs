@@ -57,11 +57,14 @@ public sealed class LoginTwoFactorHandler(
         var verifyResult = await VerifyCodeAsync(user.Id, credential, cmd.Code, ct);
         if (verifyResult.IsError)
         {
-            var attemptResult = challenge.RecordFailedAttempt(clock);
-            await db.SaveChangesAsync(ct);
-            if (attemptResult.IsError && attemptResult.FirstError == UsersErrors.InvalidOrExpiredToken)
+            _ = challenge.RecordFailedAttempt(clock);
+            try
             {
-                return attemptResult.Errors;
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return UsersErrors.TwoFactorCodeInvalid;
             }
 
             return verifyResult.Errors;
@@ -102,7 +105,7 @@ public sealed class LoginTwoFactorHandler(
     {
         if (IsRecoveryCode(code))
         {
-            var hash = RecoveryCode.HashRawValue(code);
+            var hash = RecoveryCode.HashRawValue(NormalizeRecoveryCode(code));
             var recoveryCode = await db.RecoveryCodes.FirstOrDefaultAsync(c =>
                 c.UserId == userId &&
                 c.CodeHash == hash &&
@@ -136,4 +139,7 @@ public sealed class LoginTwoFactorHandler(
         return parts.Length == 4
             && parts.All(p => p.Length == 5 && p.All(Uri.IsHexDigit));
     }
+
+    private static string NormalizeRecoveryCode(string code) =>
+        code.ToLowerInvariant();
 }
