@@ -10,20 +10,32 @@ public sealed class InMemoryNotificationStreamPublisher(IOptions<NotificationsOp
     private readonly ConcurrentDictionary<Guid, UserStreamRegistrations> registrations = new();
     private readonly int maxActiveStreamsPerUser = options.Value.Stream.MaxActiveStreamsPerUser;
 
-    public ErrorOr<Success> Subscribe(Guid userId, ChannelWriterRegistration registration)
+    public ErrorOr<Success> Subscribe(Guid userId, string clientId, ChannelWriterRegistration registration)
     {
         var registrationId = Guid.NewGuid();
-        var userRegistrations = registrations.GetOrAdd(userId, _ => new UserStreamRegistrations());
+        ChannelWriterRegistration? replacedRegistration = null;
 
-        lock (userRegistrations.SyncRoot)
+        while (true)
         {
-            if (userRegistrations.Count >= maxActiveStreamsPerUser)
+            var userRegistrations = registrations.GetOrAdd(userId, _ => new UserStreamRegistrations());
+
+            lock (userRegistrations.SyncRoot)
             {
-                registration.Dispose();
-                return NotificationsErrors.TooManyNotificationStreams;
+                if (userRegistrations.IsRemoved)
+                {
+                    continue;
+                }
+
+                if (!userRegistrations.ContainsClient(clientId) && userRegistrations.Count >= maxActiveStreamsPerUser)
+                {
+                    registration.Dispose();
+                    return NotificationsErrors.TooManyNotificationStreams;
+                }
+
+                replacedRegistration = userRegistrations.AddOrReplace(registrationId, clientId, registration);
             }
 
-            userRegistrations.Add(registrationId, registration);
+            break;
         }
 
         registration.SetDispose(() =>
@@ -35,14 +47,13 @@ public sealed class InMemoryNotificationStreamPublisher(IOptions<NotificationsOp
 
             lock (current.SyncRoot)
             {
-                current.Remove(registrationId);
-
-                if (current.Count == 0)
-                {
-                    registrations.TryRemove(userId, out _);
-                }
+                current.Remove(clientId, registrationId);
             }
+
+            RemoveIfEmpty(userId, current);
         });
+
+        replacedRegistration?.Dispose();
 
         return Result.Success;
     }
@@ -54,46 +65,78 @@ public sealed class InMemoryNotificationStreamPublisher(IOptions<NotificationsOp
             return ValueTask.CompletedTask;
         }
 
-        IReadOnlyList<KeyValuePair<Guid, ChannelWriterRegistration>> currentRegistrations;
+        IReadOnlyList<UserStreamRegistration> currentRegistrations;
         lock (userRegistrations.SyncRoot)
         {
             currentRegistrations = userRegistrations.ToList();
         }
 
-        foreach (var (registrationId, registration) in currentRegistrations)
+        foreach (var registration in currentRegistrations
+                     .Where(registration => !registration.WriterRegistration.Writer.TryWrite(streamEvent)))
         {
-            if (!registration.Writer.TryWrite(streamEvent))
+            lock (userRegistrations.SyncRoot)
             {
-                lock (userRegistrations.SyncRoot)
-                {
-                    userRegistrations.Remove(registrationId);
-                }
+                userRegistrations.Remove(registration.ClientId, registration.Id);
             }
         }
 
-        lock (userRegistrations.SyncRoot)
-        {
-            if (userRegistrations.Count == 0)
-            {
-                registrations.TryRemove(userId, out _);
-            }
-        }
+        RemoveIfEmpty(userId, userRegistrations);
 
         return ValueTask.CompletedTask;
     }
 
+    private void RemoveIfEmpty(Guid userId, UserStreamRegistrations userRegistrations)
+    {
+        lock (userRegistrations.SyncRoot)
+        {
+            if (userRegistrations.Count != 0)
+            {
+                return;
+            }
+
+            userRegistrations.MarkRemoved();
+        }
+
+        registrations.TryRemove(new KeyValuePair<Guid, UserStreamRegistrations>(userId, userRegistrations));
+    }
+
     private sealed class UserStreamRegistrations
     {
-        private readonly Dictionary<Guid, ChannelWriterRegistration> registrations = [];
+        private readonly Dictionary<string, UserStreamRegistration> registrations = new(StringComparer.Ordinal);
 
         public object SyncRoot { get; } = new();
 
+        public bool IsRemoved { get; private set; }
+
         public int Count => registrations.Count;
 
-        public void Add(Guid id, ChannelWriterRegistration registration) => registrations[id] = registration;
+        public bool ContainsClient(string clientId) => registrations.ContainsKey(clientId);
 
-        public void Remove(Guid id) => registrations.Remove(id);
+        public void MarkRemoved() => IsRemoved = true;
 
-        public List<KeyValuePair<Guid, ChannelWriterRegistration>> ToList() => registrations.ToList();
+        public ChannelWriterRegistration? AddOrReplace(Guid id, string clientId, ChannelWriterRegistration registration)
+        {
+            var replaced = registrations.TryGetValue(clientId, out var current)
+                ? current.WriterRegistration
+                : null;
+
+            registrations[clientId] = new UserStreamRegistration(id, clientId, registration);
+            return replaced;
+        }
+
+        public void Remove(string clientId, Guid id)
+        {
+            if (registrations.TryGetValue(clientId, out var registration) && registration.Id == id)
+            {
+                registrations.Remove(clientId);
+            }
+        }
+
+        public List<UserStreamRegistration> ToList() => registrations.Values.ToList();
     }
+
+    private sealed record UserStreamRegistration(
+        Guid Id,
+        string ClientId,
+        ChannelWriterRegistration WriterRegistration);
 }

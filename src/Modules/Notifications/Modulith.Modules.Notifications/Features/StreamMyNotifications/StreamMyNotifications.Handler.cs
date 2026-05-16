@@ -19,7 +19,7 @@ public sealed class StreamMyNotificationsHandler(
         });
 
         var registration = new ChannelWriterRegistration(channel.Writer);
-        var subscription = publisher.Subscribe(query.UserId, registration);
+        var subscription = publisher.Subscribe(query.UserId, query.ClientId, registration);
 
         if (subscription.IsError)
         {

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
 
 namespace Modulith.SmokeTests;
@@ -99,6 +100,23 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
         var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("3.1.1", doc.GetProperty("openapi").GetString());
         Assert.True(doc.TryGetProperty("paths", out _), "OpenAPI document should contain paths.");
+
+        var loginResponseSchema = doc
+            .GetProperty("components")
+            .GetProperty("schemas")
+            .GetProperty(nameof(LoginResponse));
+
+        var loginStatusEnum = loginResponseSchema
+            .GetProperty("properties")
+            .GetProperty("status")
+            .GetProperty("enum")
+            .EnumerateArray()
+            .Select(value => value.GetString()!)
+            .ToArray();
+
+        Assert.Equal(
+            [LoginResponseStatus.Authenticated, LoginResponseStatus.TwoFactorRequired],
+            loginStatusEnum);
     }
 
     // ── Mailpit API response shapes ───────────────────────────────────────────
