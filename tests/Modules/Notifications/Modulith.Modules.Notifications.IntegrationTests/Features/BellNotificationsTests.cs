@@ -86,7 +86,7 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
         var publisher = new InMemoryNotificationStreamPublisher(Options.Create(new NotificationsOptions()));
         var channel = Channel.CreateUnbounded<NotificationStreamEvent>();
         var registration = new ChannelWriterRegistration(channel.Writer);
-        publisher.Subscribe(userId, registration);
+        publisher.Subscribe(userId, "tab-1", registration);
         channel.Writer.TryComplete();
 
         var exception = await Record.ExceptionAsync(async () =>
@@ -99,7 +99,7 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
     }
 
     [Fact]
-    public void StreamPublisher_WhenUserHasMaximumActiveStreams_RejectsAdditionalSubscriptions()
+    public void StreamPublisher_WhenUserHasMaximumDistinctStreamClients_RejectsAdditionalSubscriptions()
     {
         var publisher = new InMemoryNotificationStreamPublisher(Options.Create(new NotificationsOptions
         {
@@ -114,14 +114,66 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
         var first = new ChannelWriterRegistration(firstChannel.Writer);
         var second = new ChannelWriterRegistration(secondChannel.Writer);
 
-        var firstSubscription = publisher.Subscribe(userId, first);
-        var secondSubscription = publisher.Subscribe(userId, second);
+        var firstSubscription = publisher.Subscribe(userId, "tab-1", first);
+        var secondSubscription = publisher.Subscribe(userId, "tab-2", second);
 
         Assert.False(firstSubscription.IsError);
         Assert.True(secondSubscription.IsError);
         Assert.True(secondChannel.Reader.Completion.IsCompleted);
 
         first.Dispose();
+    }
+
+    [Fact]
+    public void StreamPublisher_WhenSameClientSubscribes_ReplacesPreviousSubscription()
+    {
+        var publisher = new InMemoryNotificationStreamPublisher(Options.Create(new NotificationsOptions
+        {
+            Stream = new NotificationsOptions.StreamOptions
+            {
+                MaxActiveStreamsPerUser = 1,
+                ChannelCapacity = 100,
+            },
+        }));
+        var firstChannel = Channel.CreateBounded<NotificationStreamEvent>(1);
+        var secondChannel = Channel.CreateBounded<NotificationStreamEvent>(1);
+        var first = new ChannelWriterRegistration(firstChannel.Writer);
+        var second = new ChannelWriterRegistration(secondChannel.Writer);
+
+        var firstSubscription = publisher.Subscribe(userId, "tab-1", first);
+        var secondSubscription = publisher.Subscribe(userId, "tab-1", second);
+
+        Assert.False(firstSubscription.IsError);
+        Assert.False(secondSubscription.IsError);
+        Assert.True(firstChannel.Reader.Completion.IsCompleted);
+        Assert.False(secondChannel.Reader.Completion.IsCompleted);
+
+        second.Dispose();
+    }
+
+    [Fact]
+    public async Task StreamPublisher_AfterSameClientReplacement_DisposedOldSubscriptionDoesNotRemoveCurrentSubscription()
+    {
+        var publisher = new InMemoryNotificationStreamPublisher(Options.Create(new NotificationsOptions()));
+        var firstChannel = Channel.CreateBounded<NotificationStreamEvent>(1);
+        var secondChannel = Channel.CreateBounded<NotificationStreamEvent>(1);
+        var first = new ChannelWriterRegistration(firstChannel.Writer);
+        var second = new ChannelWriterRegistration(secondChannel.Writer);
+
+        publisher.Subscribe(userId, "tab-1", first);
+        publisher.Subscribe(userId, "tab-1", second);
+        first.Dispose();
+
+        await publisher.PublishAsync(
+            userId,
+            new NotificationStreamEvent("notification.created", "{}"),
+            CancellationToken.None);
+
+        Assert.False(firstChannel.Reader.TryRead(out _));
+        Assert.True(secondChannel.Reader.TryRead(out var streamEvent));
+        Assert.Equal("notification.created", streamEvent.EventName);
+
+        second.Dispose();
     }
 
     [Fact]
@@ -138,9 +190,9 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
         var first = new ChannelWriterRegistration(Channel.CreateBounded<NotificationStreamEvent>(1).Writer);
         var second = new ChannelWriterRegistration(Channel.CreateBounded<NotificationStreamEvent>(1).Writer);
 
-        var firstSubscription = publisher.Subscribe(userId, first);
+        var firstSubscription = publisher.Subscribe(userId, "tab-1", first);
         first.Dispose();
-        var secondSubscription = publisher.Subscribe(userId, second);
+        var secondSubscription = publisher.Subscribe(userId, "tab-2", second);
 
         Assert.False(firstSubscription.IsError);
         Assert.False(secondSubscription.IsError);
