@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Modulith.Modules.Notifications.Domain;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Templates;
@@ -16,7 +17,8 @@ public sealed class OnExternalLoginPendingHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IOptions<NotificationsOptions> options)
 {
     public async Task Handle(ExternalLoginPendingV1 @event, CancellationToken ct)
     {
@@ -49,11 +51,12 @@ public sealed class OnExternalLoginPendingHandler(
             return;
         }
 
+        var confirmationUrl = BuildConfirmationUrl(@event.RawToken);
         var (htmlBody, plainBody) = @event.IsExistingUser
-            ? (ExternalLoginPendingExistingUserTemplate.HtmlBody(@event.RawToken),
-               ExternalLoginPendingExistingUserTemplate.PlainTextBody(@event.RawToken))
-            : (ExternalLoginPendingNewUserTemplate.HtmlBody(@event.RawToken),
-               ExternalLoginPendingNewUserTemplate.PlainTextBody(@event.RawToken));
+            ? (ExternalLoginPendingExistingUserTemplate.HtmlBody(@event.RawToken, confirmationUrl),
+               ExternalLoginPendingExistingUserTemplate.PlainTextBody(@event.RawToken, confirmationUrl))
+            : (ExternalLoginPendingNewUserTemplate.HtmlBody(@event.RawToken, confirmationUrl),
+               ExternalLoginPendingNewUserTemplate.PlainTextBody(@event.RawToken, confirmationUrl));
 
         var message = new EmailMessage(
             To: @event.Email,
@@ -77,4 +80,10 @@ public sealed class OnExternalLoginPendingHandler(
         }
         await sendGuard.MarkSentAsync(@event.EventId, leaseToken, ct);
     }
+
+    private string BuildConfirmationUrl(string token) =>
+        options.Value.ExternalLoginConfirmationUrlTemplate.Replace(
+            "{token}",
+            Uri.EscapeDataString(token),
+            StringComparison.Ordinal);
 }

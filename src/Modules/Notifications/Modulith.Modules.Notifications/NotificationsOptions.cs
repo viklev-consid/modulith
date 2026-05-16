@@ -4,6 +4,9 @@ namespace Modulith.Modules.Notifications;
 
 public sealed class NotificationsOptions
 {
+    [Required]
+    public string ExternalLoginConfirmationUrlTemplate { get; init; } = "http://localhost:5173/auth/google/confirm?token={token}";
+
     public RetentionOptions Retention { get; init; } = new();
 
     public StreamOptions Stream { get; init; } = new();
