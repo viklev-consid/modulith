@@ -39,13 +39,6 @@ public static class NotificationsModule
         services.AddOptions<NotificationsOptions>()
             .Bind(configuration.GetSection("Modules:Notifications"))
             .ValidateDataAnnotations()
-            .Validate(options => options.ExternalLoginConfirmationUrlTemplate.Contains("{token}", StringComparison.Ordinal),
-                "External login confirmation URL template must contain the {token} placeholder.")
-            .Validate(options => Uri.TryCreate(
-                    options.ExternalLoginConfirmationUrlTemplate.Replace("{token}", "token", StringComparison.Ordinal),
-                    UriKind.Absolute,
-                    out var uri) && uri.Scheme is "http" or "https",
-                "External login confirmation URL template must be an absolute HTTP(S) URL.")
             .Validate(options => options.Stream.MaxActiveStreamsPerUser is >= 1 and <= 10,
                 "Notification stream max active streams per user must be between 1 and 10.")
             .Validate(options => options.Stream.ChannelCapacity is >= 1 and <= 1000,

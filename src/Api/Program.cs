@@ -19,6 +19,8 @@ using Modulith.Api.Infrastructure.Scheduling;
 using Modulith.Modules.Users.Security.Authorization;
 using Modulith.Shared.Infrastructure.Auth;
 using Modulith.Shared.Infrastructure.Blobs;
+using Modulith.Shared.Infrastructure.Frontend;
+using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Infrastructure.Identity;
 using Modulith.Shared.Infrastructure.Logging;
 using Modulith.Shared.Infrastructure.Messaging;
@@ -111,6 +113,13 @@ builder.Services.AddAuthorization(opts =>
     // The "admin" role is assigned via PUT /v1/users/{id}/role and grants every permission.
     opts.AddPolicy("Admin", policy => policy.RequireRole("admin"));
 });
+
+// 5a. Browser CORS policy. This is only for trusted browser clients; non-browser API clients
+// do not participate in CORS.
+builder.Services.AddBrowserCors(builder.Configuration);
+
+// 5b. Frontend link generation for user-facing emails.
+builder.Services.AddFrontendLinks(builder.Configuration);
 
 // 6. OpenAPI + Scalar
 builder.Services.AddOpenApi(opts =>
@@ -309,6 +318,9 @@ app.MapDefaultEndpoints();
 
 // 13. Global exception handler (converts unhandled exceptions to ProblemDetails with traceId)
 app.UseExceptionHandler();
+
+var corsOptions = app.Services.GetRequiredService<IOptions<CorsOptions>>().Value;
+app.UseCors(corsOptions.PolicyName);
 
 if (!app.Environment.IsEnvironment("Test"))
 {

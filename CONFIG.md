@@ -301,15 +301,36 @@ Notifications:Smtp:Password = <secret>
 
 Or API-based (SendGrid, SES): override `IEmailSender` registration in prod to use a provider-specific implementation.
 
-## External login confirmation links
+## Frontend links and browser CORS
 
-The Notifications module renders Google account-creation/linking emails from this template:
+Backend-generated emails use `Frontend:BaseUrl` as the canonical user-facing frontend and append path-only routes from `Frontend:Paths`:
 
 ```
-Modules:Notifications:ExternalLoginConfirmationUrlTemplate = https://app.example.com/auth/google/confirm?token={token}
+Frontend:BaseUrl = https://app.example.com
+Frontend:Paths:ConfirmEmail = /confirm-email
+Frontend:Paths:GoogleConfirm = /auth/google/confirm
+Frontend:Paths:ResetPassword = /reset-password
 ```
 
-The value must be an absolute HTTP(S) URL and must contain `{token}`. The frontend page should read that token and call `POST /v1/users/auth/google/confirm` with the token in the request body.
+`Frontend:BaseUrl` must be an absolute HTTP(S) URL. `Frontend:Paths:*` values are owned by the frontend routing layer and must be rooted relative paths only: start with `/`, contain no scheme/host, and contain no query string or fragment. The backend adds tokens with safe query-string encoding.
+
+The local Next.js companion frontend runs at:
+
+```
+Frontend:BaseUrl = http://localhost:3000
+```
+
+Browser CORS is configured separately:
+
+```
+Cors:PolicyName = BrowserClients
+Cors:AllowedOrigins:0 = https://app.example.com
+Cors:AllowCredentials = true
+```
+
+`Cors:AllowedOrigins` is a trusted browser-origin list only. Values must be HTTP(S) origins such as `https://app.example.com` or `http://localhost:3000`; do not include paths, query strings, fragments, or trailing slashes. CORS is not an API-client allowlist and does not apply to server-to-server or mobile clients. Do not use `*` when credentials are enabled.
+
+In local development, run the Next.js frontend on `http://localhost:3000` and the API with the development settings so browser requests from the frontend origin are accepted. The frontend pages should read the `token` query parameter and call the relevant API endpoint, for example `POST /v1/users/auth/google/confirm` for Google confirmation.
 
 ---
 

@@ -3,6 +3,7 @@ using Modulith.Modules.Notifications.Domain;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Templates;
 using Modulith.Modules.Users.Contracts.Events;
+using Modulith.Shared.Infrastructure.Frontend;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -16,7 +17,8 @@ public sealed class OnPasswordResetRequestedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IFrontendUrlBuilder frontendUrls)
 {
     public async Task Handle(PasswordResetRequestedV1 @event, CancellationToken ct)
     {
@@ -42,13 +44,12 @@ public sealed class OnPasswordResetRequestedHandler(
             return;
         }
 
-        // The raw token is passed through as-is; the consuming client constructs the
-        // full reset URL from its own base URL and this token.
+        var resetUrl = frontendUrls.ResetPassword(@event.RawToken);
         var message = new EmailMessage(
             To: @event.Email,
             Subject: PasswordResetRequestTemplate.Subject,
-            HtmlBody: PasswordResetRequestTemplate.HtmlBody(@event.RawToken),
-            PlainTextBody: PasswordResetRequestTemplate.PlainTextBody(@event.RawToken));
+            HtmlBody: PasswordResetRequestTemplate.HtmlBody(@event.RawToken, resetUrl),
+            PlainTextBody: PasswordResetRequestTemplate.PlainTextBody(@event.RawToken, resetUrl));
 
         try
         {
