@@ -33,7 +33,7 @@ public sealed class OnExternalLoginPendingNotificationTests(NotificationsCrossMo
 
         Assert.Equal("Confirm your new account", sentEmail.Subject);
         Assert.Contains("Continue creating your account", sentEmail.HtmlBody, StringComparison.Ordinal);
-        Assert.Contains("http://localhost:5173/auth/google/confirm?token=token%20with%20symbols%20%2F%2B", sentEmail.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("https://app.test/auth/google/confirm?token=token%20with%20symbols%20%2F%2B", sentEmail.HtmlBody, StringComparison.Ordinal);
         Assert.Contains(token, sentEmail.PlainTextBody, StringComparison.Ordinal);
     }
 
@@ -60,7 +60,7 @@ public sealed class OnExternalLoginPendingNotificationTests(NotificationsCrossMo
 
         Assert.Equal("Confirm linking your Google account", sentEmail.Subject);
         Assert.Contains("Confirm Google account link", sentEmail.HtmlBody, StringComparison.Ordinal);
-        Assert.Contains("http://localhost:5173/auth/google/confirm?token=existing-token", sentEmail.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("https://app.test/auth/google/confirm?token=existing-token", sentEmail.HtmlBody, StringComparison.Ordinal);
         Assert.Contains(token, sentEmail.PlainTextBody, StringComparison.Ordinal);
     }
 }

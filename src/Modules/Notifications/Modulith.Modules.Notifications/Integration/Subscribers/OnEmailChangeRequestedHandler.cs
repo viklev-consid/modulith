@@ -3,6 +3,7 @@ using Modulith.Modules.Notifications.Domain;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Templates;
 using Modulith.Modules.Users.Contracts.Events;
+using Modulith.Shared.Infrastructure.Frontend;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -16,7 +17,8 @@ public sealed class OnEmailChangeRequestedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IFrontendUrlBuilder frontendUrls)
 {
     public async Task Handle(EmailChangeRequestedV1 @event, CancellationToken ct)
     {
@@ -42,11 +44,12 @@ public sealed class OnEmailChangeRequestedHandler(
             return;
         }
 
+        var confirmationUrl = frontendUrls.ConfirmEmailChange(@event.RawToken);
         var message = new EmailMessage(
             To: @event.NewEmail,
             Subject: EmailChangeRequestTemplate.Subject,
-            HtmlBody: EmailChangeRequestTemplate.HtmlBody(@event.RawToken),
-            PlainTextBody: EmailChangeRequestTemplate.PlainTextBody(@event.RawToken));
+            HtmlBody: EmailChangeRequestTemplate.HtmlBody(@event.RawToken, confirmationUrl),
+            PlainTextBody: EmailChangeRequestTemplate.PlainTextBody(@event.RawToken, confirmationUrl));
 
         try
         {

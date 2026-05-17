@@ -42,6 +42,8 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Jwt:Issuer", TestJwtIssuer);
         builder.UseSetting("Jwt:Audience", TestJwtAudience);
         builder.UseSetting("Jwt:SigningKey", TestJwtKey);
+        builder.UseSetting("Frontend:BaseUrl", "https://app.test");
+        builder.UseSetting("Cors:AllowedOrigins:0", "https://app.test");
 
         // Satisfies GoogleAuthOptions [Required] validation so all tests can start.
         builder.UseSetting("Modules:Users:Google:ClientId", "test-google-client-id");

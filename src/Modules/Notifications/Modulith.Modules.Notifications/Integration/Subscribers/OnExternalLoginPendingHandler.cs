@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Modulith.Modules.Notifications.Domain;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Templates;
 using Modulith.Modules.Users.Contracts.Events;
+using Modulith.Shared.Infrastructure.Frontend;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -18,7 +18,7 @@ public sealed class OnExternalLoginPendingHandler(
     IEmailSender emailSender,
     IClock clock,
     NotificationSendGuard sendGuard,
-    IOptions<NotificationsOptions> options)
+    IFrontendUrlBuilder frontendUrls)
 {
     public async Task Handle(ExternalLoginPendingV1 @event, CancellationToken ct)
     {
@@ -51,7 +51,7 @@ public sealed class OnExternalLoginPendingHandler(
             return;
         }
 
-        var confirmationUrl = BuildConfirmationUrl(@event.RawToken);
+        var confirmationUrl = frontendUrls.ConfirmGoogleLogin(@event.RawToken);
         var (htmlBody, plainBody) = @event.IsExistingUser
             ? (ExternalLoginPendingExistingUserTemplate.HtmlBody(@event.RawToken, confirmationUrl),
                ExternalLoginPendingExistingUserTemplate.PlainTextBody(@event.RawToken, confirmationUrl))
@@ -80,10 +80,4 @@ public sealed class OnExternalLoginPendingHandler(
         }
         await sendGuard.MarkSentAsync(@event.EventId, leaseToken, ct);
     }
-
-    private string BuildConfirmationUrl(string token) =>
-        options.Value.ExternalLoginConfirmationUrlTemplate.Replace(
-            "{token}",
-            Uri.EscapeDataString(token),
-            StringComparison.Ordinal);
 }
