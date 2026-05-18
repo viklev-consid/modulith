@@ -24,6 +24,25 @@ internal static class UsersErrors
     public static readonly Error DisplayNameTooLong =
         Error.Validation("Users.DisplayName.TooLong", "Display name cannot exceed 100 characters.");
 
+    // Avatar
+    public static readonly Error AvatarMissing =
+        Error.NotFound("Users.Avatar.NotFound", "Avatar was not found.");
+
+    public static readonly Error AvatarTooLarge =
+        Error.Validation("Users.Avatar.TooLarge", "Avatar image cannot exceed 1 MB.");
+
+    public static readonly Error AvatarContentTypeUnsupported =
+        Error.Validation("Users.Avatar.ContentTypeUnsupported", "Avatar image must be JPEG, PNG, or WebP.");
+
+    public static readonly Error AvatarInvalid =
+        Error.Validation("Users.Avatar.Invalid", "Avatar image is invalid or could not be decoded.");
+
+    public static readonly Error AvatarDimensionsInvalid =
+        Error.Validation("Users.Avatar.DimensionsInvalid", "Avatar image must be square and between 128x128 and 512x512 pixels.");
+
+    public static readonly Error AvatarAccessDenied =
+        Error.Forbidden("Users.Avatar.AccessDenied", "You are not allowed to access this avatar.");
+
     // Registration and authentication
     public static readonly Error EmailAlreadyRegistered =
         Error.Conflict("Users.EmailAlreadyRegistered", "An account with this email address already exists.");

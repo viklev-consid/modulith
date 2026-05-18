@@ -30,6 +30,19 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(u => u.AvatarContainer)
+            .HasMaxLength(64);
+
+        builder.Property(u => u.AvatarKey)
+            .HasMaxLength(128);
+
+        builder.Property(u => u.AvatarContentType)
+            .HasMaxLength(32);
+
+        builder.Property(u => u.AvatarSizeBytes);
+
+        builder.Property(u => u.AvatarUpdatedAt);
+
         builder.Property(u => u.HasCompletedOnboarding)
             .IsRequired()
             .HasDefaultValue(true);

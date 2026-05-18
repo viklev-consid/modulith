@@ -72,6 +72,11 @@
     <PackageVersion Include="MailKit" Version="4.16.0" />
   </ItemGroup>
 
+  <!-- Media -->
+  <ItemGroup>
+    <PackageVersion Include="Magick.NET-Q8-AnyCPU" Version="14.13.0" />
+  </ItemGroup>
+
   <!-- Caching -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.5.0" />

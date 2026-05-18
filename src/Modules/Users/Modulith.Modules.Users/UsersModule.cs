@@ -40,6 +40,7 @@ using Modulith.Modules.Users.Features.TwoFactor.DisableTwoFactor;
 using Modulith.Modules.Users.Features.TwoFactor.RegenerateRecoveryCodes;
 using Modulith.Modules.Users.Features.TwoFactor.SetupTotp;
 using Modulith.Modules.Users.Features.UpdateProfile;
+using Modulith.Modules.Users.Avatars;
 using Modulith.Modules.Users.Gdpr;
 using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
@@ -109,6 +110,8 @@ public static class UsersModule
         services.AddScoped<ITotpSecretProtector, DataProtectionTotpSecretProtector>();
         services.AddScoped<ITwoFactorRequirementEvaluator, TwoFactorRequirementEvaluator>();
         services.AddScoped<ITwoFactorChallengeIssuer, TwoFactorChallengeIssuer>();
+        services.AddScoped<IAvatarImageValidator, MagickAvatarImageValidator>();
+        services.AddScoped<IUserAvatarStorage, UserAvatarStorage>();
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
