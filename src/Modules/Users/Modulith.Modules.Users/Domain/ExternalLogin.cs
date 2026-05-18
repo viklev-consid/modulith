@@ -9,11 +9,13 @@ public sealed class ExternalLogin : Entity<ExternalLoginId>
         UserId userId,
         ExternalLoginProvider provider,
         string subject,
+        string providerEmail,
         DateTimeOffset linkedAt) : base(id)
     {
         UserId = userId;
         Provider = provider;
         Subject = subject;
+        ProviderEmail = providerEmail;
         LinkedAt = linkedAt;
     }
 
@@ -23,12 +25,14 @@ public sealed class ExternalLogin : Entity<ExternalLoginId>
     public UserId UserId { get; private set; } = null!;
     public ExternalLoginProvider Provider { get; private set; }
     public string Subject { get; private set; } = string.Empty;
+    public string ProviderEmail { get; private set; } = string.Empty;
     public DateTimeOffset LinkedAt { get; private set; }
 
     internal static ExternalLogin Create(
         UserId userId,
         ExternalLoginProvider provider,
         string subject,
+        Email providerEmail,
         DateTimeOffset linkedAt)
-        => new(ExternalLoginId.New(), userId, provider, subject, linkedAt);
+        => new(ExternalLoginId.New(), userId, provider, subject, providerEmail.Value, linkedAt);
 }

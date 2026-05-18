@@ -193,14 +193,23 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public ErrorOr<Success> LinkExternalLogin(
         ExternalLoginProvider provider,
         string subject,
+        string providerEmail,
         DateTimeOffset linkedAt)
     {
+        // Check duplicate provider before validating the supplied provider email so callers cannot
+        // infer existing links through email-validation error shape.
         if (externalLogins.Any(e => e.Provider == provider))
         {
             return UsersErrors.ExternalLoginAlreadyLinked;
         }
 
-        var login = ExternalLogin.Create(Id, provider, subject, linkedAt);
+        var providerEmailResult = Email.Create(providerEmail);
+        if (providerEmailResult.IsError)
+        {
+            return providerEmailResult.Errors;
+        }
+
+        var login = ExternalLogin.Create(Id, provider, subject, providerEmailResult.Value, linkedAt);
         externalLogins.Add(login);
         RaiseEvent(new ExternalLoginLinked(Id, provider, subject, linkedAt));
         return Result.Success;

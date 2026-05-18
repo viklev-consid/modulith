@@ -28,6 +28,12 @@ internal sealed class ExternalLoginConfiguration : IEntityTypeConfiguration<Exte
             .HasMaxLength(255)
             .IsRequired();
 
+        // Stored as a normalized string because this is an external identity claim snapshot,
+        // not the user's canonical account Email value object.
+        builder.Property(e => e.ProviderEmail)
+            .HasMaxLength(254)
+            .IsRequired();
+
         builder.Property(e => e.LinkedAt).IsRequired();
 
         // Unique per (provider, subject) — a Google account can only be linked to one user.

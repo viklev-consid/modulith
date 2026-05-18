@@ -11,4 +11,8 @@ public sealed record GetCurrentUserResponse(
     bool HasPassword,
     bool HasCompletedOnboarding,
     bool TwoFactorEnabled,
-    IReadOnlyCollection<string> LinkedProviders);
+    IReadOnlyCollection<LinkedAccountResponse> LinkedAccounts);
+
+public sealed record LinkedAccountResponse(
+    string Provider,
+    string ProviderEmail);

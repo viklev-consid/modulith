@@ -46,7 +46,7 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
             ["hasPassword"] = dbUser.PasswordHash is not null,
             ["hasCompletedOnboarding"] = dbUser.HasCompletedOnboarding,
             ["linkedLogins"] = dbUser.ExternalLogins
-                .Select(e => new { provider = e.Provider.ToString(), subject = e.Subject, linkedAt = e.LinkedAt })
+                .Select(e => new { provider = e.Provider.ToString(), providerEmail = e.ProviderEmail, subject = e.Subject, linkedAt = e.LinkedAt })
                 .ToList(),
             ["createdAt"] = dbUser.CreatedAt,
             ["updatedAt"] = dbUser.UpdatedAt,

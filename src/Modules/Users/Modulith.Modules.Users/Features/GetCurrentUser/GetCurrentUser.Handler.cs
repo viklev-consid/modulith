@@ -25,7 +25,10 @@ public sealed class GetCurrentUserHandler(UsersDbContext db, IPermissionCatalog 
         var roleName = query.TokenRole ?? user.Role.Name;
         var permissions = permissionCatalog.GetPermissionsForRole(roleName);
         var permissionsVersion = permissionCatalog.GetPermissionsVersion(roleName);
-        var linkedProviders = user.ExternalLogins.Select(e => e.Provider.ToString()).Order(StringComparer.Ordinal).ToList();
+        var linkedAccounts = user.ExternalLogins
+            .Select(e => new LinkedAccountResponse(e.Provider.ToString(), e.ProviderEmail))
+            .OrderBy(e => e.Provider, StringComparer.Ordinal)
+            .ToList();
         var twoFactorEnabled = await db.TwoFactorCredentials
             .Where(c => c.UserId == user.Id)
             .WhereActive()
@@ -42,6 +45,6 @@ public sealed class GetCurrentUserHandler(UsersDbContext db, IPermissionCatalog 
             HasPassword: user.PasswordHash is not null,
             HasCompletedOnboarding: user.HasCompletedOnboarding,
             TwoFactorEnabled: twoFactorEnabled,
-            LinkedProviders: linkedProviders);
+            LinkedAccounts: linkedAccounts);
     }
 }
