@@ -75,7 +75,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             var user = await db.Users
                 .Include(u => u.ExternalLogins)
                 .FirstAsync(u => u.Email == emailVal);
-            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, "provider@example.com", clock.UtcNow);
             await db.SaveChangesAsync();
         }
 
@@ -111,7 +111,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             var user = await db.Users
                 .Include(u => u.ExternalLogins)
                 .FirstAsync(u => u.Email == emailVal);
-            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, "provider@example.com", clock.UtcNow);
 
             var credential = TwoFactorCredential.CreateTotp(
                 user.Id,
@@ -282,7 +282,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             var user = await db.Users
                 .Include(u => u.ExternalLogins)
                 .FirstAsync(u => u.Id == new UserId(regBody.UserId));
-            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, "provider@example.com", clock.UtcNow);
             await db.SaveChangesAsync();
         }
 
@@ -334,7 +334,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             var emailVal = Email.Create(email).Value;
             var user = await db.Users.Include(u => u.ExternalLogins).FirstAsync(u => u.Email == emailVal);
             userId = user.Id.Value;
-            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, "provider@example.com", clock.UtcNow);
             await db.SaveChangesAsync();
         }
 

@@ -51,6 +51,7 @@ public sealed class LinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsync
             .FirstOrDefaultAsync(e => e.Subject == subject);
         Assert.NotNull(login);
         Assert.Equal(new UserId(userId), login.UserId);
+        Assert.Equal("ext2@google.com", login.ProviderEmail);
     }
 
     [Fact]

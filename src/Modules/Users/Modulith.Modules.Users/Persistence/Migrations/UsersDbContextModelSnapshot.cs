@@ -87,6 +87,12 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("provider");
 
+                    b.Property<string>("ProviderEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("provider_email");
+
                     b.Property<string>("Subject")
                         .IsRequired()
                         .HasMaxLength(255)

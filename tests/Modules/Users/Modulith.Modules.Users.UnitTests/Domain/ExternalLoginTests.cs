@@ -273,10 +273,22 @@ public sealed class ExternalLoginTests
         var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
         user.ClearDomainEvents();
 
-        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
+        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", DateTimeOffset.UtcNow);
 
         Assert.False(result.IsError);
         Assert.Single(user.ExternalLogins);
+        Assert.Equal("provider@example.com", user.ExternalLogins[0].ProviderEmail);
+    }
+
+    [Fact]
+    public void User_LinkExternalLogin_NormalizesProviderEmail()
+    {
+        var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
+
+        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, " Provider@Example.COM ", DateTimeOffset.UtcNow);
+
+        Assert.False(result.IsError);
+        Assert.Equal("provider@example.com", user.ExternalLogins[0].ProviderEmail);
     }
 
     [Fact]
@@ -285,7 +297,7 @@ public sealed class ExternalLoginTests
         var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
         user.ClearDomainEvents();
 
-        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", DateTimeOffset.UtcNow);
 
         Assert.Single(user.DomainEvents);
         Assert.IsType<ExternalLoginLinked>(user.DomainEvents.First());
@@ -295,10 +307,10 @@ public sealed class ExternalLoginTests
     public void User_LinkExternalLogin_FailsWhenProviderAlreadyLinked_SameSubject()
     {
         var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
-        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
+        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", DateTimeOffset.UtcNow);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Conflict, result.FirstError.Type);
@@ -310,10 +322,10 @@ public sealed class ExternalLoginTests
         // Guard is provider-level, not subject-level. A second Google account is rejected
         // even when its subject differs from the one already linked.
         var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
-        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, "google-subject-99999", DateTimeOffset.UtcNow);
+        var result = user.LinkExternalLogin(ExternalLoginProvider.Google, "google-subject-99999", "provider@example.com", DateTimeOffset.UtcNow);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorOr.ErrorType.Conflict, result.FirstError.Type);
@@ -325,7 +337,7 @@ public sealed class ExternalLoginTests
     public void User_UnlinkExternalLogin_SucceedsWhenPasswordExists()
     {
         var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
         var result = user.UnlinkExternalLogin(ExternalLoginProvider.Google);
@@ -346,9 +358,9 @@ public sealed class ExternalLoginTests
         // rejected — confirming the invariant that prevents the backdoor scenario.
         var clock = new FixedClock(DateTimeOffset.UtcNow);
         var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, clock.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", clock.UtcNow);
 
-        var secondLink = user.LinkExternalLogin(ExternalLoginProvider.Google, "other-subject", clock.UtcNow);
+        var secondLink = user.LinkExternalLogin(ExternalLoginProvider.Google, "other-subject", "provider@example.com", clock.UtcNow);
 
         Assert.True(secondLink.IsError);
         Assert.Equal(ErrorOr.ErrorType.Conflict, secondLink.FirstError.Type);
@@ -359,7 +371,7 @@ public sealed class ExternalLoginTests
     {
         var clock = new FixedClock(DateTimeOffset.UtcNow);
         var user = User.CreateExternal(validEmail, "Alice", ExternalLoginProvider.Google, validSubject, clock).Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, clock.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", clock.UtcNow);
         user.ClearDomainEvents();
 
         var result = user.UnlinkExternalLogin(ExternalLoginProvider.Google);
@@ -383,7 +395,7 @@ public sealed class ExternalLoginTests
     public void User_UnlinkExternalLogin_RaisesExternalLoginUnlinkedEvent()
     {
         var user = User.CreateWithPassword(validEmail, new PasswordHash("$2a$12$hash"), "Alice").Value;
-        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, DateTimeOffset.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, validSubject, "provider@example.com", DateTimeOffset.UtcNow);
         user.ClearDomainEvents();
 
         user.UnlinkExternalLogin(ExternalLoginProvider.Google);

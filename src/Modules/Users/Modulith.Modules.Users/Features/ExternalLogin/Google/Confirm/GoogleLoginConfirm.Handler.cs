@@ -104,7 +104,7 @@ public sealed class GoogleLoginConfirmHandler(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var linkResult = user.LinkExternalLogin(pending.Provider, pending.Subject, now);
+        var linkResult = user.LinkExternalLogin(pending.Provider, pending.Subject, pending.Email, now);
         if (linkResult.IsError)
         {
             return linkResult.Errors;
@@ -155,7 +155,7 @@ public sealed class GoogleLoginConfirmHandler(
 
         var user = userResult.Value;
 
-        var linkResult = user.LinkExternalLogin(pending.Provider, pending.Subject, now);
+        var linkResult = user.LinkExternalLogin(pending.Provider, pending.Subject, pending.Email, now);
         if (linkResult.IsError)
         {
             return linkResult.Errors;

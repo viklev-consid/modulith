@@ -51,7 +51,7 @@ public sealed class LinkGoogleLoginHandler(
         }
 
         var now = clock.UtcNow;
-        var linkResult = user.LinkExternalLogin(ExternalLoginProvider.Google, identity.Subject, now);
+        var linkResult = user.LinkExternalLogin(ExternalLoginProvider.Google, identity.Subject, identity.Email, now);
         if (linkResult.IsError)
         {
             return linkResult.Errors;

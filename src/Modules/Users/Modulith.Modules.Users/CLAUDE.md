@@ -71,7 +71,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `PUT /v1/users/{userId}/role` — requires `users.roles.write` (admin only)
 - `GET /v1/users` — requires `users.users.read` (admin only)
 - `GET /v1/users/{userId}` — requires `users.users.read` (admin only)
-- `GET /v1/users/me` — returns `userId` (Guid), `email`, `displayName`, `createdAt`, `role`, `permissions[]`, `permissionsVersion`, `hasPassword` (bool), `hasCompletedOnboarding` (bool), `linkedProviders` (sorted string[])
+- `GET /v1/users/me` — returns `userId` (Guid), `email`, `displayName`, `createdAt`, `role`, `permissions[]`, `permissionsVersion`, `hasPassword` (bool), `hasCompletedOnboarding` (bool), `linkedAccounts` (sorted provider + providerEmail objects)
 - `AdminBootstrapper` hosted service for non-dev environments
 - See `docs/how-to/auth/use-rbac.md` and ADR-0030
 

@@ -65,6 +65,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
         Assert.Single(user.ExternalLogins);
         Assert.Equal("Google", user.ExternalLogins[0].Provider.ToString());
         Assert.Equal(subject, user.ExternalLogins[0].Subject);
+        Assert.Equal(email, user.ExternalLogins[0].ProviderEmail);
     }
 
     [Fact]
@@ -110,6 +111,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
             .FirstAsync(u => u.Email == emailVal);
         Assert.Single(user.ExternalLogins);
         Assert.Equal(subject, user.ExternalLogins[0].Subject);
+        Assert.Equal(email, user.ExternalLogins[0].ProviderEmail);
     }
 
     [Fact]

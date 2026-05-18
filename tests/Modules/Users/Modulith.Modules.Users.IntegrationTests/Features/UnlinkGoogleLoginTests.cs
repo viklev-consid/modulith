@@ -66,7 +66,7 @@ public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsy
             var scopeClock = scope.ServiceProvider.GetRequiredService<IClock>();
             var emailVal = Email.Create(email).Value;
             var user = User.CreateExternal(emailVal, "OnlyGoogle", ExternalLoginProvider.Google, subject, scopeClock).Value;
-            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, scopeClock.UtcNow);
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, "provider@example.com", scopeClock.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             userId = user.Id.Value;
@@ -180,7 +180,7 @@ public sealed class UnlinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsy
         var user = await db.Users
             .Include(u => u.ExternalLogins)
             .FirstAsync(u => u.Id == new UserId(userId));
-        user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+        user.LinkExternalLogin(ExternalLoginProvider.Google, subject, "provider@example.com", clock.UtcNow);
         await db.SaveChangesAsync();
     }
 }

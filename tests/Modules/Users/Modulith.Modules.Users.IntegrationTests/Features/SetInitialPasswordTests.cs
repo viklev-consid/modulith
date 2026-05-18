@@ -210,7 +210,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
             var clock = scope.ServiceProvider.GetRequiredService<IClock>();
             var emailVal = Email.Create(email).Value;
             var user = User.CreateExternal(emailVal, "ExternalUser", ExternalLoginProvider.Google, subject, clock).Value;
-            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, clock.UtcNow);
+            user.LinkExternalLogin(ExternalLoginProvider.Google, subject, "provider@example.com", clock.UtcNow);
             db.Users.Add(user);
             await db.SaveChangesAsync();
             userId = user.Id.Value;
