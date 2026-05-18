@@ -86,6 +86,7 @@ public static class NotificationsModule
         opts.Discovery.IncludeType<OnPasswordResetRequestedHandler>();
         opts.Discovery.IncludeType<OnPasswordResetHandler>();
         opts.Discovery.IncludeType<OnPasswordChangedHandler>();
+        opts.Discovery.IncludeType<OnEmailConfirmationRequestedHandler>();
         opts.Discovery.IncludeType<OnEmailChangeRequestedHandler>();
         opts.Discovery.IncludeType<OnEmailChangedHandler>();
 

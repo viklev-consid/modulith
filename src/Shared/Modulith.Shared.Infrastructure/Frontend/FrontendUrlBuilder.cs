@@ -5,8 +5,15 @@ namespace Modulith.Shared.Infrastructure.Frontend;
 
 public sealed class FrontendUrlBuilder(IOptions<FrontendOptions> options) : IFrontendUrlBuilder
 {
-    public string ConfirmEmailChange(string token) =>
+    public string ConfirmEmail(string token) =>
         Build(options.Value.Paths.ConfirmEmail, new Dictionary<string, string?>
+        (StringComparer.Ordinal)
+        {
+            ["token"] = token,
+        });
+
+    public string ConfirmEmailChange(string token) =>
+        Build(options.Value.Paths.ConfirmEmailChange, new Dictionary<string, string?>
         (StringComparer.Ordinal)
         {
             ["token"] = token,

@@ -80,6 +80,7 @@ public sealed class ChangePasswordTests(UsersApiFixture fixture) : IAsyncLifetim
     {
         await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync(email);
 
         var response = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest(email, "Password1!"));

@@ -16,9 +16,8 @@ namespace Modulith.Modules.Users.Features.Register;
 public sealed class RegisterHandler(
     UsersDbContext db,
     IPasswordHasher passwordHasher,
-    IJwtGenerator jwtGenerator,
-    IRefreshTokenIssuer refreshTokenIssuer,
     IOptions<UsersOptions> options,
+    ISingleUseTokenService tokenService,
     IMessageBus bus,
     IClock clock)
 {
@@ -86,8 +85,10 @@ public sealed class RegisterHandler(
         // Grant default consents on registration.
         db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.WelcomeEmail, clock.UtcNow));
 
-        // Issue refresh token alongside initial access token.
-        var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
+        var (_, rawConfirmationToken) = tokenService.Create(
+            user.Id,
+            TokenPurpose.EmailConfirmation,
+            options.Value.EmailConfirmationTokenLifetime);
 
         try
         {
@@ -105,15 +106,15 @@ public sealed class RegisterHandler(
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
 
-        var accessTokenExpiresAt = clock.UtcNow.AddMinutes(options.Value.AccessTokenLifetimeMinutes);
-        var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
-
-        return new RegisterResponse(
+        await bus.PublishAsync(new EmailConfirmationRequestedV1(
             user.Id.Value,
-            accessToken,
-            accessTokenExpiresAt,
-            rawRefreshToken,
-            refreshToken.ExpiresAt);
+            user.Email.Value,
+            user.DisplayName,
+            rawConfirmationToken,
+            Guid.NewGuid()));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailConfirmationRequestedV1)));
+
+        return new RegisterResponse(user.Id.Value);
     }
 
     private async Task<UserInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)

@@ -12,9 +12,8 @@ namespace Modulith.Modules.Users.IntegrationTests.Features;
 /// <summary>
 /// Fixture that lowers MaxActiveRefreshTokensPerUser to 3 so cap enforcement
 /// can be tested without issuing many tokens. The cap is set to 3 rather than 2
-/// because Register also issues a refresh token, giving a baseline count of 1
-/// before any Login call. With cap=3: Login × 2 fills the cap; Login × 3 triggers
-/// revocation of the oldest, leaving exactly 1 revoked token.
+/// because three successful logins fill the cap; the fourth login triggers
+/// revocation of the oldest, leaving exactly one revoked token.
 /// </summary>
 public sealed class SmallCapFixture : UsersApiFixture
 {
@@ -36,13 +35,15 @@ public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<Sma
     [Fact]
     public async Task Login_WhenCapReached_RevokesOldestTokenAndKeepsCount()
     {
-        // Arrange — register once, then login three times (cap = 2).
+        // Arrange — register once, then login four times (cap = 3).
         await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync("alice@example.com");
 
         _ = await LoginAsync();
         _ = await LoginAsync();
-        LoginResponse login3 = await LoginAsync(); // should push out login1's token
+        _ = await LoginAsync();
+        LoginResponse login4 = await LoginAsync(); // should push out login1's token
 
         // Act — inspect persisted state directly.
         using var scope = fixture.Services.CreateScope();
@@ -60,8 +61,8 @@ public sealed class SessionCapTests(SmallCapFixture fixture) : IClassFixture<Sma
         Assert.True(revoked[0].IssuedAt <= active.Min(t => t.IssuedAt),
             "The revoked token should be the oldest one.");
 
-        // The third login must have succeeded — cap enforcement is not a login failure.
-        Assert.NotEmpty(login3.RefreshToken);
+        // The fourth login must have succeeded — cap enforcement is not a login failure.
+        Assert.NotEmpty(login4.RefreshToken);
     }
 
     private async Task<LoginResponse> LoginAsync()

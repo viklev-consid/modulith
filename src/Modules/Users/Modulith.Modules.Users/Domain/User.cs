@@ -37,6 +37,8 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public string DisplayName { get; private set; } = null!;
     public Role Role { get; private set; } = Role.User;
     public bool HasCompletedOnboarding { get; private set; }
+    public DateTimeOffset? EmailConfirmedAt { get; private set; }
+    public bool IsEmailConfirmed => EmailConfirmedAt is not null;
 
     public IReadOnlyList<ExternalLogin> ExternalLogins => externalLogins.AsReadOnly();
 
@@ -92,8 +94,20 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         var role = initialRole ?? Role.User;
         var user = new User(UserId.New(), email, passwordHash: null, normalizedName, role, hasCompletedOnboarding: false);
         var now = clock.UtcNow;
+        user.ConfirmEmail(clock);
         user.RaiseEvent(new UserProvisionedFromExternal(user.Id, provider, subject, email.Value, normalizedName, now));
         return user;
+    }
+
+    public bool ConfirmEmail(IClock clock)
+    {
+        if (EmailConfirmedAt is not null)
+        {
+            return false;
+        }
+
+        EmailConfirmedAt = clock.UtcNow;
+        return true;
     }
 
     public ErrorOr<Success> ChangeRole(Role newRole, UserId changedBy)

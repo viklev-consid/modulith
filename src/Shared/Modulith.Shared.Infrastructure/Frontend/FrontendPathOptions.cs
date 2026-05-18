@@ -8,9 +8,11 @@ public sealed class FrontendPathOptions
     public string ConfirmEmail { get; init; } = "/confirm-email";
 
     [Required]
+    public string ConfirmEmailChange { get; init; } = "/confirm-email-change";
+
+    [Required]
     public string GoogleConfirm { get; init; } = "/auth/google/confirm";
 
     [Required]
     public string ResetPassword { get; init; } = "/reset-password";
 }
-

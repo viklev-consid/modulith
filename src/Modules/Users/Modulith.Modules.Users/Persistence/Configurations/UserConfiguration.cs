@@ -34,6 +34,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(u => u.EmailConfirmedAt);
+
         builder.Property(u => u.Role)
             .HasConversion(r => r.Name, v => new Role(v))
             .HasMaxLength(32)

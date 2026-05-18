@@ -27,7 +27,9 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
     {
         var resp = await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest(email, "Password1!", name));
-        return (await resp.Content.ReadFromJsonAsync<RegisterResponse>())!;
+        var body = (await resp.Content.ReadFromJsonAsync<RegisterResponse>())!;
+        await fixture.ConfirmEmailAsync(email);
+        return body;
     }
 
     private HttpClient AdminClient(Guid userId, string email)

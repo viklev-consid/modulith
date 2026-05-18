@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.Register;
+using Modulith.Modules.Users.Persistence;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -14,7 +17,7 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task Register_WithValidRequest_Returns201AndToken()
+    public async Task Register_WithValidRequest_Returns201AndRequiresEmailConfirmation()
     {
         var request = new RegisterRequest("alice@example.com", "Password1!", "Alice");
 
@@ -24,8 +27,17 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(body);
         Assert.NotEqual(Guid.Empty, body.UserId);
-        Assert.NotEmpty(body.AccessToken);
-        Assert.NotEmpty(body.RefreshToken);
+        Assert.Contains("confirm", body.Message, StringComparison.OrdinalIgnoreCase);
+
+        var state = await fixture.QueryDbAsync<UsersDbContext, (bool Confirmed, int ConfirmationTokens)>((db, ct) =>
+            db.Users
+                .Where(u => u.Id == new UserId(body.UserId))
+                .Select(u => new ValueTuple<bool, int>(
+                    u.IsEmailConfirmed,
+                    db.SingleUseTokens.Count(t => t.UserId == u.Id && t.Purpose == TokenPurpose.EmailConfirmation)))
+                .SingleAsync(ct));
+        Assert.False(state.Confirmed);
+        Assert.Equal(1, state.ConfirmationTokens);
     }
 
     [Fact]

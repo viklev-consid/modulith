@@ -319,6 +319,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
     private async Task<LoginResponse> RegisterAndLoginAsync(string email)
     {
         await client.PostAsJsonAsync("/v1/users/register", new RegisterRequest(email, "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync(email);
         var response = await client.PostAsJsonAsync("/v1/users/login", new LoginRequest(email, "Password1!"));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<LoginResponse>())!;

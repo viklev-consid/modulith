@@ -4,13 +4,15 @@ using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Infrastructure.Seeding;
+using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.Seeding;
 
 internal sealed class UsersDevSeeder(
     UsersDbContext db,
     IPasswordHasher passwordHasher,
-    IOptions<UsersDevOptions> devOpts) : IModuleSeeder
+    IOptions<UsersDevOptions> devOpts,
+    IClock clock) : IModuleSeeder
 {
     private static readonly (string Email, string Password, string DisplayName)[] seedUsers =
     [
@@ -61,6 +63,8 @@ internal sealed class UsersDevSeeder(
             {
                 existingUser.ChangeRole(role, existingUser.Id);
             }
+
+            existingUser.ConfirmEmail(clock);
             return;
         }
 
@@ -71,6 +75,8 @@ internal sealed class UsersDevSeeder(
             return;
         }
 
-        db.Users.Add(userResult.Value);
+        var user = userResult.Value;
+        user.ConfirmEmail(clock);
+        db.Users.Add(user);
     }
 }

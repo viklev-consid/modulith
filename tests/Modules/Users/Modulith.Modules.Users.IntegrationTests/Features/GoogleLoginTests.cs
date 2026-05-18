@@ -273,6 +273,7 @@ public sealed class GoogleLoginTests(GoogleUsersApiFixture fixture) : IAsyncLife
             new RegisterRequest(email, "Password1!", "Alice"));
         var regBody = await regResp.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(regBody);
+        await fixture.ConfirmEmailAsync(email);
 
         // Seed Google as a linked provider directly in the DB.
         using (var scope = fixture.Services.CreateScope())

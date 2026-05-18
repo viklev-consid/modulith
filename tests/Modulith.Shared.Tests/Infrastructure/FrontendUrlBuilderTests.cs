@@ -7,13 +7,23 @@ namespace Modulith.Shared.Tests.Infrastructure;
 public sealed class FrontendUrlBuilderTests
 {
     [Fact]
+    public void ConfirmEmail_BuildsConfiguredUrl()
+    {
+        var builder = CreateBuilder("https://app.test");
+
+        var url = builder.ConfirmEmail("email-token");
+
+        Assert.Equal("https://app.test/confirm-email?token=email-token", url);
+    }
+
+    [Fact]
     public void ConfirmEmailChange_BuildsConfiguredUrl()
     {
         var builder = CreateBuilder("https://app.test");
 
         var url = builder.ConfirmEmailChange("email-token");
 
-        Assert.Equal("https://app.test/confirm-email?token=email-token", url);
+        Assert.Equal("https://app.test/confirm-email-change?token=email-token", url);
     }
 
     [Fact]
@@ -53,7 +63,7 @@ public sealed class FrontendUrlBuilderTests
 
         var url = builder.ConfirmEmailChange("token");
 
-        Assert.Equal("https://app.test/confirm-email?token=token", url);
+        Assert.Equal("https://app.test/confirm-email-change?token=token", url);
     }
 
     private static FrontendUrlBuilder CreateBuilder(string baseUrl) =>
@@ -63,6 +73,7 @@ public sealed class FrontendUrlBuilderTests
             Paths = new FrontendPathOptions
             {
                 ConfirmEmail = "/confirm-email",
+                ConfirmEmailChange = "/confirm-email-change",
                 GoogleConfirm = "/auth/google/confirm",
                 ResetPassword = "/reset-password",
             },
