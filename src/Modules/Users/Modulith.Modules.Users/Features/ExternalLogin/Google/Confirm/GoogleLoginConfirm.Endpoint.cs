@@ -26,7 +26,7 @@ internal static class GoogleLoginConfirmEndpoint
 
                 var ip = httpContext.Connection.RemoteIpAddress?.ToString();
                 var ua = httpContext.Request.Headers.UserAgent.ToString();
-                var command = new GoogleLoginConfirmCommand(request.Token, request.InvitationToken, ip, ua);
+                var command = new GoogleLoginConfirmCommand(request.Token, request.InvitationToken, ip, ua, request.UseGoogleAvatar);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GoogleLoginConfirmResponse>>(command, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })

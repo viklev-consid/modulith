@@ -195,6 +195,11 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("provider");
 
+                    b.Property<string>("ProviderAvatarUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("provider_avatar_url");
+
                     b.Property<string>("Subject")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -556,6 +561,29 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("AvatarContainer")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("avatar_container");
+
+                    b.Property<string>("AvatarContentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("avatar_content_type");
+
+                    b.Property<string>("AvatarKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("avatar_key");
+
+                    b.Property<long?>("AvatarSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("avatar_size_bytes");
+
+                    b.Property<DateTimeOffset?>("AvatarUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("avatar_updated_at");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")

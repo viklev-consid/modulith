@@ -11,8 +11,13 @@ public sealed record GetCurrentUserResponse(
     bool HasPassword,
     bool HasCompletedOnboarding,
     bool TwoFactorEnabled,
+    CurrentUserAvatarResponse? Avatar,
     IReadOnlyCollection<LinkedAccountResponse> LinkedAccounts);
 
 public sealed record LinkedAccountResponse(
     string Provider,
     string ProviderEmail);
+
+public sealed record CurrentUserAvatarResponse(
+    string Url,
+    DateTimeOffset UpdatedAt);

@@ -32,6 +32,9 @@ internal sealed class PendingExternalLoginConfiguration : IEntityTypeConfigurati
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(p => p.ProviderAvatarUrl)
+            .HasMaxLength(2048);
+
         builder.Property(p => p.IsExistingUser).IsRequired();
         builder.Property(p => p.TokenHash).IsRequired();
         builder.Property(p => p.CreatedFromIp).HasMaxLength(45); // max IPv6 length

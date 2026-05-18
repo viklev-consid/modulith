@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Users.Avatars;
 using Modulith.Modules.Users.IntegrationTests.Fakes;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
@@ -21,10 +23,14 @@ public sealed class InviteOnlyGoogleUsersModuleCollection : ICollectionFixture<I
 public class GoogleUsersApiFixture : ApiTestFixture
 {
     public FakeGoogleIdTokenVerifier GoogleVerifier { get; } = new();
+    public FakeGoogleAvatarImporter? GoogleAvatarImporter =>
+        Services.GetService<IGoogleAvatarImporter>() as FakeGoogleAvatarImporter;
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
         services.AddSingleton<IGoogleIdTokenVerifier>(GoogleVerifier);
+        services.RemoveAll<IGoogleAvatarImporter>();
+        services.AddSingleton<IGoogleAvatarImporter, FakeGoogleAvatarImporter>();
         services.AddSingleton<IEmailSender, FakeEmailSender>();
     }
 

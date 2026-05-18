@@ -19,6 +19,7 @@ public sealed class ExternalLoginTests
 
         var (pending, rawValue) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var rawBytes = System.Text.Encoding.UTF8.GetBytes(rawValue);
@@ -32,6 +33,7 @@ public sealed class ExternalLoginTests
 
         var (pending, rawValue) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var expectedHash = PendingExternalLogin.HashRawValue(rawValue);
@@ -47,6 +49,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, lifetime, clock);
 
         Assert.Equal(now.Add(lifetime), pending.ExpiresAt);
@@ -60,6 +63,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: longUa, TimeSpan.FromMinutes(15), clock);
 
         Assert.True(pending.UserAgent!.Length <= 512);
@@ -72,10 +76,11 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var originalHash = pending.TokenHash.ToArray();
-        pending.Refresh(TimeSpan.FromMinutes(15), clock, "alice@example.com");
+        pending.Refresh(TimeSpan.FromMinutes(15), clock, "alice@example.com", null);
 
         Assert.False(pending.TokenHash.SequenceEqual(originalHash));
     }
@@ -88,13 +93,14 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, lifetime, clock);
 
         // Advance past expiry so the record is expired.
         clock.Advance(TimeSpan.FromMinutes(16));
         Assert.False(pending.IsValid(clock));
 
-        pending.Refresh(lifetime, clock, "alice@example.com");
+        pending.Refresh(lifetime, clock, "alice@example.com", null);
 
         Assert.Equal(clock.UtcNow.Add(lifetime), pending.ExpiresAt);
         Assert.True(pending.IsValid(clock));
@@ -107,9 +113,10 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
-        var newRaw = pending.Refresh(TimeSpan.FromMinutes(15), clock, "alice@example.com");
+        var newRaw = pending.Refresh(TimeSpan.FromMinutes(15), clock, "alice@example.com", null);
 
         Assert.True(pending.TokenHash.SequenceEqual(PendingExternalLogin.HashRawValue(newRaw)));
     }
@@ -121,6 +128,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         Assert.True(pending.IsValid(clock));
@@ -133,6 +141,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         clock.Advance(TimeSpan.FromMinutes(16));
@@ -146,6 +155,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         var result = pending.Consume(clock);
@@ -161,6 +171,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         clock.Advance(TimeSpan.FromMinutes(16));
@@ -176,6 +187,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         pending.Consume(clock);
@@ -191,6 +203,7 @@ public sealed class ExternalLoginTests
 
         var (pending, _) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, validSubject, "alice@example.com", "Alice",
+            null,
             isExistingUser: false, createdFromIp: null, userAgent: null, TimeSpan.FromMinutes(15), clock);
 
         pending.Consume(clock);

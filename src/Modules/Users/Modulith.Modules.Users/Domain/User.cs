@@ -35,10 +35,16 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public PasswordHash? PasswordHash { get; private set; }
 
     public string DisplayName { get; private set; } = null!;
+    public string? AvatarContainer { get; private set; }
+    public string? AvatarKey { get; private set; }
+    public string? AvatarContentType { get; private set; }
+    public long? AvatarSizeBytes { get; private set; }
+    public DateTimeOffset? AvatarUpdatedAt { get; private set; }
     public Role Role { get; private set; } = Role.User;
     public bool HasCompletedOnboarding { get; private set; }
     public DateTimeOffset? EmailConfirmedAt { get; private set; }
     public bool IsEmailConfirmed => EmailConfirmedAt is not null;
+    public bool HasAvatar => AvatarContainer is not null && AvatarKey is not null;
 
     public IReadOnlyList<ExternalLogin> ExternalLogins => externalLogins.AsReadOnly();
 
@@ -154,6 +160,33 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         DisplayName = normalized;
         RaiseEvent(new UserProfileUpdated(Id, oldDisplayName, normalized));
         return Result.Success;
+    }
+
+    public (string? Container, string? Key) SetAvatar(
+        string container,
+        string key,
+        string contentType,
+        long sizeBytes,
+        IClock clock)
+    {
+        var previous = (AvatarContainer, AvatarKey);
+        AvatarContainer = container;
+        AvatarKey = key;
+        AvatarContentType = contentType;
+        AvatarSizeBytes = sizeBytes;
+        AvatarUpdatedAt = clock.UtcNow;
+        return previous;
+    }
+
+    public (string? Container, string? Key) RemoveAvatar()
+    {
+        var previous = (AvatarContainer, AvatarKey);
+        AvatarContainer = null;
+        AvatarKey = null;
+        AvatarContentType = null;
+        AvatarSizeBytes = null;
+        AvatarUpdatedAt = null;
+        return previous;
     }
 
     private static ErrorOr<string> NormalizeDisplayName(string displayName)

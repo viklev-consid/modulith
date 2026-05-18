@@ -69,6 +69,41 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
     }
 
     [Fact]
+    public async Task GoogleLoginConfirm_DoesNotImportGoogleAvatarByDefault()
+    {
+        const string email = "newgoogle-no-avatar@example.com";
+        const string subject = "sub-new-no-avatar";
+
+        var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false, providerAvatarUrl: "https://google.test/avatar.png");
+
+        await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+            new GoogleLoginConfirmRequest(rawToken));
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Email == Email.Create(email).Value);
+        Assert.False(user.HasAvatar);
+    }
+
+    [Fact]
+    public async Task GoogleLoginConfirm_WhenOptedIn_ImportsGoogleAvatar()
+    {
+        const string email = "newgoogle-avatar@example.com";
+        const string subject = "sub-new-avatar";
+
+        var rawToken = await SeedPendingLoginAsync(subject, email, isExistingUser: false, providerAvatarUrl: "https://google.test/avatar.png");
+
+        await client.PostAsJsonAsync("/v1/users/auth/google/confirm",
+            new GoogleLoginConfirmRequest(rawToken, UseGoogleAvatar: true));
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Email == Email.Create(email).Value);
+        Assert.True(user.HasAvatar);
+        Assert.Equal("image/png", user.AvatarContentType);
+    }
+
+    [Fact]
     public async Task GoogleLoginConfirm_ForExistingUser_Returns200AndLinksGoogle()
     {
         const string email = "existinglinked@example.com";
@@ -284,7 +319,8 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
 
     private async Task<string> SeedPendingLoginAsync(
         string subject, string email, bool isExistingUser,
-        TimeSpan? lifetime = null)
+        TimeSpan? lifetime = null,
+        string? providerAvatarUrl = null)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -292,6 +328,7 @@ public sealed class GoogleLoginConfirmTests(GoogleUsersApiFixture fixture) : IAs
 
         var (pending, rawToken) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, subject, email, "Test User",
+            providerAvatarUrl,
             isExistingUser, createdFromIp: null, userAgent: null,
             lifetime ?? TimeSpan.FromMinutes(15), clock);
 

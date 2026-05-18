@@ -1,6 +1,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Modulith.Modules.Users.Avatars;
 using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
@@ -19,6 +20,8 @@ public sealed class GoogleLoginConfirmHandler(
     IRefreshTokenIssuer refreshTokenIssuer,
     IOptions<UsersOptions> options,
     IMessageBus bus,
+    IGoogleAvatarImporter googleAvatarImporter,
+    IUserAvatarStorage avatarStorage,
     IClock clock)
 {
     public async Task<ErrorOr<GoogleLoginConfirmResponse>> Handle(GoogleLoginConfirmCommand cmd, CancellationToken ct)
@@ -110,6 +113,22 @@ public sealed class GoogleLoginConfirmHandler(
             return linkResult.Errors;
         }
 
+        StoredAvatar? importedAvatar = null;
+        (string? Container, string? Key) previousAvatar = default;
+        if (cmd.UseGoogleAvatar)
+        {
+            importedAvatar = await googleAvatarImporter.ImportAsync(pending.ProviderAvatarUrl, ct);
+            if (importedAvatar is not null)
+            {
+                previousAvatar = user.SetAvatar(
+                    importedAvatar.BlobRef.Container,
+                    importedAvatar.BlobRef.Key,
+                    importedAvatar.ContentType,
+                    importedAvatar.SizeBytes,
+                    clock);
+            }
+        }
+
         var (refreshToken, rawRefreshToken) = await refreshTokenIssuer.IssueAsync(user.Id, ct);
 
         try
@@ -118,14 +137,27 @@ public sealed class GoogleLoginConfirmHandler(
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
-            // Detach pending changes so AutoApplyTransactions' SaveChangesAsync doesn't retry them.
-            db.ChangeTracker.Clear();
+            if (importedAvatar is not null)
+            {
+                await avatarStorage.DeleteAsync(importedAvatar.BlobRef.Container, importedAvatar.BlobRef.Key, ct);
+            }
+
+            DetachFailedExistingUserLinkAttempt(user, pending);
             return UsersErrors.ExternalLoginLinkedToOtherUser;
         }
 
+        if (importedAvatar is not null)
+        {
+            await avatarStorage.DeleteAsync(previousAvatar.Container, previousAvatar.Key, ct);
+        }
+
         await bus.PublishAsync(new ExternalLoginLinkedV1(user.Id.Value, user.Email.Value, pending.Provider.ToString(), pending.Subject, now, Guid.NewGuid()));
+        if (importedAvatar is not null)
+        {
+            await bus.PublishAsync(new UserAvatarUpdatedV1(user.Id.Value, Guid.NewGuid()));
+        }
         await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty, Guid.NewGuid()));
-        UsersTelemetry.EventsPublished.Add(2, new KeyValuePair<string, object?>("event", "ExternalLoginLinkedV1+UserLoggedInV1"));
+        UsersTelemetry.EventsPublished.Add(importedAvatar is null ? 2 : 3, new KeyValuePair<string, object?>("event", importedAvatar is null ? "ExternalLoginLinkedV1+UserLoggedInV1" : "ExternalLoginLinkedV1+UserAvatarUpdatedV1+UserLoggedInV1"));
 
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
 
@@ -161,6 +193,21 @@ public sealed class GoogleLoginConfirmHandler(
             return linkResult.Errors;
         }
 
+        StoredAvatar? importedAvatar = null;
+        if (cmd.UseGoogleAvatar)
+        {
+            importedAvatar = await googleAvatarImporter.ImportAsync(pending.ProviderAvatarUrl, ct);
+            if (importedAvatar is not null)
+            {
+                user.SetAvatar(
+                    importedAvatar.BlobRef.Container,
+                    importedAvatar.BlobRef.Key,
+                    importedAvatar.ContentType,
+                    importedAvatar.SizeBytes,
+                    clock);
+            }
+        }
+
         if (invitation is not null)
         {
             var acceptResult = invitation.Accept(user.Id, email, clock);
@@ -180,6 +227,11 @@ public sealed class GoogleLoginConfirmHandler(
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
+            if (importedAvatar is not null)
+            {
+                await avatarStorage.DeleteAsync(importedAvatar.BlobRef.Container, importedAvatar.BlobRef.Key, ct);
+            }
+
             // Detach the failed provisioning graph before all return paths so AutoApplyTransactions'
             // SaveChangesAsync doesn't retry the failed entities.
             DetachFailedProvisioningAttempt(user, consent);
@@ -205,8 +257,12 @@ public sealed class GoogleLoginConfirmHandler(
         await bus.PublishAsync(new UserProvisionedFromExternalV1(
             user.Id.Value, pending.Provider.ToString(), pending.Subject,
             user.Email.Value, user.DisplayName, now, Guid.NewGuid()));
+        if (importedAvatar is not null)
+        {
+            await bus.PublishAsync(new UserAvatarUpdatedV1(user.Id.Value, Guid.NewGuid()));
+        }
         await bus.PublishAsync(new UserLoggedInV1(user.Id.Value, user.Email.Value, cmd.IpAddress ?? string.Empty, Guid.NewGuid()));
-        UsersTelemetry.EventsPublished.Add(2, new KeyValuePair<string, object?>("event", "UserProvisionedFromExternalV1+UserLoggedInV1"));
+        UsersTelemetry.EventsPublished.Add(importedAvatar is null ? 2 : 3, new KeyValuePair<string, object?>("event", importedAvatar is null ? "UserProvisionedFromExternalV1+UserLoggedInV1" : "UserProvisionedFromExternalV1+UserAvatarUpdatedV1+UserLoggedInV1"));
 
         var accessToken = jwtGenerator.Generate(user.Id, user.Email.Value, user.DisplayName, user.Role.Name, refreshToken.Id.Value);
 
@@ -243,7 +299,8 @@ public sealed class GoogleLoginConfirmHandler(
     private async Task<User?> LoadUserForEmailAsync(Email email, CancellationToken ct)
         => await db.Users
             .FromSqlInterpolated($"""
-                SELECT id, created_at, created_by, display_name, email,
+                SELECT id, avatar_container, avatar_content_type, avatar_key, avatar_size_bytes, avatar_updated_at,
+                       created_at, created_by, display_name, email,
                        email_confirmed_at, has_completed_onboarding, password_hash, role,
                        updated_at, updated_by, xmin
                 FROM users.users
@@ -252,6 +309,22 @@ public sealed class GoogleLoginConfirmHandler(
                 """)
             .Include(u => u.ExternalLogins)
             .FirstOrDefaultAsync(ct);
+
+    private void DetachFailedExistingUserLinkAttempt(User user, PendingExternalLogin pending)
+    {
+        foreach (var entry in db.ChangeTracker.Entries<Domain.ExternalLogin>()
+            .Where(e => e.State == EntityState.Added &&
+                e.Entity.UserId == user.Id &&
+                e.Entity.Provider == pending.Provider &&
+                string.Equals(e.Entity.Subject, pending.Subject, StringComparison.Ordinal))
+            .ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
+
+        // Drop the avatar mutation too; the link failed, so no profile side effect should commit.
+        db.Entry(user).State = EntityState.Unchanged;
+    }
 
     private async Task<UserInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)
     {

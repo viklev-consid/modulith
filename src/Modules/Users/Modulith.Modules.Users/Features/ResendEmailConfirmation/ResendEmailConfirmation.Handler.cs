@@ -28,7 +28,8 @@ public sealed class ResendEmailConfirmationHandler(
 
         var user = await db.Users
             .FromSqlInterpolated($"""
-                SELECT id, created_at, created_by, display_name, email,
+                SELECT id, avatar_container, avatar_content_type, avatar_key, avatar_size_bytes, avatar_updated_at,
+                       created_at, created_by, display_name, email,
                        email_confirmed_at, has_completed_onboarding, password_hash, role,
                        updated_at, updated_by, xmin
                 FROM users.users
