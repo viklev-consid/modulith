@@ -4,18 +4,21 @@ using System.Net.Http.Json;
 using ImageMagick;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Audit.Persistence;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Features.UpdateAvatar;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Infrastructure.Blobs;
+using Wolverine.Tracking;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
-[Collection("UsersModule")]
+[Collection("GoogleUsersModule")]
 [Trait("Category", "Integration")]
-public sealed class AvatarTests(UsersApiFixture fixture) : IAsyncLifetime
+public sealed class AvatarTests(GoogleUsersApiFixture fixture) : IAsyncLifetime
 {
     private readonly HttpClient anonymous = fixture.CreateAnonymousClient();
 
@@ -32,7 +35,7 @@ public sealed class AvatarTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<UpdateAvatarResponse>();
         Assert.NotNull(body);
-        Assert.Equal($"/v1/users/{userId}/avatar", body.Url);
+        Assert.StartsWith($"/v1/users/{userId}/avatar?v=", body.Url, StringComparison.Ordinal);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -74,6 +77,23 @@ public sealed class AvatarTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(bytes, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task GetUserAvatar_WithMatchingETag_Returns304WithoutBody()
+    {
+        var (userId, client) = await RegisterAuthenticatedClientAsync("etag@example.com", "Avatar User");
+        await client.PutAsync("/v1/users/me/avatar", CreateAvatarContent(CreateImageBytes(128, MagickFormat.Png), "image/png", "avatar.png"));
+        var first = await client.GetAsync($"/v1/users/{userId}/avatar");
+        var etag = first.Headers.ETag?.ToString();
+        Assert.False(string.IsNullOrWhiteSpace(etag));
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/users/{userId}/avatar");
+        request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotModified, response.StatusCode);
+        Assert.Empty(await response.Content.ReadAsByteArrayAsync());
     }
 
     [Fact]
@@ -145,7 +165,30 @@ public sealed class AvatarTests(UsersApiFixture fixture) : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<GetCurrentUserResponse>();
         Assert.NotNull(body);
         Assert.NotNull(body.Avatar);
-        Assert.Equal($"/v1/users/{userId}/avatar", body.Avatar.Url);
+        Assert.StartsWith($"/v1/users/{userId}/avatar?v=", body.Avatar.Url, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AvatarChanges_AreAudited()
+    {
+        var (userId, client) = await RegisterAuthenticatedClientAsync("avatar-audit@example.com", "Avatar User");
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .WaitForMessageToBeReceivedAt<UserAvatarUpdatedV1>(fixture.ApplicationHost)
+            .ExecuteAndWaitAsync(_ =>
+                client.PutAsync("/v1/users/me/avatar", CreateAvatarContent(CreateImageBytes(128, MagickFormat.Png), "image/png", "avatar.png")));
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .WaitForMessageToBeReceivedAt<UserAvatarRemovedV1>(fixture.ApplicationHost)
+            .ExecuteAndWaitAsync(_ => client.DeleteAsync("/v1/users/me/avatar"));
+
+        using var scope = fixture.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var entries = await auditDb.AuditEntries.ToListAsync();
+        Assert.Contains(entries, e => string.Equals(e.EventType, "user.avatar_updated", StringComparison.Ordinal) && e.ActorId == userId && e.ResourceId == userId);
+        Assert.Contains(entries, e => string.Equals(e.EventType, "user.avatar_removed", StringComparison.Ordinal) && e.ActorId == userId && e.ResourceId == userId);
     }
 
     private async Task<(Guid UserId, HttpClient Client)> RegisterAuthenticatedClientAsync(string email, string displayName)
@@ -174,4 +217,5 @@ public sealed class AvatarTests(UsersApiFixture fixture) : IAsyncLifetime
         image.Format = format;
         return image.ToByteArray();
     }
+
 }

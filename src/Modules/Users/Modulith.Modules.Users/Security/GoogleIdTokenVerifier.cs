@@ -46,6 +46,7 @@ internal sealed class GoogleIdTokenVerifier(
         var email = result.ClaimsIdentity.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
         var emailVerified = result.ClaimsIdentity.FindFirst("email_verified")?.Value;
         var name = result.ClaimsIdentity.FindFirst("name")?.Value;
+        var picture = result.ClaimsIdentity.FindFirst("picture")?.Value;
 
         if (string.IsNullOrEmpty(sub) || string.IsNullOrEmpty(email))
         {
@@ -57,7 +58,7 @@ internal sealed class GoogleIdTokenVerifier(
             return UsersErrors.InvalidIdToken;
         }
 
-        return new GoogleIdentity(sub, email, name ?? email);
+        return new GoogleIdentity(sub, email, name ?? email, picture);
     }
 
     private static Task<TokenValidationResult> ValidateAsync(string idToken, GoogleAuthOptions opts, IEnumerable<SecurityKey> keys) =>

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Users.Avatars;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Gdpr;
@@ -6,7 +7,7 @@ using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.Gdpr;
 
-public sealed class UsersPersonalDataEraser(UsersDbContext db) : IPersonalDataEraser
+public sealed class UsersPersonalDataEraser(UsersDbContext db, IUserAvatarStorage avatarStorage) : IPersonalDataEraser
 {
     public async Task<ErasureResult> EraseAsync(UserRef user, ErasureStrategy strategy, CancellationToken ct)
     {
@@ -41,6 +42,7 @@ public sealed class UsersPersonalDataEraser(UsersDbContext db) : IPersonalDataEr
         // PendingExternalLogins are keyed by email, not UserId (pre-account records).
         // Find and delete by email if we still have the user record.
         var dbUserForEmail = await db.Users.FindAsync([userId], ct);
+        var avatarToDelete = (Container: dbUserForEmail?.AvatarContainer, Key: dbUserForEmail?.AvatarKey);
         if (dbUserForEmail is not null)
         {
             affected += await db.PendingExternalLogins
@@ -67,6 +69,7 @@ public sealed class UsersPersonalDataEraser(UsersDbContext db) : IPersonalDataEr
         affected += consents.Count;
 
         await db.SaveChangesAsync(ct);
+        await avatarStorage.DeleteAsync(avatarToDelete.Container, avatarToDelete.Key, ct);
 
         return new ErasureResult(user.UserId, ErasureStrategy.HardDelete, affected);
     }

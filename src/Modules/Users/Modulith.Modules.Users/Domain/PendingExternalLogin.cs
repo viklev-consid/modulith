@@ -18,6 +18,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
         string subject,
         string email,
         string displayName,
+        string? providerAvatarUrl,
         bool isExistingUser,
         byte[] tokenHash,
         string? createdFromIp,
@@ -29,6 +30,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
         Subject = subject;
         Email = email;
         DisplayName = displayName;
+        ProviderAvatarUrl = providerAvatarUrl;
         IsExistingUser = isExistingUser;
         TokenHash = tokenHash;
         CreatedFromIp = createdFromIp;
@@ -44,6 +46,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
     public string Subject { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
     public string DisplayName { get; private set; } = string.Empty;
+    public string? ProviderAvatarUrl { get; private set; }
 
     /// <summary>Captured at creation time so email template selection is deterministic.</summary>
     public bool IsExistingUser { get; private set; }
@@ -63,6 +66,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
         string subject,
         string email,
         string displayName,
+        string? providerAvatarUrl,
         bool isExistingUser,
         string? createdFromIp,
         string? userAgent,
@@ -87,6 +91,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
             subject,
             normalizedEmail,
             truncatedDisplayName,
+            NormalizeAvatarUrl(providerAvatarUrl),
             isExistingUser,
             hash,
             createdFromIp,
@@ -103,7 +108,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
     /// raw value to embed in the re-sent confirmation email. The previous raw token becomes invalid
     /// immediately.
     /// </summary>
-    public string Refresh(TimeSpan lifetime, IClock clock, string email)
+    public string Refresh(TimeSpan lifetime, IClock clock, string email, string? providerAvatarUrl)
     {
         var rawBytes = RandomNumberGenerator.GetBytes(32);
         var rawValue = Convert.ToBase64String(rawBytes)
@@ -112,6 +117,7 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
         TokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(rawValue));
         ExpiresAt = clock.UtcNow.Add(lifetime);
         Email = email.Trim().ToLowerInvariant();
+        ProviderAvatarUrl = NormalizeAvatarUrl(providerAvatarUrl);
         return rawValue;
     }
 
@@ -131,4 +137,15 @@ public sealed class PendingExternalLogin : Entity<PendingExternalLoginId>
 
     public static byte[] HashRawValue(string rawValue) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(rawValue));
+
+    private static string? NormalizeAvatarUrl(string? providerAvatarUrl)
+    {
+        if (string.IsNullOrWhiteSpace(providerAvatarUrl))
+        {
+            return null;
+        }
+
+        var trimmed = providerAvatarUrl.Trim();
+        return trimmed.Length > 2048 ? trimmed[..2048] : trimmed;
+    }
 }

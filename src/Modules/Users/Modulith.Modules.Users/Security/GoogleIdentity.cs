@@ -1,3 +1,3 @@
 namespace Modulith.Modules.Users.Security;
 
-public sealed record GoogleIdentity(string Subject, string Email, string Name);
+public sealed record GoogleIdentity(string Subject, string Email, string Name, string? PictureUrl = null);

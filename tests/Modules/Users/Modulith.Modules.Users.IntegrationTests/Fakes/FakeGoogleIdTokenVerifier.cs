@@ -8,8 +8,8 @@ public sealed class FakeGoogleIdTokenVerifier : IGoogleIdTokenVerifier
     private ErrorOr<GoogleIdentity> result =
         new GoogleIdentity("google-sub-default", "fake@example.com", "Fake User");
 
-    public void SetIdentity(string subject, string email, string name = "Test User") =>
-        result = new GoogleIdentity(subject, email, name);
+    public void SetIdentity(string subject, string email, string name = "Test User", string? pictureUrl = null) =>
+        result = new GoogleIdentity(subject, email, name, pictureUrl);
 
     public void SetError(Error error) =>
         result = error;

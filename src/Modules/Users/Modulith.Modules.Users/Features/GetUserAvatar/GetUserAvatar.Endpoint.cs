@@ -24,15 +24,17 @@ internal static class GetUserAvatarEndpoint
                 }
 
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetUserAvatarResponse>>(
-                    new GetUserAvatarQuery(userId, requestingUserId, currentUser.Role),
+                    new GetUserAvatarQuery(userId, requestingUserId, currentUser.Role, http.Request.Headers.IfNoneMatch.ToString()),
                     ct);
 
                 return result.Match<IResult>(
                     avatar =>
                     {
-                        http.Response.Headers.CacheControl = "private, max-age=300";
-                        http.Response.Headers.ETag = $"\"{avatar.UpdatedAt.ToUnixTimeMilliseconds():x}\"";
-                        return Results.Stream(avatar.Content, avatar.ContentType);
+                        http.Response.Headers.CacheControl = "private, max-age=300, must-revalidate";
+                        http.Response.Headers.ETag = avatar.ETag;
+                        return avatar.NotModified
+                            ? Results.StatusCode(StatusCodes.Status304NotModified)
+                            : Results.Stream(avatar.Content!, avatar.ContentType!);
                     },
                     Problems.FromErrors);
             })

@@ -55,6 +55,41 @@ public sealed class LinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsync
     }
 
     [Fact]
+    public async Task LinkGoogleLogin_DoesNotOverrideAvatarByDefault()
+    {
+        var (userId, accessToken) = await RegisterAndLoginAsync("link-no-avatar@example.com");
+        fixture.GoogleVerifier.SetIdentity("sub-link-no-avatar", "ext-avatar@google.com", "Alice", "https://google.test/avatar.png");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/auth/google/link",
+            new LinkGoogleLoginRequest("any-id-token"));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Id == new UserId(userId));
+        Assert.False(user.HasAvatar);
+    }
+
+    [Fact]
+    public async Task LinkGoogleLogin_WhenOptedIn_ImportsGoogleAvatar()
+    {
+        var (userId, accessToken) = await RegisterAndLoginAsync("link-avatar@example.com");
+        fixture.GoogleVerifier.SetIdentity("sub-link-avatar", "ext-avatar@google.com", "Alice", "https://google.test/avatar.png");
+        var auth = fixture.CreateAuthenticatedClientWithToken(accessToken);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/auth/google/link",
+            new LinkGoogleLoginRequest("any-id-token", OverrideAvatarWithGoogleAvatar: true));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Id == new UserId(userId));
+        Assert.True(user.HasAvatar);
+        Assert.Equal("image/png", user.AvatarContentType);
+    }
+
+    [Fact]
     public async Task LinkGoogleLogin_WhenSubjectAlreadyLinkedToOtherUser_Returns409()
     {
         const string subject = "sub-conflict";

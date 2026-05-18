@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Modulith.Modules.Users.Avatars;
 using Modulith.Shared.Infrastructure.Http;
@@ -55,16 +56,19 @@ internal static class UpdateAvatarEndpoint
                         statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
+                var buffer = new byte[file.Length];
                 await using var stream = file.OpenReadStream();
-                await using var buffer = new MemoryStream((int)file.Length);
-                await stream.CopyToAsync(buffer, ct);
+                await stream.ReadExactlyAsync(buffer, ct);
 
-                var command = new UpdateAvatarCommand(userId, buffer.ToArray(), file.ContentType, file.FileName);
+                var command = new UpdateAvatarCommand(userId, buffer, file.ContentType, file.FileName);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<UpdateAvatarResponse>>(command, ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })
         .WithName("UpdateAvatar")
         .WithSummary("Upload or replace the authenticated user's avatar.")
+        .WithMetadata(
+            new RequestSizeLimitAttribute(AvatarConstants.MaxMultipartBodyBytes),
+            new RequestFormLimitsAttribute { MultipartBodyLengthLimit = AvatarConstants.MaxMultipartBodyBytes })
         .Accepts<IFormFile>("multipart/form-data")
         .Produces<UpdateAvatarResponse>()
         .ProducesValidationProblem()

@@ -48,7 +48,13 @@ public sealed class GetUserAvatarHandler(UsersDbContext db, IUserAvatarStorage a
             return UsersErrors.AvatarMissing;
         }
 
+        var etag = GetUserAvatarResponse.ToETag(avatar.AvatarUpdatedAt.Value);
+        if (string.Equals(query.IfNoneMatch, etag, StringComparison.Ordinal))
+        {
+            return new GetUserAvatarResponse(null, null, avatar.AvatarUpdatedAt.Value, NotModified: true);
+        }
+
         var content = await avatarStorage.GetAsync(avatar.AvatarContainer, avatar.AvatarKey, ct);
-        return new GetUserAvatarResponse(content.Stream, content.Metadata.ContentType, avatar.AvatarUpdatedAt.Value);
+        return new GetUserAvatarResponse(content.Stream, content.Metadata.ContentType, avatar.AvatarUpdatedAt.Value, NotModified: false);
     }
 }

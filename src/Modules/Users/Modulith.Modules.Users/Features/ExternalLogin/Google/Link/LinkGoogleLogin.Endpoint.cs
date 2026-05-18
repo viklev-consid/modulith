@@ -33,7 +33,7 @@ internal static class LinkGoogleLoginEndpoint
                 }
 
                 var ip = httpContext.Connection.RemoteIpAddress?.ToString();
-                var command = new LinkGoogleLoginCommand(userId, request.IdToken, ip);
+                var command = new LinkGoogleLoginCommand(userId, request.IdToken, ip, request.OverrideAvatarWithGoogleAvatar);
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<Success>>(command, ct);
                 return result.ToProblemDetailsOr(_ => Results.NoContent());
             })

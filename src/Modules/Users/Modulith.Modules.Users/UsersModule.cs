@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Modulith.Modules.Users.Avatars;
 using Modulith.Modules.Users.ConsentManagement;
 using Modulith.Modules.Users.Contracts.Authorization;
 using Modulith.Modules.Users.Features.ChangePassword;
@@ -13,6 +14,7 @@ using Modulith.Modules.Users.Features.ConfirmEmail;
 using Modulith.Modules.Users.Features.ConfirmEmailChange;
 using Modulith.Modules.Users.Features.CreateInvitation;
 using Modulith.Modules.Users.Features.DeleteAccount;
+using Modulith.Modules.Users.Features.DeleteAvatar;
 using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
 using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
@@ -22,9 +24,8 @@ using Modulith.Modules.Users.Features.ExternalLogin.Google.Unlink;
 using Modulith.Modules.Users.Features.ExternalLogin.SetInitialPassword;
 using Modulith.Modules.Users.Features.ForgotPassword;
 using Modulith.Modules.Users.Features.GetCurrentUser;
-using Modulith.Modules.Users.Features.DeleteAvatar;
-using Modulith.Modules.Users.Features.GetUserById;
 using Modulith.Modules.Users.Features.GetUserAvatar;
+using Modulith.Modules.Users.Features.GetUserById;
 using Modulith.Modules.Users.Features.ListInvitations;
 using Modulith.Modules.Users.Features.ListUsers;
 using Modulith.Modules.Users.Features.Login;
@@ -41,9 +42,8 @@ using Modulith.Modules.Users.Features.TwoFactor.ConfirmTotp;
 using Modulith.Modules.Users.Features.TwoFactor.DisableTwoFactor;
 using Modulith.Modules.Users.Features.TwoFactor.RegenerateRecoveryCodes;
 using Modulith.Modules.Users.Features.TwoFactor.SetupTotp;
-using Modulith.Modules.Users.Features.UpdateProfile;
 using Modulith.Modules.Users.Features.UpdateAvatar;
-using Modulith.Modules.Users.Avatars;
+using Modulith.Modules.Users.Features.UpdateProfile;
 using Modulith.Modules.Users.Gdpr;
 using Modulith.Modules.Users.Jobs;
 using Modulith.Modules.Users.Persistence;
@@ -113,8 +113,16 @@ public static class UsersModule
         services.AddScoped<ITotpSecretProtector, DataProtectionTotpSecretProtector>();
         services.AddScoped<ITwoFactorRequirementEvaluator, TwoFactorRequirementEvaluator>();
         services.AddScoped<ITwoFactorChallengeIssuer, TwoFactorChallengeIssuer>();
-        services.AddScoped<IAvatarImageValidator, MagickAvatarImageValidator>();
+        services.AddScoped<IAvatarImageInspector, MagickAvatarImageInspector>();
         services.AddScoped<IUserAvatarStorage, UserAvatarStorage>();
+        services.AddHttpClient<IGoogleAvatarImporter, GoogleAvatarImporter>(client =>
+            {
+                client.Timeout = AvatarConstants.GoogleImportTimeout;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+            });
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();

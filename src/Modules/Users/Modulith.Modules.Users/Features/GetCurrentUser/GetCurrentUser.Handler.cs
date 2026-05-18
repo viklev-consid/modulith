@@ -1,5 +1,6 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Users.Avatars;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security.Authorization;
@@ -46,7 +47,7 @@ public sealed class GetCurrentUserHandler(UsersDbContext db, IPermissionCatalog 
             HasCompletedOnboarding: user.HasCompletedOnboarding,
             TwoFactorEnabled: twoFactorEnabled,
             Avatar: user.HasAvatar && user.AvatarUpdatedAt is not null
-                ? new CurrentUserAvatarResponse($"/v1/users/{user.Id.Value}/avatar", user.AvatarUpdatedAt.Value)
+                ? new CurrentUserAvatarResponse(AvatarUrl.ForUser(user.Id.Value, user.AvatarUpdatedAt.Value), user.AvatarUpdatedAt.Value)
                 : null,
             LinkedAccounts: linkedAccounts);
     }

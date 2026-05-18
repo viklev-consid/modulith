@@ -42,6 +42,16 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
         {
             ["email"] = dbUser.Email.Value,
             ["displayName"] = dbUser.DisplayName,
+            ["avatar"] = dbUser.HasAvatar
+                ? new
+                {
+                    container = dbUser.AvatarContainer,
+                    key = dbUser.AvatarKey,
+                    contentType = dbUser.AvatarContentType,
+                    sizeBytes = dbUser.AvatarSizeBytes,
+                    updatedAt = dbUser.AvatarUpdatedAt,
+                }
+                : null,
             ["role"] = dbUser.Role.Name,
             ["hasPassword"] = dbUser.PasswordHash is not null,
             ["hasCompletedOnboarding"] = dbUser.HasCompletedOnboarding,

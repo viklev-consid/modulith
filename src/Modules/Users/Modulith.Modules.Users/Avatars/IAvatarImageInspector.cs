@@ -2,7 +2,7 @@ using ErrorOr;
 
 namespace Modulith.Modules.Users.Avatars;
 
-public interface IAvatarImageValidator
+public interface IAvatarImageInspector
 {
     Task<ErrorOr<AvatarImageInfo>> ValidateAsync(
         Stream content,

@@ -1,17 +1,20 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Users.Avatars;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
+using Wolverine;
 
 namespace Modulith.Modules.Users.Features.UpdateAvatar;
 
 public sealed class UpdateAvatarHandler(
     UsersDbContext db,
-    IAvatarImageValidator validator,
+    IAvatarImageInspector validator,
     IUserAvatarStorage avatarStorage,
+    IMessageBus bus,
     IClock clock)
 {
     public async Task<ErrorOr<UpdateAvatarResponse>> Handle(UpdateAvatarCommand cmd, CancellationToken ct)
@@ -52,8 +55,11 @@ public sealed class UpdateAvatarHandler(
 
         await avatarStorage.DeleteAsync(previous.Container, previous.Key, ct);
 
+        await bus.PublishAsync(new UserAvatarUpdatedV1(user.Id.Value, Guid.NewGuid()));
+        UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserAvatarUpdatedV1)));
+
         return new UpdateAvatarResponse(
-            $"/v1/users/{user.Id.Value}/avatar",
+            AvatarUrl.ForUser(user.Id.Value, user.AvatarUpdatedAt!.Value),
             user.AvatarUpdatedAt!.Value);
     }
 }

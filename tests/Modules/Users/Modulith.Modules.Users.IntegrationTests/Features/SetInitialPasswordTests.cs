@@ -231,6 +231,7 @@ public sealed class SetInitialPasswordTests(GoogleUsersApiFixture fixture) : IAs
 
         var (pending, rawToken) = PendingExternalLogin.Create(
             ExternalLoginProvider.Google, subject, email, "Test User",
+            null,
             isExistingUser, createdFromIp: null, userAgent: null,
             TimeSpan.FromMinutes(15), clock);
 

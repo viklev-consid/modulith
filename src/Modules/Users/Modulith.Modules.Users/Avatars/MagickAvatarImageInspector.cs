@@ -4,7 +4,7 @@ using Modulith.Modules.Users.Errors;
 
 namespace Modulith.Modules.Users.Avatars;
 
-public sealed class MagickAvatarImageValidator : IAvatarImageValidator
+public sealed class MagickAvatarImageInspector : IAvatarImageInspector
 {
     public Task<ErrorOr<AvatarImageInfo>> ValidateAsync(
         Stream content,

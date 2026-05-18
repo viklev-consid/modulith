@@ -118,7 +118,7 @@ public sealed class GoogleLoginHandler(
 
         if (activePending is not null)
         {
-            var refreshedRawToken = activePending.Refresh(opts.PendingExternalLoginLifetime, clock, identity.Email);
+            var refreshedRawToken = activePending.Refresh(opts.PendingExternalLoginLifetime, clock, identity.Email, identity.PictureUrl);
             await db.SaveChangesAsync(ct);
 
             // Re-query live state — IsExistingUser on the pending record was snapshotted at creation
@@ -152,6 +152,7 @@ public sealed class GoogleLoginHandler(
             identity.Subject,
             normalizedEmail,
             identity.Name,
+            identity.PictureUrl,
             isExistingUser,
             cmd.IpAddress,
             cmd.UserAgent,
