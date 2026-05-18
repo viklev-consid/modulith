@@ -44,6 +44,11 @@ public sealed class LoginHandler(
             return UsersErrors.InvalidCredentials;
         }
 
+        if (!user.IsEmailConfirmed)
+        {
+            return UsersErrors.EmailNotConfirmed;
+        }
+
         if (await twoFactorRequirementEvaluator.IsRequiredAsync(user, ct))
         {
             var (challenge, rawChallengeToken) = twoFactorChallengeIssuer.Issue(user.Id, cmd.IpAddress);

@@ -17,6 +17,8 @@ public sealed class UsersOptions
 
     public TimeSpan EmailChangeTokenLifetime { get; init; } = TimeSpan.FromMinutes(30);
 
+    public TimeSpan EmailConfirmationTokenLifetime { get; init; } = TimeSpan.FromHours(24);
+
     [Range(8, 128)]
     public int MinPasswordLength { get; init; } = 10;
 

@@ -21,6 +21,8 @@ internal static class UsersRoutes
     public const string ChangePassword = $"{Me}/password";
     public const string RequestEmailChange = $"{Me}/email/request";
     public const string ConfirmEmailChange = $"{Me}/email/confirm";
+    public const string ConfirmEmail = $"{Prefix}/email/confirm";
+    public const string ResendEmailConfirmation = $"{Prefix}/email/confirmation/resend";
     public const string RefreshToken = $"{Prefix}/token/refresh";
     public const string Logout = $"{Prefix}/logout";
     public const string LogoutAll = $"{Prefix}/logout/all";

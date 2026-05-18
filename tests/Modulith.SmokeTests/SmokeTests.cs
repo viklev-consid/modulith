@@ -1,8 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.Login;
 using Modulith.Modules.Users.Features.Register;
+using Modulith.Modules.Users.Persistence;
+using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.SmokeTests;
 
@@ -39,10 +44,26 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
 
         var registered = await registerResponse.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(registered);
-        Assert.NotEmpty(registered.AccessToken);
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+            var user = await db.Users.FirstAsync(u => u.Email == Email.Create("smoke@example.com").Value);
+            user.ConfirmEmail(clock);
+            await db.SaveChangesAsync();
+        }
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/v1/users/login",
+            new LoginRequest("smoke@example.com", "Password1!"));
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(login);
+        Assert.NotEmpty(login.AccessToken);
 
         // Get /me with the issued token
-        var authed = fixture.CreateAuthenticatedClientWithToken(registered.AccessToken);
+        var authed = fixture.CreateAuthenticatedClientWithToken(login.AccessToken);
         var meResponse = await authed.GetAsync("/v1/users/me");
 
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);

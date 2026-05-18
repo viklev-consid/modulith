@@ -67,6 +67,21 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
         var regBody = await reg.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(regBody);
 
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<Modulith.Shared.Kernel.Interfaces.IClock>();
+            var user = await db.Users.FirstAsync(u => u.Email == Domain.Email.Create("alice@example.com").Value);
+            user.ConfirmEmail(clock);
+            await db.SaveChangesAsync();
+        }
+
+        var login = await client.PostAsJsonAsync("/v1/users/login",
+            new LoginRequest("alice@example.com", "Password1!"));
+        login.EnsureSuccessStatusCode();
+        var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginBody);
+
         // Issue a reset token directly via the service — captures the raw value
         string rawToken;
         using (var scope = fixture.Services.CreateScope())
@@ -87,7 +102,7 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
 
         // Pre-existing refresh token must be revoked
         var refreshAttempt = await client.PostAsJsonAsync("/v1/users/token/refresh",
-            new RefreshTokenRequest(regBody.RefreshToken));
+            new RefreshTokenRequest(loginBody.RefreshToken));
         Assert.Equal(HttpStatusCode.Unauthorized, refreshAttempt.StatusCode);
 
         // New password must work

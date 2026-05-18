@@ -19,6 +19,7 @@ public sealed class FrontendOptionsValidator : IValidateOptions<FrontendOptions>
         }
 
         ValidatePath(options.Paths.ConfirmEmail, "Frontend:Paths:ConfirmEmail", failures);
+        ValidatePath(options.Paths.ConfirmEmailChange, "Frontend:Paths:ConfirmEmailChange", failures);
         ValidatePath(options.Paths.GoogleConfirm, "Frontend:Paths:GoogleConfirm", failures);
         ValidatePath(options.Paths.ResetPassword, "Frontend:Paths:ResetPassword", failures);
 

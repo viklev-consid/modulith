@@ -14,7 +14,7 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task Register_WithValidRequest_Returns201AndToken()
+    public async Task Register_WithValidRequest_Returns201AndRequiresEmailConfirmation()
     {
         var request = new RegisterRequest("alice@example.com", "Password1!", "Alice");
 
@@ -24,8 +24,8 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(body);
         Assert.NotEqual(Guid.Empty, body.UserId);
-        Assert.NotEmpty(body.AccessToken);
-        Assert.NotEmpty(body.RefreshToken);
+        Assert.True(body.RequiresEmailConfirmation);
+        Assert.Contains("confirm", body.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

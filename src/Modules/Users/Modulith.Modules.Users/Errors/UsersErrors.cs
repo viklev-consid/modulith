@@ -34,6 +34,9 @@ internal static class UsersErrors
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("Users.InvalidCredentials", "The email address or password is incorrect.");
 
+    public static readonly Error EmailNotConfirmed =
+        Error.Unauthorized("Users.Email.NotConfirmed", "Please confirm your email address before signing in.");
+
     public static readonly Error UserNotFound =
         Error.NotFound("Users.UserNotFound", "User was not found.");
 

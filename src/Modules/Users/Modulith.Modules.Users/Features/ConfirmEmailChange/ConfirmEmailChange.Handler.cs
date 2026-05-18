@@ -62,6 +62,12 @@ public sealed class ConfirmEmailChangeHandler(
             return changeResult.Errors;
         }
 
+        var confirmResult = user.MarkEmailConfirmed(clock.UtcNow);
+        if (confirmResult.IsError)
+        {
+            return confirmResult.Errors;
+        }
+
         db.PendingEmailChanges.Remove(pending);
 
         try

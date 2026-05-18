@@ -15,4 +15,5 @@ public enum NotificationType
     TwoFactorEnabled = 11,
     TwoFactorDisabled = 12,
     RecoveryCodesRegenerated = 13,
+    EmailConfirmationRequest = 14,
 }
