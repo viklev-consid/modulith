@@ -168,6 +168,7 @@ public sealed class LinkGoogleLoginTests(GoogleUsersApiFixture fixture) : IAsync
             new RegisterRequest(email, "Password1!", "Alice"));
         var regBody = await reg.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(regBody);
+        await fixture.ConfirmEmailAsync(email);
 
         var login = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest(email, "Password1!"));

@@ -86,6 +86,7 @@ public sealed class LogoutTests(UsersApiFixture fixture) : IAsyncLifetime
     {
         await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync("alice@example.com");
 
         var response = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "Password1!"));

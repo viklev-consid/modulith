@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.Register;
+using Modulith.Modules.Users.Persistence;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -26,6 +29,16 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.NotEqual(Guid.Empty, body.UserId);
         Assert.True(body.RequiresEmailConfirmation);
         Assert.Contains("confirm", body.Message, StringComparison.OrdinalIgnoreCase);
+
+        var state = await fixture.QueryDbAsync<UsersDbContext, (bool Confirmed, int ConfirmationTokens)>((db, ct) =>
+            db.Users
+                .Where(u => u.Id == new UserId(body.UserId))
+                .Select(u => new ValueTuple<bool, int>(
+                    u.IsEmailConfirmed,
+                    db.SingleUseTokens.Count(t => t.UserId == u.Id && t.Purpose == TokenPurpose.EmailConfirmation)))
+                .SingleAsync(ct));
+        Assert.False(state.Confirmed);
+        Assert.Equal(1, state.ConfirmationTokens);
     }
 
     [Fact]

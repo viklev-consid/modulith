@@ -147,6 +147,7 @@ public sealed class CompleteOnboardingTests(GoogleUsersApiFixture fixture) : IAs
     {
         await anon.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("pwduser@example.com", "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync("pwduser@example.com");
         var login = await anon.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("pwduser@example.com", "Password1!"));
         var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>();

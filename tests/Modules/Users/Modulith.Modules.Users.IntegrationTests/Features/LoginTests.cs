@@ -19,6 +19,7 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
     {
         await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync("alice@example.com");
 
         var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "Password1!"));
@@ -31,10 +32,23 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Login_WhenEmailNotConfirmed_Returns401()
+    {
+        await client.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+
+        var response = await client.PostAsJsonAsync("/v1/users/login",
+            new LoginRequest("alice@example.com", "Password1!"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Login_WithWrongPassword_Returns401()
     {
         await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync("alice@example.com");
 
         var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("alice@example.com", "WrongPassword1!"));
@@ -56,6 +70,7 @@ public sealed class LoginTests(UsersApiFixture fixture) : IAsyncLifetime
     {
         await client.PostAsJsonAsync("/v1/users/register",
             new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+        await fixture.ConfirmEmailAsync("alice@example.com");
 
         var response = await client.PostAsJsonAsync("/v1/users/login",
             new LoginRequest("ALICE@EXAMPLE.COM", "Password1!"));
