@@ -8,6 +8,8 @@ internal static class UsersRoutes
     public const string Login = $"{Prefix}/login";
     public const string Me = $"{Prefix}/me";
     public const string Profile = $"{Me}/profile";
+    public const string MyAvatar = $"{Me}/avatar";
+    public const string UserAvatar = $"{Prefix}/{{userId:guid}}/avatar";
     public const string PersonalData = $"{Me}/personal-data";
     public const string List = Prefix;
     public const string ById = $"{Prefix}/{{userId:guid}}";

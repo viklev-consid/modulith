@@ -45,6 +45,9 @@ public sealed class GetCurrentUserHandler(UsersDbContext db, IPermissionCatalog 
             HasPassword: user.PasswordHash is not null,
             HasCompletedOnboarding: user.HasCompletedOnboarding,
             TwoFactorEnabled: twoFactorEnabled,
+            Avatar: user.HasAvatar && user.AvatarUpdatedAt is not null
+                ? new CurrentUserAvatarResponse($"/v1/users/{user.Id.Value}/avatar", user.AvatarUpdatedAt.Value)
+                : null,
             LinkedAccounts: linkedAccounts);
     }
 }
