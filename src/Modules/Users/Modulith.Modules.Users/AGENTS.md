@@ -73,7 +73,7 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 - `IRefreshTokenIssuer` - issues and rotates `RefreshToken` entities.
 - `ISingleUseTokenService` - creates and verifies single-use token primitives.
 - `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` - verifies Google ID tokens against JWKS cached in `IMemoryCache`. Returns `ExternalAuthUnavailable` if JWKS fetch fails.
-- `ITotpService` / `TotpService` - generates TOTP secrets and verifies 6-digit codes.
+- `ITotpService` / `TotpService` - generates TOTP secrets and verifies 6-digit codes against the current step plus a short previous-step grace period. Forward-step grace is intentionally not accepted; clients are expected to keep device time synced.
 - `ITotpSecretProtector` / `DataProtectionTotpSecretProtector` - protects TOTP secrets at rest.
 - `ITwoFactorChallengeIssuer` - issues pending login challenges.
 - `ITwoFactorRequirementEvaluator` - policy-ready hook for deciding whether local 2FA is required before token issuance.

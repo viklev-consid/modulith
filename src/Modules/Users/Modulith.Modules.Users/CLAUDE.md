@@ -158,7 +158,7 @@ For general module conventions, see [`../CLAUDE.md`](../CLAUDE.md).
 - `IRefreshTokenIssuer` — issues and rotates `RefreshToken` entities. Handles device fingerprinting (UA + IP, opaque) for session context.
 - `ISingleUseTokenService` — creates and verifies `SingleUseToken` instances for password reset and email change.
 - `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` — verifies Google ID tokens against Google's JWKS endpoint. JWKS is cached in `IMemoryCache` (`GoogleAuthOptions.JwksCacheDuration`, default 60 min). Returns `ExternalAuthUnavailable` if JWKS fetch fails (fail-closed). **Must be `public` interface** — Wolverine handler discovery requires all injected types to be public.
-- `ITotpService` / `TotpService` — generates TOTP secrets, builds provisioning URIs, and verifies 6-digit TOTP codes with configured time-step drift.
+- `ITotpService` / `TotpService` — generates TOTP secrets, builds provisioning URIs, and verifies 6-digit TOTP codes against the current step plus a short previous-step grace period. Forward-step grace is intentionally not accepted; clients are expected to keep device time synced.
 - `ITotpSecretProtector` / `DataProtectionTotpSecretProtector` — protects TOTP secrets at rest with ASP.NET Core Data Protection.
 - `ITwoFactorChallengeIssuer` / `TwoFactorChallengeIssuer` — issues pending 2FA challenges after first-factor success.
 - `ITwoFactorRequirementEvaluator` / `TwoFactorRequirementEvaluator` — policy-ready hook for deciding whether a user must complete 2FA before token issuance.
@@ -197,8 +197,8 @@ public sealed class UsersOptions
     public TimeSpan TwoFactorChallengeLifetime { get; init; } = TimeSpan.FromMinutes(5);
     [Range(1, 20)]
     public int RecoveryCodeCount { get; init; } = 10;
-    [Range(0, 2)]
-    public int TotpAllowedTimeStepDrift { get; init; } = 1;
+    [Range(typeof(TimeSpan), "00:00:00", "00:00:10")]
+    public TimeSpan TotpPreviousStepGracePeriod { get; init; } = TimeSpan.FromSeconds(5);
     [Required]
     public string TotpIssuer { get; init; } = "Modulith";
     [Required]

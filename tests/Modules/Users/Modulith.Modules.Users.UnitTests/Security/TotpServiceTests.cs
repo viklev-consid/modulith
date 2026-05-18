@@ -8,28 +8,70 @@ namespace Modulith.Modules.Users.UnitTests.Security;
 public sealed class TotpServiceTests
 {
     [Fact]
-    public void Verify_WithOneStepDrift_AcceptsPreviousCurrentAndNextSteps()
+    public void Verify_AcceptsCurrentStep()
     {
-        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_017);
         var clock = new FixedClock(now);
         var service = new TotpService(clock);
         const string secret = "JBSWY3DPEHPK3PXP";
 
-        Assert.True(service.Verify(secret, ComputeCode(secret, now.AddSeconds(-30)), allowedTimeStepDrift: 1).IsValid);
-        Assert.True(service.Verify(secret, ComputeCode(secret, now), allowedTimeStepDrift: 1).IsValid);
-        Assert.True(service.Verify(secret, ComputeCode(secret, now.AddSeconds(30)), allowedTimeStepDrift: 1).IsValid);
+        var result = service.Verify(secret, ComputeCode(secret, now), TimeSpan.FromSeconds(5));
+
+        Assert.True(result.IsValid);
+        Assert.Equal(now.ToUnixTimeSeconds() / 30, result.TimeStep);
     }
 
     [Fact]
-    public void Verify_WithOneStepDrift_RejectsCodeTwoStepsAway()
+    public void Verify_AcceptsPreviousStepOnlyInsideGracePeriod()
     {
-        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_004);
         var clock = new FixedClock(now);
         var service = new TotpService(clock);
         const string secret = "JBSWY3DPEHPK3PXP";
 
-        Assert.False(service.Verify(secret, ComputeCode(secret, now.AddSeconds(-60)), allowedTimeStepDrift: 1).IsValid);
-        Assert.False(service.Verify(secret, ComputeCode(secret, now.AddSeconds(60)), allowedTimeStepDrift: 1).IsValid);
+        var result = service.Verify(secret, ComputeCode(secret, now.AddSeconds(-30)), TimeSpan.FromSeconds(5));
+
+        Assert.True(result.IsValid);
+        Assert.Equal(now.ToUnixTimeSeconds() / 30 - 1, result.TimeStep);
+    }
+
+    [Fact]
+    public void Verify_RejectsPreviousStepAtGraceBoundary()
+    {
+        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_005);
+        var clock = new FixedClock(now);
+        var service = new TotpService(clock);
+        const string secret = "JBSWY3DPEHPK3PXP";
+
+        var result = service.Verify(secret, ComputeCode(secret, now.AddSeconds(-30)), TimeSpan.FromSeconds(5));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Verify_RejectsPreviousStepOutsideGracePeriod()
+    {
+        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_011);
+        var clock = new FixedClock(now);
+        var service = new TotpService(clock);
+        const string secret = "JBSWY3DPEHPK3PXP";
+
+        var result = service.Verify(secret, ComputeCode(secret, now.AddSeconds(-30)), TimeSpan.FromSeconds(5));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Verify_RejectsNextStep()
+    {
+        var now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_025);
+        var clock = new FixedClock(now);
+        var service = new TotpService(clock);
+        const string secret = "JBSWY3DPEHPK3PXP";
+
+        var result = service.Verify(secret, ComputeCode(secret, now.AddSeconds(30)), TimeSpan.FromSeconds(5));
+
+        Assert.False(result.IsValid);
     }
 
     private static string ComputeCode(string secret, DateTimeOffset timestamp)

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
@@ -18,6 +19,8 @@ public sealed class RegistrationDisabledUsersModuleCollection : ICollectionFixtu
 
 public class UsersApiFixture : ApiTestFixture
 {
+    public TestClock Clock { get; } = new();
+
     public async Task ConfirmEmailAsync(string email)
     {
         await ExecuteDbAsync<UsersDbContext>(async (db, ct) =>
@@ -27,6 +30,12 @@ public class UsersApiFixture : ApiTestFixture
             user.ConfirmEmail(clock);
             await db.SaveChangesAsync(ct);
         });
+    }
+
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.RemoveAll<IClock>();
+        services.AddSingleton<IClock>(Clock);
     }
 
     protected override async Task MigrateAsync(IServiceProvider services)

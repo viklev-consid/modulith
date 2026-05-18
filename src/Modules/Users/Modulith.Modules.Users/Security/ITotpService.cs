@@ -4,5 +4,5 @@ public interface ITotpService
 {
     string GenerateSecret();
     string BuildOtpAuthUri(string issuer, string accountName, string secret);
-    TotpVerificationResult Verify(string secret, string code, int allowedTimeStepDrift);
+    TotpVerificationResult Verify(string secret, string code, TimeSpan previousStepGracePeriod);
 }

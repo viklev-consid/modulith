@@ -48,7 +48,7 @@ public sealed class ConfirmTotpHandler(
         var verification = totpService.Verify(
             secretProtector.Unprotect(credential.ProtectedSecret),
             cmd.Code,
-            options.Value.TotpAllowedTimeStepDrift);
+            options.Value.TotpPreviousStepGracePeriod);
 
         if (!verification.IsValid)
         {

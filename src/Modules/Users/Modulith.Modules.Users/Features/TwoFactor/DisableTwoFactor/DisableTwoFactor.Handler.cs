@@ -100,7 +100,7 @@ public sealed class DisableTwoFactorHandler(
         var verification = totpService.Verify(
             secretProtector.Unprotect(credential.ProtectedSecret),
             code,
-            options.Value.TotpAllowedTimeStepDrift);
+            options.Value.TotpPreviousStepGracePeriod);
 
         if (!verification.IsValid)
         {

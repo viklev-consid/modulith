@@ -24,7 +24,7 @@ internal sealed class TotpService(IClock clock) : ITotpService
         return $"otpauth://totp/{label}?secret={secret}&issuer={issuerValue}&algorithm=SHA1&digits={digits}&period={timeStepSeconds}";
     }
 
-    public TotpVerificationResult Verify(string secret, string code, int allowedTimeStepDrift)
+    public TotpVerificationResult Verify(string secret, string code, TimeSpan previousStepGracePeriod)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Length != 6 || !code.All(char.IsDigit))
         {
@@ -32,23 +32,20 @@ internal sealed class TotpService(IClock clock) : ITotpService
         }
 
         var secretBytes = Base32Decode(secret);
-        var currentStep = ToTimeStep(clock.UtcNow);
+        var now = clock.UtcNow;
+        var currentStep = ToTimeStep(now);
 
-        for (var offset = -allowedTimeStepDrift; offset <= allowedTimeStepDrift; offset++)
+        if (IsCodeMatch(secretBytes, currentStep, code))
         {
-            var step = currentStep + offset;
-            if (step < 0)
-            {
-                continue;
-            }
+            return new TotpVerificationResult(true, currentStep);
+        }
 
-            var expected = ComputeCode(secretBytes, step);
-            if (CryptographicOperations.FixedTimeEquals(
-                Encoding.ASCII.GetBytes(expected),
-                Encoding.ASCII.GetBytes(code)))
-            {
-                return new TotpVerificationResult(true, step);
-            }
+        if (currentStep > 0 &&
+            previousStepGracePeriod > TimeSpan.Zero &&
+            SecondsIntoCurrentStep(now) < previousStepGracePeriod.TotalSeconds &&
+            IsCodeMatch(secretBytes, currentStep - 1, code))
+        {
+            return new TotpVerificationResult(true, currentStep - 1);
         }
 
         return new TotpVerificationResult(false, 0);
@@ -56,6 +53,17 @@ internal sealed class TotpService(IClock clock) : ITotpService
 
     private static long ToTimeStep(DateTimeOffset timestamp) =>
         timestamp.ToUnixTimeSeconds() / timeStepSeconds;
+
+    private static int SecondsIntoCurrentStep(DateTimeOffset timestamp) =>
+        (int)(timestamp.ToUnixTimeSeconds() % timeStepSeconds);
+
+    private static bool IsCodeMatch(byte[] secretBytes, long step, string code)
+    {
+        var expected = ComputeCode(secretBytes, step);
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.ASCII.GetBytes(expected),
+            Encoding.ASCII.GetBytes(code));
+    }
 
     private static string ComputeCode(byte[] secret, long timeStep)
     {

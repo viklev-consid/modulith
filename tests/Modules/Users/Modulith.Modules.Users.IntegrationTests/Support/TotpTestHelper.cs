@@ -7,6 +7,8 @@ internal static class TotpTestHelper
 {
     public static string Current(string secret) => Compute(secret, DateTimeOffset.UtcNow);
 
+    public static string Current(string secret, DateTimeOffset timestamp) => Compute(secret, timestamp);
+
     public static string Next(string secret) => Compute(secret, DateTimeOffset.UtcNow.AddSeconds(30));
 
     private static string Compute(string secret, DateTimeOffset timestamp)

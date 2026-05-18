@@ -20,7 +20,11 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
 {
     private readonly HttpClient client = fixture.CreateAnonymousClient();
 
-    public Task InitializeAsync() => fixture.ResetDatabaseAsync();
+    public async Task InitializeAsync()
+    {
+        fixture.Clock.Set(DateTimeOffset.UtcNow);
+        await fixture.ResetDatabaseAsync();
+    }
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
@@ -74,7 +78,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
         var challenge = await login.Content.ReadFromJsonAsync<LoginResponse>();
 
         var response = await client.PostAsJsonAsync("/v1/users/login/2fa",
-            new LoginTwoFactorRequest(challenge!.Challenge!.ChallengeToken, NextTotp(setup.Secret)));
+            new LoginTwoFactorRequest(challenge!.Challenge!.ChallengeToken, CurrentTotp(setup.Secret)));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<LoginTwoFactorResponse>();
@@ -171,7 +175,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
         }
 
         var validAfterLock = await client.PostAsJsonAsync("/v1/users/login/2fa",
-            new LoginTwoFactorRequest(challenge!.Challenge!.ChallengeToken, NextTotp(setup.Secret)));
+            new LoginTwoFactorRequest(challenge!.Challenge!.ChallengeToken, CurrentTotp(setup.Secret)));
 
         Assert.Equal(HttpStatusCode.BadRequest, validAfterLock.StatusCode);
 
@@ -188,7 +192,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
     public async Task LoginTwoFactor_ReusingTotpStep_Returns400()
     {
         var setup = await EnableTwoFactorAsync("replay@example.com");
-        var code = NextTotp(setup.Secret);
+        var code = CurrentTotp(setup.Secret);
 
         var firstChallenge = await LoginForChallengeAsync("replay@example.com");
         var first = await client.PostAsJsonAsync("/v1/users/login/2fa",
@@ -209,7 +213,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
         var auth = fixture.CreateAuthenticatedClientWithToken(setup.AccessToken);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/2fa/recovery-codes/regenerate",
-            new RegenerateRecoveryCodesRequest("WrongPassword1!", NextTotp(setup.Secret)));
+            new RegenerateRecoveryCodesRequest("WrongPassword1!", CurrentTotp(setup.Secret)));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -222,7 +226,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
         var oldCode = setup.RecoveryCodes[0];
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/2fa/recovery-codes/regenerate",
-            new RegenerateRecoveryCodesRequest("Password1!", NextTotp(setup.Secret)));
+            new RegenerateRecoveryCodesRequest("Password1!", CurrentTotp(setup.Secret)));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var regenerated = await response.Content.ReadFromJsonAsync<RegenerateRecoveryCodesResponse>();
@@ -269,7 +273,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
         var auth = fixture.CreateAuthenticatedClientWithToken(setup.AccessToken);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/2fa/totp/confirm",
-            new ConfirmTotpRequest(NextTotp(setup.Secret)));
+            new ConfirmTotpRequest(CurrentTotp(setup.Secret)));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -281,7 +285,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
         var auth = fixture.CreateAuthenticatedClientWithToken(setup.AccessToken);
         using var request = new HttpRequestMessage(HttpMethod.Delete, "/v1/users/me/2fa")
         {
-            Content = JsonContent.Create(new DisableTwoFactorRequest("Password1!", NextTotp(setup.Secret))),
+            Content = JsonContent.Create(new DisableTwoFactorRequest("Password1!", CurrentTotp(setup.Secret))),
         };
 
         var response = await auth.SendAsync(request);
@@ -351,6 +355,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
             new ConfirmTotpRequest(CurrentTotp(setup.Secret)));
         confirm.EnsureSuccessStatusCode();
         var confirmation = (await confirm.Content.ReadFromJsonAsync<ConfirmTotpResponse>())!;
+        fixture.Clock.Advance(TimeSpan.FromSeconds(30));
 
         return new EnabledTwoFactor(
             login.UserId,
@@ -359,9 +364,7 @@ public sealed class TwoFactorTests(UsersApiFixture fixture) : IAsyncLifetime
             confirmation.RecoveryCodes);
     }
 
-    private static string CurrentTotp(string secret) => TotpTestHelper.Current(secret);
-
-    private static string NextTotp(string secret) => TotpTestHelper.Next(secret);
+    private string CurrentTotp(string secret) => TotpTestHelper.Current(secret, fixture.Clock.UtcNow);
 
     private sealed record EnabledTwoFactor(
         Guid UserId,

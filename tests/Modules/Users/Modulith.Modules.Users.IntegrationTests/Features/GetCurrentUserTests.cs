@@ -96,7 +96,7 @@ public sealed class GetCurrentUserTests(UsersApiFixture fixture) : IAsyncLifetim
 
         var confirmResponse = await client.PostAsJsonAsync(
             "/v1/users/me/2fa/totp/confirm",
-            new ConfirmTotpRequest(TotpTestHelper.Current(setup.Secret)));
+            new ConfirmTotpRequest(TotpTestHelper.Current(setup.Secret, fixture.Clock.UtcNow)));
         confirmResponse.EnsureSuccessStatusCode();
 
         var response = await client.GetAsync("/v1/users/me");
