@@ -12,6 +12,8 @@ For the decisions, see [`../../adr/0028-auth-flows-baseline.md`](../../adr/0028-
 |---|---|---|---|
 | Register | `POST /v1/users/register` | public | `auth` |
 | Login | `POST /v1/users/login` | public | `auth` |
+| ConfirmEmail | `POST /v1/users/email/confirm` | public | `auth` |
+| ResendEmailConfirmation | `POST /v1/users/email/confirmation/resend` | public | `auth` |
 | RefreshToken | `POST /v1/users/token/refresh` | public* | `auth` |
 | Logout | `POST /v1/users/logout` | authenticated | `write` |
 | LogoutAll | `POST /v1/users/logout/all` | authenticated | `write` |
@@ -106,6 +108,30 @@ public sealed class RefreshToken : Entity<RefreshTokenId>
 ---
 
 ## Password reset flow
+
+## Email confirmation flow
+
+Password registration is login-gated by email ownership confirmation:
+
+1. `Register` creates the user as unconfirmed, creates a purpose-bound `EmailConfirmation` single-use token, publishes `EmailConfirmationRequestedV1`, and returns no access or refresh tokens.
+2. Notifications renders the confirmation URL with `IFrontendUrlBuilder.ConfirmEmail(token)`.
+3. `ConfirmEmail` consumes the token and marks `User.EmailConfirmedAt`.
+4. `Login` rejects password users until `EmailConfirmedAt` is set.
+
+Google-provisioned users are treated as confirmed because Google has already verified the email address. Dev seed users are also marked confirmed.
+
+### Frontend route requirements
+
+There are two distinct frontend confirmation routes:
+
+- `Frontend:Paths:ConfirmEmail` — new account confirmation, default `/confirm-email`.
+- `Frontend:Paths:ConfirmEmailChange` — existing account email-change confirmation, default `/confirm-email-change`.
+
+Deploy both frontend routes before deploying an API configuration that splits these paths. Email-change confirmation links are already live in the product surface; routing them to the new-account confirmation screen will break that flow.
+
+### Token rendering tradeoff
+
+Email confirmation messages include both a link and the raw token as copy/paste fallback text. This matches the existing password reset and email-change UX pattern. Anyone who can read or receive the email can confirm the account, so do not log raw tokens and do not persist them outside the email delivery path.
 
 ### ForgotPassword slice
 

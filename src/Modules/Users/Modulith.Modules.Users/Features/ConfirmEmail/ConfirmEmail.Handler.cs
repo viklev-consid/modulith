@@ -36,11 +36,7 @@ public sealed class ConfirmEmailHandler(
             return consumeResult.Errors;
         }
 
-        var confirmResult = user.ConfirmEmail(clock);
-        if (confirmResult.IsError)
-        {
-            return confirmResult.Errors;
-        }
+        user.ConfirmEmail(clock);
 
         await db.SaveChangesAsync(ct);
 

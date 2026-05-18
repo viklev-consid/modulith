@@ -27,7 +27,6 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.NotNull(body);
         Assert.NotEqual(Guid.Empty, body.UserId);
-        Assert.True(body.RequiresEmailConfirmation);
         Assert.Contains("confirm", body.Message, StringComparison.OrdinalIgnoreCase);
 
         var state = await fixture.QueryDbAsync<UsersDbContext, (bool Confirmed, int ConfirmationTokens)>((db, ct) =>

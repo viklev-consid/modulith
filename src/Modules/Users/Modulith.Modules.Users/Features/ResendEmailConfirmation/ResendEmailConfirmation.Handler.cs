@@ -26,7 +26,16 @@ public sealed class ResendEmailConfirmationHandler(
             return new ResendEmailConfirmationResponse();
         }
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == emailResult.Value, ct);
+        var user = await db.Users
+            .FromSqlInterpolated($"""
+                SELECT id, created_at, created_by, display_name, email,
+                       email_confirmed_at, has_completed_onboarding, password_hash, role,
+                       updated_at, updated_by, xmin
+                FROM users.users
+                WHERE email = {emailResult.Value.Value}
+                FOR UPDATE
+                """)
+            .FirstOrDefaultAsync(ct);
         if (user is null || user.IsEmailConfirmed)
         {
             return new ResendEmailConfirmationResponse();

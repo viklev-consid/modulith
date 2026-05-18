@@ -94,21 +94,20 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         var role = initialRole ?? Role.User;
         var user = new User(UserId.New(), email, passwordHash: null, normalizedName, role, hasCompletedOnboarding: false);
         var now = clock.UtcNow;
-        user.EmailConfirmedAt = now;
+        user.ConfirmEmail(clock);
         user.RaiseEvent(new UserProvisionedFromExternal(user.Id, provider, subject, email.Value, normalizedName, now));
         return user;
     }
 
-    public ErrorOr<Success> ConfirmEmail(IClock clock)
+    public bool ConfirmEmail(IClock clock)
     {
-        EmailConfirmedAt ??= clock.UtcNow;
-        return Result.Success;
-    }
+        if (EmailConfirmedAt is not null)
+        {
+            return false;
+        }
 
-    public ErrorOr<Success> MarkEmailConfirmed(DateTimeOffset confirmedAt)
-    {
-        EmailConfirmedAt ??= confirmedAt;
-        return Result.Success;
+        EmailConfirmedAt = clock.UtcNow;
+        return true;
     }
 
     public ErrorOr<Success> ChangeRole(Role newRole, UserId changedBy)

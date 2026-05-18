@@ -63,9 +63,54 @@ public sealed class EmailConfirmationTests(UsersApiFixture fixture) : IAsyncLife
     }
 
     [Fact]
+    public async Task ConfirmEmail_WithExpiredToken_Returns400()
+    {
+        await RegisterAsync("alice@example.com");
+        var rawToken = await CreateConfirmationTokenAsync("alice@example.com", TimeSpan.FromSeconds(-1));
+
+        var response = await client.PostAsJsonAsync("/v1/users/email/confirm",
+            new ConfirmEmailRequest(rawToken));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmEmail_WithConsumedToken_Returns400()
+    {
+        await RegisterAsync("alice@example.com");
+        var rawToken = await CreateConfirmationTokenAsync("alice@example.com");
+
+        var first = await client.PostAsJsonAsync("/v1/users/email/confirm",
+            new ConfirmEmailRequest(rawToken));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var second = await client.PostAsJsonAsync("/v1/users/email/confirm",
+            new ConfirmEmailRequest(rawToken));
+
+        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+    }
+
+    [Fact]
     public async Task ResendEmailConfirmation_ForUnconfirmedUser_ReplacesPendingToken()
     {
         await RegisterAsync("alice@example.com");
+        var originalHash = await GetActiveConfirmationTokenHashAsync("alice@example.com");
+
+        var response = await client.PostAsJsonAsync("/v1/users/email/confirmation/resend",
+            new ResendEmailConfirmationRequest("alice@example.com"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var replacementHash = await GetActiveConfirmationTokenHashAsync("alice@example.com");
+        Assert.NotEqual(Convert.ToBase64String(originalHash), Convert.ToBase64String(replacementHash));
+    }
+
+    [Fact]
+    public async Task ResendEmailConfirmation_ForConfirmedUser_DoesNotCreateToken()
+    {
+        await RegisterAsync("alice@example.com");
+        var originalHash = await GetActiveConfirmationTokenHashAsync("alice@example.com");
+        await fixture.ConfirmEmailAsync("alice@example.com");
 
         var response = await client.PostAsJsonAsync("/v1/users/email/confirmation/resend",
             new ResendEmailConfirmationRequest("alice@example.com"));
@@ -73,11 +118,10 @@ public sealed class EmailConfirmationTests(UsersApiFixture fixture) : IAsyncLife
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var activeTokenCount = await fixture.QueryDbAsync<UsersDbContext, int>((db, ct) =>
-            db.SingleUseTokens.CountAsync(t =>
-                t.Purpose == TokenPurpose.EmailConfirmation &&
-                t.ConsumedAt == null,
-                ct));
+            ActiveConfirmationTokens(db, "alice@example.com").CountAsync(ct));
+        var currentHash = await GetActiveConfirmationTokenHashAsync("alice@example.com");
         Assert.Equal(1, activeTokenCount);
+        Assert.Equal(Convert.ToBase64String(originalHash), Convert.ToBase64String(currentHash));
     }
 
     [Fact]
@@ -102,7 +146,7 @@ public sealed class EmailConfirmationTests(UsersApiFixture fixture) : IAsyncLife
         return body.UserId;
     }
 
-    private async Task<string> CreateConfirmationTokenAsync(string email)
+    private async Task<string> CreateConfirmationTokenAsync(string email, TimeSpan? lifetime = null)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -113,8 +157,22 @@ public sealed class EmailConfirmationTests(UsersApiFixture fixture) : IAsyncLife
             .Where(t => t.UserId == user.Id && t.Purpose == TokenPurpose.EmailConfirmation)
             .ExecuteDeleteAsync();
 
-        var (_, rawToken) = tokenService.Create(user.Id, TokenPurpose.EmailConfirmation, TimeSpan.FromHours(24));
+        var (_, rawToken) = tokenService.Create(user.Id, TokenPurpose.EmailConfirmation, lifetime ?? TimeSpan.FromHours(24));
         await db.SaveChangesAsync();
         return rawToken;
+    }
+
+    private async Task<byte[]> GetActiveConfirmationTokenHashAsync(string email) =>
+        await fixture.QueryDbAsync<UsersDbContext, byte[]>((db, ct) =>
+            ActiveConfirmationTokens(db, email)
+                .Select(t => t.TokenHash)
+                .SingleAsync(ct));
+
+    private static IQueryable<SingleUseToken> ActiveConfirmationTokens(UsersDbContext db, string email)
+    {
+        var userEmail = Email.Create(email).Value;
+        return db.SingleUseTokens
+            .Where(t => t.Purpose == TokenPurpose.EmailConfirmation && t.ConsumedAt == null)
+            .Where(t => db.Users.Any(u => u.Id == t.UserId && u.Email == userEmail));
     }
 }
