@@ -121,6 +121,15 @@ internal static class UsersErrors
     public static readonly Error TermsNotAccepted =
         Error.Validation("Users.Onboarding.TermsNotAccepted", "Terms of service must be accepted.");
 
+    public static readonly Error LegalDocumentsUnavailable =
+        Error.Validation("Users.Onboarding.LegalDocumentsUnavailable", "Required legal documents are not available.");
+
+    public static readonly Error RequiredLegalDocumentMissing =
+        Error.Validation("Users.Onboarding.RequiredLegalDocumentMissing", "All required legal documents must be accepted.");
+
+    public static readonly Error LegalDocumentAcceptanceInvalid =
+        Error.Validation("Users.Onboarding.LegalDocumentAcceptanceInvalid", "One or more accepted legal documents are stale or invalid.");
+
     // Two-factor authentication
     public static readonly Error TwoFactorRequired =
         Error.Unauthorized("Users.TwoFactor.Required", "Two-factor authentication is required to complete sign-in.");

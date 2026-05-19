@@ -32,29 +32,48 @@ public sealed class CompleteOnboardingHandler(
             return UsersErrors.UserNotFound;
         }
 
-        if (!cmd.AcceptTerms)
+        if (!cmd.AcceptTerms && cmd.AcceptedDocuments.Count == 0)
         {
             return UsersErrors.TermsNotAccepted;
         }
 
         var now = clock.UtcNow;
-        var termsKey = $"tos:{optionsValue.TermsOfServiceVersion}";
+        var requiredDocuments = await db.LegalDocuments
+            .Where(d => d.IsRequiredForOnboarding && d.SupersededAt == null)
+            .ToListAsync(ct);
 
-        var alreadyAccepted = await db.TermsAcceptances
-            .AnyAsync(t => t.UserId == user.Id && t.Version == termsKey, ct);
+        if (requiredDocuments.Count == 0)
+        {
+            return UsersErrors.LegalDocumentsUnavailable;
+        }
+
+        if (cmd.AcceptedDocuments.Count > 0)
+        {
+            var validationResult = ValidateAcceptedDocuments(requiredDocuments, cmd.AcceptedDocuments);
+            if (validationResult.IsError)
+            {
+                return validationResult.Errors;
+            }
+        }
 
         var trackerCleared = false;
-        if (!alreadyAccepted)
+        foreach (var document in requiredDocuments)
         {
-            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, termsKey, now, cmd.IpAddress, cmd.UserAgent));
-            try
+            var alreadyAccepted = await db.TermsAcceptances
+                .AnyAsync(t => t.UserId == user.Id && t.Version == $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}", ct);
+
+            if (!alreadyAccepted)
             {
-                await db.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
-            {
-                db.ChangeTracker.Clear();
-                trackerCleared = true;
+                db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, document, now, cmd.IpAddress, cmd.UserAgent));
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+                {
+                    db.ChangeTracker.Clear();
+                    trackerCleared = true;
+                }
             }
         }
 
@@ -75,7 +94,8 @@ public sealed class CompleteOnboardingHandler(
                 now,
                 cmd.IpAddress,
                 cmd.UserAgent,
-                optionsValue.PrivacyPolicyVersion));
+                requiredDocuments.FirstOrDefault(d => d.DocumentType == LegalDocumentType.PrivacyPolicy)?.Version
+                    ?? optionsValue.PrivacyPolicyVersion));
         }
 
         var wasAlreadyCompleted = user.HasCompletedOnboarding;
@@ -92,6 +112,31 @@ public sealed class CompleteOnboardingHandler(
         {
             await bus.PublishAsync(new UserOnboardingCompletedV1(user.Id.Value, Guid.NewGuid()));
             UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserOnboardingCompletedV1)));
+        }
+
+        return Result.Success;
+    }
+
+    private static ErrorOr<Success> ValidateAcceptedDocuments(
+        IReadOnlyCollection<LegalDocument> requiredDocuments,
+        IReadOnlyCollection<AcceptedLegalDocumentCommand> acceptedDocuments)
+    {
+        var acceptedById = acceptedDocuments
+            .GroupBy(d => d.DocumentId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var document in requiredDocuments)
+        {
+            if (!acceptedById.TryGetValue(document.Id.Value, out var accepted))
+            {
+                return UsersErrors.RequiredLegalDocumentMissing;
+            }
+
+            if (!string.Equals(accepted.Version, document.Version, StringComparison.Ordinal) ||
+                !string.Equals(accepted.ContentHash, document.ContentHash, StringComparison.Ordinal))
+            {
+                return UsersErrors.LegalDocumentAcceptanceInvalid;
+            }
         }
 
         return Result.Success;

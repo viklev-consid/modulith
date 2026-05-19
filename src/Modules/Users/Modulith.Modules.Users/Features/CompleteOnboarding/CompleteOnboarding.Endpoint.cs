@@ -34,7 +34,16 @@ internal static class CompleteOnboardingEndpoint
 
                 var ip = httpContext.Connection.RemoteIpAddress?.ToString();
                 var userAgent = httpContext.Request.Headers.UserAgent.ToString();
-                var command = new CompleteOnboardingCommand(userId, request.AcceptTerms, request.AcceptMarketingEmails, ip, userAgent);
+                var acceptedDocuments = request.AcceptedDocuments?
+                    .Select(d => new AcceptedLegalDocumentCommand(d.DocumentId, d.Version, d.ContentHash))
+                    .ToArray() ?? [];
+                var command = new CompleteOnboardingCommand(
+                    userId,
+                    request.AcceptTerms == true,
+                    request.AcceptMarketingEmails,
+                    acceptedDocuments,
+                    ip,
+                    userAgent);
                 var result = await bus.InvokeAsync<ErrorOr<Success>>(command, ct);
                 return result.ToProblemDetailsOr(_ => Results.NoContent());
             })
