@@ -8,6 +8,7 @@ internal static class UsersRoutes
     public const string Login = $"{Prefix}/login";
     public const string Me = $"{Prefix}/me";
     public const string Profile = $"{Me}/profile";
+    public const string CompleteOnboarding = $"{Me}/onboarding";
     public const string MyAvatar = $"{Me}/avatar";
     public const string UserAvatar = $"{Prefix}/{{userId:guid}}/avatar";
     public const string PersonalData = $"{Me}/personal-data";
@@ -34,11 +35,4 @@ internal static class UsersRoutes
     public const string ConfirmTotp = $"{TwoFactor}/totp/confirm";
     public const string RegenerateRecoveryCodes = $"{TwoFactor}/recovery-codes/regenerate";
 
-    // External login — Phase 14
-    public const string GoogleLogin = $"{Prefix}/auth/google/login";
-    public const string GoogleLoginConfirm = $"{Prefix}/auth/google/confirm";
-    public const string LinkGoogleLogin = $"{Me}/auth/google/link";
-    public const string UnlinkGoogleLogin = $"{Me}/auth/google/unlink";
-    public const string SetInitialPassword = $"{Me}/password/initial";
-    public const string CompleteOnboarding = $"{Me}/onboarding";
 }

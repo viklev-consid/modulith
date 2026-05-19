@@ -82,7 +82,7 @@ public static class NotificationsModule
 
     public static WolverineOptions AddNotificationsHandlers(this WolverineOptions opts)
     {
-        opts.Discovery.IncludeType<OnUserRegisteredHandler>();
+        opts.Discovery.IncludeType<OnUserEmailConfirmedHandler>();
         opts.Discovery.IncludeType<OnPasswordResetRequestedHandler>();
         opts.Discovery.IncludeType<OnPasswordResetHandler>();
         opts.Discovery.IncludeType<OnPasswordChangedHandler>();
@@ -90,10 +90,6 @@ public static class NotificationsModule
         opts.Discovery.IncludeType<OnEmailChangeRequestedHandler>();
         opts.Discovery.IncludeType<OnEmailChangedHandler>();
 
-        // External login notifications — Phase 14
-        opts.Discovery.IncludeType<OnExternalLoginPendingHandler>();
-        opts.Discovery.IncludeType<OnExternalLoginLinkedHandler>();
-        opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
         opts.Discovery.IncludeType<OnTwoFactorEnabledHandler>();
         opts.Discovery.IncludeType<OnTwoFactorDisabledHandler>();
         opts.Discovery.IncludeType<OnRecoveryCodesRegeneratedHandler>();

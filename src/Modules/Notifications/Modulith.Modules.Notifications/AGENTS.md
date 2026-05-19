@@ -2,7 +2,7 @@
 
 This module owns user notifications. It has two intentionally separate surfaces:
 
-- **Email notifications** for account/security/lifecycle communication such as password reset, password changed, email change, welcome, and external-login events.
+- **Email notifications** for account/security/lifecycle communication such as password reset, password changed, email change, and welcome events.
 - **Bell notifications** for product activity shown in-app, such as replies, mentions, assignments, follows, approvals, and workflow updates. SSE is only a live transport for bell updates; it is not a notification channel.
 
 Do not automatically mirror email notifications into bell notifications. Account/security notifications are email-only unless a product decision explicitly says otherwise.
@@ -30,7 +30,7 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 2. `DeliveryStatus` uses a four-state protocol (`Pending -> Sending -> Sent` or `Pending -> Sending -> Failed`) to prevent duplicate sends.
 3. `RetryableSmtpException` resets to `Pending` via `MarkReadyAsync`; `TerminalSmtpException` transitions to `Failed` via `MarkFailedAsync`.
 4. `IConsentRegistry` gates every notification type. Security notifications bypass consent because they are security-critical.
-5. Raw tokens from password reset, email change, and external-login events may be embedded in email links but must never be logged.
+5. Raw tokens from password reset and email change events may be embedded in email links but must never be logged.
 6. Bell notifications are idempotent by `IdempotencyKey`. If a duplicate insert fails, detach the added entity before returning the existing row.
 7. Bell endpoints are current-user scoped under `/v1/me/...`; do not add `/users/{id}/notifications` without an explicit admin use case.
 8. Retention is stored per bell notification in `RetentionUntil`; cleanup deletes rows whose retention has elapsed.
@@ -87,7 +87,7 @@ SSE clients must provide a stable per-tab `clientId` query parameter. Treat it a
 ## Known footguns
 
 - `SmtpEmailSender` is a real SMTP client. Integration tests must override `IEmailSender` with a fake.
-- Raw tokens arrive in `PasswordResetRequestedV1.RawToken`, `EmailChangeRequestedV1.RawToken`, and `ExternalLoginPendingV1.RawToken`. Embed them in email body links; never log them.
+- Raw tokens arrive in `PasswordResetRequestedV1.RawToken` and `EmailChangeRequestedV1.RawToken`. Embed them in email body links; never log them.
 - The `NotificationLog.IdempotencyKey` unique constraint makes duplicate detection race-safe. Catch `DbUpdateException.IsUniqueConstraintViolation()` rather than pre-checking with `AnyAsync`, then still fall through to `TryClaimAsync`.
 - Adding a subscriber for a new event requires registering the handler in `NotificationsModule.AddNotificationsHandlers`.
 - Adding a scheduled cleanup handler requires registering it in `AddNotificationsHandlers` and anchoring the TickerQ job in `AddNotificationsJobs`.

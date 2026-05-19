@@ -27,16 +27,6 @@ public sealed class FrontendUrlBuilderTests
     }
 
     [Fact]
-    public void ConfirmGoogleLogin_BuildsConfiguredUrl()
-    {
-        var builder = CreateBuilder("https://app.test");
-
-        var url = builder.ConfirmGoogleLogin("google-token");
-
-        Assert.Equal("https://app.test/auth/google/confirm?token=google-token", url);
-    }
-
-    [Fact]
     public void ResetPassword_BuildsConfiguredUrl()
     {
         var builder = CreateBuilder("https://app.test");
@@ -74,7 +64,6 @@ public sealed class FrontendUrlBuilderTests
             {
                 ConfirmEmail = "/confirm-email",
                 ConfirmEmailChange = "/confirm-email-change",
-                GoogleConfirm = "/auth/google/confirm",
                 ResetPassword = "/reset-password",
             },
         }));

@@ -1,4 +1,4 @@
-namespace Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
+namespace Modulith.Modules.Users.Features.CompleteOnboarding;
 
 public sealed record CompleteOnboardingCommand(
     Guid UserId,

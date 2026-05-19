@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
+namespace Modulith.Modules.Users.Features.CompleteOnboarding;
 
 internal sealed class CompleteOnboardingValidator : AbstractValidator<CompleteOnboardingRequest>
 {

@@ -22,11 +22,6 @@ public sealed class UsersOptions
     [Range(8, 128)]
     public int MinPasswordLength { get; init; } = 10;
 
-    public TimeSpan PendingExternalLoginLifetime { get; init; } = TimeSpan.FromMinutes(15);
-
-    [Range(1, 20)]
-    public int MaxPendingExternalLoginsPerEmail { get; init; } = 5;
-
     public TimeSpan TwoFactorChallengeLifetime { get; init; } = TimeSpan.FromMinutes(5);
 
     [Range(1, 20)]

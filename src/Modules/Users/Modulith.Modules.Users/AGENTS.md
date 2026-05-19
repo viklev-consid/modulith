@@ -1,6 +1,6 @@
 # AGENTS.md - Users Module
 
-This module owns the user identity lifecycle: registration, authentication, profile management, RBAC, GDPR user data handling, and Google external login. It does not use ASP.NET Identity; see ADR-0007.
+This module owns the user identity lifecycle: registration, username/password authentication, profile management, RBAC, and GDPR user data handling. It does not use ASP.NET Identity; see ADR-0007.
 
 For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 
@@ -15,8 +15,6 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 - **RefreshToken** - session entity. Stored hashed and rotated on each use.
 - **PendingEmailChange** - requested-but-unconfirmed new email plus token hash.
 - **Consent** - tracks user agreement to processing purposes.
-- **ExternalLogin** - links a `(Provider, Subject)` pair to a `User`; unique across all users.
-- **PendingExternalLogin** - pre-account record for the Google email loop. Token is random, hashed, single-use, and expires.
 - **TermsAcceptance** - immutable record of a legal document version accepted by a user.
 - **TwoFactorCredential** - optional per-user TOTP credential; the protected secret uses ASP.NET Core Data Protection.
 - **RecoveryCode** - hashed, single-use fallback code for 2FA login and disable flows.
@@ -31,7 +29,6 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 - Forgot password, reset password, change password.
 - Request and confirm email change.
 - Consent tracking, GDPR export, GDPR erasure.
-- Google login email loop, confirm, link, unlink, set initial password, complete onboarding.
 - Optional per-user TOTP two-factor authentication with recovery codes.
 
 ---
@@ -40,17 +37,13 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 
 1. Email addresses are unique across the `users` schema and stored lowercased.
 2. Passwords are BCrypt-hashed before the aggregate ever sees them. Plaintext passwords never enter the domain.
-3. Token values (`SingleUseToken`, `RefreshToken`, pending external login token, pending 2FA challenge token, recovery codes) are stored as SHA-256 hashes. Raw values exist only in HTTP responses to Notifications, email bodies, or one-time 2FA setup/regeneration responses.
-4. Enumeration is not possible through forgot-password, request-email-change, or Google login. Keep responses uniform.
+3. Token values (`SingleUseToken`, `RefreshToken`, pending 2FA challenge token, recovery codes) are stored as SHA-256 hashes. Raw values exist only in HTTP responses to Notifications, email bodies, or one-time 2FA setup/regeneration responses.
+4. Enumeration is not possible through forgot-password or request-email-change. Keep responses uniform.
 5. Security-sensitive events revoke refresh tokens: password reset revokes all; password change revokes all except the current session; email change confirmation revokes all.
 6. Refresh-token reuse triggers full chain revocation and forced re-login.
-7. External-only users have `PasswordHash = null` and `HasCompletedOnboarding = false` until dedicated slices fill them.
-8. `ExternalLogin` is unique per `(Provider, Subject)` globally and per `(User, Provider)` for each user.
-9. A password-less user cannot unlink their only external login.
-10. `CompleteOnboarding` is idempotent for the current terms-of-service version.
-11. Use `IClock`; never use `DateTime.UtcNow` in this module.
-12. TOTP secrets are protected with ASP.NET Core Data Protection; production deployments must persist and share the key ring.
-13. Pending 2FA challenges expire, have capped failed attempts, and use opaque lockout errors.
+7. Use `IClock`; never use `DateTime.UtcNow` in this module.
+8. TOTP secrets are protected with ASP.NET Core Data Protection; production deployments must persist and share the key ring.
+9. Pending 2FA challenges expire, have capped failed attempts, and use opaque lockout errors.
 
 ---
 
@@ -72,13 +65,12 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 - `IJwtGenerator` / `JwtGenerator` - issues access tokens.
 - `IRefreshTokenIssuer` - issues and rotates `RefreshToken` entities.
 - `ISingleUseTokenService` - creates and verifies single-use token primitives.
-- `IGoogleIdTokenVerifier` / `GoogleIdTokenVerifier` - verifies Google ID tokens against JWKS cached in `IMemoryCache`. Returns `ExternalAuthUnavailable` if JWKS fetch fails.
 - `ITotpService` / `TotpService` - generates TOTP secrets and verifies 6-digit codes against the current step plus a short previous-step grace period. Forward-step grace is intentionally not accepted; clients are expected to keep device time synced.
 - `ITotpSecretProtector` / `DataProtectionTotpSecretProtector` - protects TOTP secrets at rest.
 - `ITwoFactorChallengeIssuer` - issues pending login challenges.
 - `ITwoFactorRequirementEvaluator` - policy-ready hook for deciding whether local 2FA is required before token issuance.
 
-Wolverine handler discovery requires constructor-injected types and return types to be public-visible. Keep `IGoogleIdTokenVerifier` and `GoogleIdentity` public.
+Wolverine handler discovery requires constructor-injected types and return types to be public-visible.
 
 ---
 
@@ -87,8 +79,7 @@ Wolverine handler discovery requires constructor-injected types and return types
 Sensitive values, especially `JwtOptions.SigningKey`, live in user-secrets or a secret store, not config files. See [`../../../../CONFIG.md`](../../../../CONFIG.md).
 
 - Shared JWT options: `JwtOptions`, bound from `Jwt:`.
-- Google options: `GoogleAuthOptions`, bound from `Modules:Users:Google:`. `ClientId` is required. `JwksUri` defaults to Google's OAuth cert endpoint. `JwksCacheDuration` defaults to 60 minutes.
-- Users options: `UsersOptions`, bound from `Modules:Users:`. Includes access-token lifetime, refresh-token lifetime, session cap, password policy, token lifetimes, pending external-login lifetime, two-factor settings, and legal document versions.
+- Users options: `UsersOptions`, bound from `Modules:Users:`. Includes access-token lifetime, refresh-token lifetime, session cap, password policy, token lifetimes, two-factor settings, and legal document versions.
 - TOTP secrets are protected with ASP.NET Core Data Protection. Production deployments must persist and share the Data Protection key ring across API instances; losing the key ring makes existing TOTP secrets undecryptable.
 
 ---
@@ -97,25 +88,7 @@ Sensitive values, especially `JwtOptions.SigningKey`, live in user-secrets or a 
 
 Events are published from `Modulith.Modules.Users.Contracts/Events/`. Consumers live in other modules; Users does not know who subscribes.
 
-Important events include registration, login/logout, password reset/change, email change, erasure request, external login pending/linked/unlinked, external provisioning, onboarding completion, two-factor enabled/disabled, and recovery-code regeneration. Raw token events are for Notifications only and must never be logged.
-
----
-
-## Google login concurrency rules
-
-Do not modify `GoogleLoginHandler` fast path or `UnlinkGoogleLoginHandler` without preserving the `FOR UPDATE` lock and publish-before-commit order:
-
-1. `FOR UPDATE` lock.
-2. State mutation.
-3. `SaveChangesAsync`.
-4. `bus.PublishAsync`.
-5. Wolverine commits.
-
-Do not add explicit EF transactions inside these handlers; Wolverine transaction middleware already owns the transaction.
-
-Do not add `ExpiresAt > now` back to the Step 1 reuse check in `GoogleLoginHandler`. Expired but unconsumed rows still block the partial unique index and must be refreshed rather than skipped.
-
-Do not widen `LinkExternalLogin` duplicate checks back to `(provider, subject)`. The guard is intentionally provider-level so a user can have at most one Google account.
+Important events include registration, login/logout, password reset/change, email change, erasure request, onboarding completion, two-factor enabled/disabled, and recovery-code regeneration. Raw token events are for Notifications only and must never be logged.
 
 ---
 
@@ -128,7 +101,7 @@ Do not widen `LinkExternalLogin` duplicate checks back to `(provider, subject)`.
 - Do not return specific forgot-password, request-email-change, or invalid-token errors that create account or token-validity oracles.
 - Never log raw tokens, TOTP secrets, or recovery codes.
 - Compare hashes with `CryptographicOperations.FixedTimeEquals` for application-level equality checks.
-- `SweepExpiredTokensHandler` also sweeps pending external logins and pending 2FA challenges. Do not add a separate cleanup.
+- `SweepExpiredTokensHandler` also sweeps pending 2FA challenges. Do not add a separate cleanup.
 - Do not reveal the 2FA failed-attempt cap. Return invalid-code errors until the consumed challenge naturally becomes invalid/expired on the next request.
 - Do not remove `xmin` from `PendingTwoFactorChallenge`; failed-attempt counting is security-sensitive.
 
@@ -141,7 +114,7 @@ Do not implement these without an explicit request:
 - Email confirmation as an access gate.
 - Account lockout after failed logins.
 - Breach password checks.
-- Additional external identity providers beyond Google.
+- External identity providers.
 - Multi-tenancy or organization membership.
 - Admin user impersonation.
 

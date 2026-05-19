@@ -70,13 +70,11 @@ The API validates configuration at startup. For a fresh clone, set these values 
 
 ```bash
 dotnet user-secrets set "Jwt:SigningKey" "local-dev-signing-key-change-me-32chars-minimum" --project src/Api
-dotnet user-secrets set "Modules:Users:Google:ClientId" "local-dev-google-client-id" --project src/Api
 ```
 
 Notes:
 
 - `Jwt:SigningKey` must be at least 32 characters.
-- `Modules:Users:Google:ClientId` is required because the Google login verifier is configured at startup. Use a real Google OAuth client id only if you want to exercise Google login locally; otherwise a non-empty placeholder is enough to boot.
 - The default dev admin is configured in `src/Api/appsettings.Development.json`. Override it with user-secrets only if you want a different seeded admin:
 
 ```bash
@@ -109,7 +107,7 @@ Open the Aspire dashboard from the URL printed in the terminal. From there, use 
 http://localhost:5125/scalar/v1
 ```
 
-Mailpit is linked from the Aspire dashboard. Use it to inspect development emails such as password reset, email change, welcome, Google login confirmation, and 2FA security notifications.
+Mailpit is linked from the Aspire dashboard. Use it to inspect development emails such as password reset, email change, welcome, and 2FA security notifications.
 
 ### 4. Sign in with seeded users
 

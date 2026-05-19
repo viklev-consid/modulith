@@ -58,34 +58,10 @@ public sealed class SweepExpiredTokensTests(UsersApiFixture fixture) : IAsyncLif
             Email.Create("new@example.test").Value,
             expiredSingleUseToken.Id);
 
-        var (expiredPendingExternalLogin, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google,
-            "expired-subject",
-            "expired@example.test",
-            "Expired",
-            null,
-            isExistingUser: false,
-            createdFromIp: null,
-            userAgent: null,
-            TimeSpan.FromDays(1),
-            oldClock);
-        var (freshPendingExternalLogin, _) = PendingExternalLogin.Create(
-            ExternalLoginProvider.Google,
-            "fresh-subject",
-            "fresh@example.test",
-            "Fresh",
-            null,
-            isExistingUser: false,
-            createdFromIp: null,
-            userAgent: null,
-            TimeSpan.FromDays(30),
-            freshClock);
-
         db.Users.Add(user);
         db.RefreshTokens.AddRange(expiredRefreshToken, freshRefreshToken);
         db.SingleUseTokens.AddRange(expiredSingleUseToken, freshSingleUseToken);
         db.PendingEmailChanges.Add(pendingEmail);
-        db.PendingExternalLogins.AddRange(expiredPendingExternalLogin, freshPendingExternalLogin);
         await db.SaveChangesAsync();
 
         var bus = fixture.ApplicationHost.Services.GetRequiredService<IMessageBus>();
@@ -99,8 +75,6 @@ public sealed class SweepExpiredTokensTests(UsersApiFixture fixture) : IAsyncLif
         Assert.DoesNotContain(await assertDb.SingleUseTokens.ToListAsync(), t => t.Id == expiredSingleUseToken.Id);
         Assert.Contains(await assertDb.SingleUseTokens.ToListAsync(), t => t.Id == freshSingleUseToken.Id);
         Assert.Empty(await assertDb.PendingEmailChanges.ToListAsync());
-        Assert.DoesNotContain(await assertDb.PendingExternalLogins.ToListAsync(), p => p.Id == expiredPendingExternalLogin.Id);
-        Assert.Contains(await assertDb.PendingExternalLogins.ToListAsync(), p => p.Id == freshPendingExternalLogin.Id);
     }
 
     private sealed class FixedClock(DateTimeOffset utcNow) : IClock

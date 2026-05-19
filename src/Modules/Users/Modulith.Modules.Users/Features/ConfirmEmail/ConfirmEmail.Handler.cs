@@ -1,17 +1,20 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
 using Modulith.Shared.Kernel.Interfaces;
+using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ConfirmEmail;
 
 public sealed class ConfirmEmailHandler(
     UsersDbContext db,
     ISingleUseTokenService tokenService,
-    IClock clock)
+    IClock clock,
+    IMessageBus bus)
 {
     public async Task<ErrorOr<ConfirmEmailResponse>> Handle(ConfirmEmailCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(ConfirmEmailHandler), () => HandleCoreAsync(cmd, ct));
@@ -36,9 +39,15 @@ public sealed class ConfirmEmailHandler(
             return consumeResult.Errors;
         }
 
-        user.ConfirmEmail(clock);
+        var confirmed = user.ConfirmEmail(clock);
 
         await db.SaveChangesAsync(ct);
+
+        if (confirmed)
+        {
+            await bus.PublishAsync(new UserEmailConfirmedV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
+            UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserEmailConfirmedV1)));
+        }
 
         return new ConfirmEmailResponse();
     }

@@ -11,9 +11,7 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
     public async Task<PersonalDataExport> ExportAsync(UserRef user, CancellationToken ct)
     {
         var userId = new UserId(user.UserId);
-        var dbUser = await db.Users
-            .Include(u => u.ExternalLogins)
-            .FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var dbUser = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
 
         if (dbUser is null)
         {
@@ -53,11 +51,7 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
                 }
                 : null,
             ["role"] = dbUser.Role.Name,
-            ["hasPassword"] = dbUser.PasswordHash is not null,
             ["hasCompletedOnboarding"] = dbUser.HasCompletedOnboarding,
-            ["linkedLogins"] = dbUser.ExternalLogins
-                .Select(e => new { provider = e.Provider.ToString(), providerEmail = e.ProviderEmail, subject = e.Subject, linkedAt = e.LinkedAt })
-                .ToList(),
             ["createdAt"] = dbUser.CreatedAt,
             ["updatedAt"] = dbUser.UpdatedAt,
             ["consents"] = consents,

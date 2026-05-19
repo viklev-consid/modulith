@@ -45,9 +45,6 @@ public abstract class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLif
         builder.UseSetting("Frontend:BaseUrl", "https://app.test");
         builder.UseSetting("Cors:AllowedOrigins:0", "https://app.test");
 
-        // Satisfies GoogleAuthOptions [Required] validation so all tests can start.
-        builder.UseSetting("Modules:Users:Google:ClientId", "test-google-client-id");
-
         builder.ConfigureServices(services =>
         {
             // Cap host shutdown so Wolverine's DurabilityAgent (which retries against the

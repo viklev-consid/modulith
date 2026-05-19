@@ -10,7 +10,7 @@ using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
-namespace Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
+namespace Modulith.Modules.Users.Features.CompleteOnboarding;
 
 public sealed class CompleteOnboardingHandler(
     UsersDbContext db,
@@ -23,7 +23,7 @@ public sealed class CompleteOnboardingHandler(
 
     private async Task<ErrorOr<Success>> HandleCoreAsync(CompleteOnboardingCommand cmd, CancellationToken ct)
     {
-        var opts = options.Value;
+        var optionsValue = options.Value;
         var userId = new UserId(cmd.UserId);
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
@@ -38,35 +38,26 @@ public sealed class CompleteOnboardingHandler(
         }
 
         var now = clock.UtcNow;
-        var tosKey = $"tos:{opts.TermsOfServiceVersion}";
+        var termsKey = $"tos:{optionsValue.TermsOfServiceVersion}";
 
-        // Step 1: Save the ToS acceptance in isolation so that a concurrent unique-key
-        // collision on (user_id, version) cannot roll back the consent or onboarding
-        // writes that follow.
         var alreadyAccepted = await db.TermsAcceptances
-            .AnyAsync(t => t.UserId == user.Id && t.Version == tosKey, ct);
+            .AnyAsync(t => t.UserId == user.Id && t.Version == termsKey, ct);
 
         var trackerCleared = false;
         if (!alreadyAccepted)
         {
-            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, tosKey, now, cmd.IpAddress, cmd.UserAgent));
+            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, termsKey, now, cmd.IpAddress, cmd.UserAgent));
             try
             {
                 await db.SaveChangesAsync(ct);
             }
             catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
             {
-                // A concurrent request won the race on terms_acceptances (user_id, version).
-                // The row is present — clear the poisoned tracked entity and continue so
-                // that the consent and onboarding writes below are not discarded.
                 db.ChangeTracker.Clear();
                 trackerCleared = true;
             }
         }
 
-        // Step 2: If the tracker was cleared above, re-fetch the user so EF can
-        // track the HasCompletedOnboarding mutation. The concurrent winner may have
-        // already completed onboarding; CompleteOnboarding() is idempotent.
         if (trackerCleared)
         {
             user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
@@ -78,7 +69,13 @@ public sealed class CompleteOnboardingHandler(
 
         if (cmd.AcceptMarketingEmails)
         {
-            db.Consents.Add(Consent.Grant(user.Id.Value, ConsentKeys.MarketingEmail, now, cmd.IpAddress, cmd.UserAgent, opts.PrivacyPolicyVersion));
+            db.Consents.Add(Consent.Grant(
+                user.Id.Value,
+                ConsentKeys.MarketingEmail,
+                now,
+                cmd.IpAddress,
+                cmd.UserAgent,
+                optionsValue.PrivacyPolicyVersion));
         }
 
         var wasAlreadyCompleted = user.HasCompletedOnboarding;

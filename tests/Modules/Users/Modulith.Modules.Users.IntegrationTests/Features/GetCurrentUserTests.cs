@@ -1,15 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.Register;
-using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Features.TwoFactor.ConfirmTotp;
 using Modulith.Modules.Users.Features.TwoFactor.SetupTotp;
 using Modulith.Modules.Users.IntegrationTests.Support;
-using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
@@ -41,43 +36,6 @@ public sealed class GetCurrentUserTests(UsersApiFixture fixture) : IAsyncLifetim
         Assert.Equal("alice@example.com", body.Email);
         Assert.Equal("Alice", body.DisplayName);
         Assert.False(body.TwoFactorEnabled);
-    }
-
-    [Fact]
-    public async Task GetCurrentUser_WhenExternalLoginLinked_ReturnsLinkedAccountProviderEmail()
-    {
-        var registerResponse = await (await anonymous.PostAsJsonAsync("/v1/users/register",
-            new RegisterRequest("local@example.com", "Password1!", "Local User")))
-            .Content.ReadFromJsonAsync<RegisterResponse>();
-
-        using (var scope = fixture.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
-            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
-            var userId = new UserId(registerResponse!.UserId);
-            var user = await db.Users
-                .Include(u => u.ExternalLogins)
-                .FirstAsync(u => u.Id == userId);
-            var linkResult = user.LinkExternalLogin(
-                ExternalLoginProvider.Google,
-                "sub-current-user",
-                "linked-google@example.com",
-                clock.UtcNow);
-            Assert.False(linkResult.IsError);
-            await db.SaveChangesAsync();
-        }
-
-        var client = fixture.CreateAuthenticatedClient(
-            registerResponse!.UserId, "local@example.com", "Local User");
-
-        var response = await client.GetAsync("/v1/users/me");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<GetCurrentUserResponse>();
-        Assert.NotNull(body);
-        var linkedAccount = Assert.Single(body.LinkedAccounts);
-        Assert.Equal("Google", linkedAccount.Provider);
-        Assert.Equal("linked-google@example.com", linkedAccount.ProviderEmail);
     }
 
     [Fact]

@@ -6,8 +6,8 @@ namespace Modulith.Api.Infrastructure.DeadLetters;
 /// <summary>
 /// Redacted projection of a Wolverine <see cref="DeadLetterEnvelope"/>.
 /// The message body (<c>Envelope</c> and <c>Message</c> on the source type) is intentionally
-/// excluded because integration events such as <c>PasswordResetRequestedV1</c>,
-/// <c>EmailChangeRequestedV1</c>, and <c>ExternalLoginPendingV1</c> carry single-use
+/// excluded because integration events such as <c>PasswordResetRequestedV1</c>
+/// and <c>EmailChangeRequestedV1</c> carry single-use
 /// security tokens. Exposing the raw payload to any admin who can call this API would
 /// allow token theft without touching the Users module.
 /// </summary>

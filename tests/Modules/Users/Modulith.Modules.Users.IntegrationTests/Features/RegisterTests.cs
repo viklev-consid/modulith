@@ -29,14 +29,16 @@ public sealed class RegisterTests(UsersApiFixture fixture) : IAsyncLifetime
         Assert.NotEqual(Guid.Empty, body.UserId);
         Assert.Contains("confirm", body.Message, StringComparison.OrdinalIgnoreCase);
 
-        var state = await fixture.QueryDbAsync<UsersDbContext, (bool Confirmed, int ConfirmationTokens)>((db, ct) =>
+        var state = await fixture.QueryDbAsync<UsersDbContext, (bool Confirmed, bool HasCompletedOnboarding, int ConfirmationTokens)>((db, ct) =>
             db.Users
                 .Where(u => u.Id == new UserId(body.UserId))
-                .Select(u => new ValueTuple<bool, int>(
+                .Select(u => new ValueTuple<bool, bool, int>(
                     u.IsEmailConfirmed,
+                    u.HasCompletedOnboarding,
                     db.SingleUseTokens.Count(t => t.UserId == u.Id && t.Purpose == TokenPurpose.EmailConfirmation)))
                 .SingleAsync(ct));
         Assert.False(state.Confirmed);
+        Assert.False(state.HasCompletedOnboarding);
         Assert.Equal(1, state.ConfirmationTokens);
     }
 

@@ -19,13 +19,6 @@ public sealed class FrontendUrlBuilder(IOptions<FrontendOptions> options) : IFro
             ["token"] = token,
         });
 
-    public string ConfirmGoogleLogin(string token) =>
-        Build(options.Value.Paths.GoogleConfirm, new Dictionary<string, string?>
-        (StringComparer.Ordinal)
-        {
-            ["token"] = token,
-        });
-
     public string ResetPassword(string token) =>
         Build(options.Value.Paths.ResetPassword, new Dictionary<string, string?>
         (StringComparer.Ordinal)

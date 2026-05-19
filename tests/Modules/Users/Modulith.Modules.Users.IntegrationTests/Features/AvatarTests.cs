@@ -16,9 +16,9 @@ using Wolverine.Tracking;
 
 namespace Modulith.Modules.Users.IntegrationTests.Features;
 
-[Collection("GoogleUsersModule")]
+[Collection("UsersGdpr")]
 [Trait("Category", "Integration")]
-public sealed class AvatarTests(GoogleUsersApiFixture fixture) : IAsyncLifetime
+public sealed class AvatarTests(GdprApiFixture fixture) : IAsyncLifetime
 {
     private readonly HttpClient anonymous = fixture.CreateAnonymousClient();
 

@@ -65,11 +65,7 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnUserAvatarUpdatedHandler>();
         opts.Discovery.IncludeType<OnUserAvatarRemovedHandler>();
 
-        // External login audit subscribers — Phase 14
-        opts.Discovery.IncludeType<OnExternalLoginLinkedHandler>();
-        opts.Discovery.IncludeType<OnExternalLoginUnlinkedHandler>();
         opts.Discovery.IncludeType<OnUserOnboardingCompletedHandler>();
-        opts.Discovery.IncludeType<OnUserProvisionedFromExternalHandler>();
         opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         opts.Discovery.IncludeType<OnRefreshTokenReuseDetectedHandler>();
         opts.Discovery.IncludeType<OnTwoFactorEnabledHandler>();
