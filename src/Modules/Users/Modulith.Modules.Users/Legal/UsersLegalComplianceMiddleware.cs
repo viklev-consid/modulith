@@ -1,8 +1,9 @@
-using System.Security.Claims;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
+using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.Legal;
 
@@ -11,9 +12,10 @@ internal static class UsersLegalComplianceMiddleware
     public static IApplicationBuilder UseUsersLegalCompliance(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {
+            var currentUser = context.RequestServices.GetRequiredService<ICurrentUser>();
             if (ShouldSkip(context) ||
-                context.User.Identity?.IsAuthenticated != true ||
-                !Guid.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                !currentUser.IsAuthenticated ||
+                !Guid.TryParse(currentUser.Id, out var userId))
             {
                 await next(context);
                 return;
@@ -28,12 +30,25 @@ internal static class UsersLegalComplianceMiddleware
                 return;
             }
 
-            context.Response.StatusCode = StatusCodes.Status428PreconditionRequired;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                code = "Users.LegalAcceptance.Required",
-                detail = "Updated legal terms must be accepted before continuing.",
-            }, context.RequestAborted);
+            var result = Results.Problem(
+                type: "https://developer.mozilla.org/docs/Web/HTTP/Status/428",
+                title: "Legal acceptance required",
+                detail: "Updated legal terms must be accepted before continuing.",
+                statusCode: StatusCodes.Status428PreconditionRequired,
+                extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["errorCode"] = "Users.LegalAcceptance.Required",
+                    ["traceId"] = Activity.Current?.TraceId.ToString(),
+                    ["missingDocuments"] = compliance.MissingDocuments.Select(document => new
+                    {
+                        documentId = document.Id.Value,
+                        type = LegalDocumentMapper.ToWireType(document.DocumentType),
+                        document.Version,
+                        document.ContentHash,
+                    }).ToArray(),
+                });
+
+            await result.ExecuteAsync(context);
         });
 
     private static bool ShouldSkip(HttpContext context)
@@ -41,12 +56,7 @@ internal static class UsersLegalComplianceMiddleware
         var path = context.Request.Path;
         var method = context.Request.Method;
 
-        if (!path.StartsWithSegments(UsersRoutes.Me, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (HttpMethods.IsGet(method) && string.Equals(path.Value, UsersRoutes.Me, StringComparison.OrdinalIgnoreCase))
+        if (!path.StartsWithSegments("/v1", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -55,6 +65,9 @@ internal static class UsersLegalComplianceMiddleware
             path.StartsWithSegments(UsersRoutes.LegalAcceptances, StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments(UsersRoutes.OnboardingLegalRequirements, StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments(UsersRoutes.CompleteOnboarding, StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWithSegments(UsersRoutes.Logout, StringComparison.OrdinalIgnoreCase);
+            path.StartsWithSegments(UsersRoutes.Logout, StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWithSegments(UsersRoutes.PersonalData, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(path.Value, UsersRoutes.Me, StringComparison.OrdinalIgnoreCase) &&
+                HttpMethods.IsDelete(method);
     }
 }

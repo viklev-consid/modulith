@@ -16,8 +16,6 @@ public static class LegalDocumentMapper
         blockingLevel switch
         {
             LegalDocumentBlockingLevel.None => "none",
-            LegalDocumentBlockingLevel.PromptOnly => "promptOnly",
-            LegalDocumentBlockingLevel.BlockSensitiveActions => "blockSensitiveActions",
             LegalDocumentBlockingLevel.BlockAllAuthenticatedUse => "blockAllAuthenticatedUse",
             _ => throw new ArgumentOutOfRangeException(nameof(blockingLevel), blockingLevel, "Unknown legal document blocking level."),
         };

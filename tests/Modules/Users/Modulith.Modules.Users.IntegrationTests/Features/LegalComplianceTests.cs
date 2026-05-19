@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.GetLegalCompliance;
@@ -107,7 +109,86 @@ public sealed class LegalComplianceTests(UsersApiFixture fixture) : IAsyncLifeti
         var compliance = await auth.GetAsync("/v1/users/me/legal-compliance");
 
         Assert.Equal((HttpStatusCode)428, blocked.StatusCode);
+        var problem = await blocked.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Equal(428, problem.Status);
+        Assert.Equal("Legal acceptance required", problem.Title);
+        Assert.True(problem.Extensions.ContainsKey("traceId"));
+        var missingDocuments = Assert.IsType<JsonElement>(problem.Extensions["missingDocuments"]);
+        Assert.Equal(JsonValueKind.Array, missingDocuments.ValueKind);
+        Assert.Equal(1, missingDocuments.GetArrayLength());
         Assert.Equal(HttpStatusCode.OK, compliance.StatusCode);
+    }
+
+    [Fact]
+    public async Task LegalComplianceMiddleware_WhenBlockingDocumentIsMissing_AllowsLegalAcceptance()
+    {
+        var document = await SeedLegalDocumentAsync("1.1", isRequiredForContinuedUse: true);
+        var (userId, email, displayName) = await SeedUserAsync("legal-blocked-accept@example.com", "Legal Blocked Accept");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/legal-acceptances",
+            new
+            {
+                acceptedDocuments = new[]
+                {
+                    new { documentId = document.Id, document.Version, document.ContentHash },
+                },
+            });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LegalComplianceMiddleware_WhenBlockingDocumentIsMissing_AllowsLogout()
+    {
+        await SeedLegalDocumentAsync("1.1", isRequiredForContinuedUse: true);
+        var (userId, email, displayName) = await SeedUserAsync("legal-blocked-logout@example.com", "Legal Blocked Logout");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/logout", new { refreshToken = "not-a-real-refresh-token" });
+
+        Assert.NotEqual((HttpStatusCode)428, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LegalComplianceMiddleware_WhenBlockingDocumentIsMissing_AllowsPersonalDataExport()
+    {
+        await SeedLegalDocumentAsync("1.1", isRequiredForContinuedUse: true);
+        var (userId, email, displayName) = await SeedUserAsync("legal-blocked-export@example.com", "Legal Blocked Export");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+
+        var response = await auth.GetAsync("/v1/users/me/personal-data");
+
+        Assert.NotEqual((HttpStatusCode)428, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LegalComplianceMiddleware_WhenBlockingDocumentIsMissing_AllowsAccountDeletion()
+    {
+        await SeedLegalDocumentAsync("1.1", isRequiredForContinuedUse: true);
+        var (userId, email, displayName) = await SeedUserAsync("legal-blocked-delete@example.com", "Legal Blocked Delete");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+
+        var response = await auth.DeleteAsync("/v1/users/me");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LegalComplianceMiddleware_WhenBlockingDocumentIsMissing_BlocksCrossModuleActions()
+    {
+        await SeedLegalDocumentAsync("1.1", isRequiredForContinuedUse: true);
+        var (userId, email, displayName) = await SeedUserAsync("legal-blocked-catalog@example.com", "Legal Blocked Catalog");
+        var auth = fixture.CreateAuthenticatedClientBuilder()
+            .WithUser(userId, email, displayName)
+            .WithClaim("permission", "catalog.products.write")
+            .Build();
+
+        var response = await auth.PostAsJsonAsync("/v1/catalog/products",
+            new { sku = "LEGAL-GATE-1", name = "Blocked Product", price = 12.50m, currency = "USD" });
+
+        Assert.Equal((HttpStatusCode)428, response.StatusCode);
     }
 
     private async Task<SeededLegalDocument> SeedLegalDocumentAsync(string version, bool isRequiredForContinuedUse)
