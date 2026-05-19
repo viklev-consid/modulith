@@ -10,6 +10,8 @@ internal static class UsersRoutes
     public const string Profile = $"{Me}/profile";
     public const string CompleteOnboarding = $"{Me}/onboarding";
     public const string OnboardingLegalRequirements = $"{Me}/onboarding/legal-requirements";
+    public const string LegalCompliance = $"{Me}/legal-compliance";
+    public const string LegalAcceptances = $"{Me}/legal-acceptances";
     public const string MyAvatar = $"{Me}/avatar";
     public const string UserAvatar = $"{Prefix}/{{userId:guid}}/avatar";
     public const string PersonalData = $"{Me}/personal-data";

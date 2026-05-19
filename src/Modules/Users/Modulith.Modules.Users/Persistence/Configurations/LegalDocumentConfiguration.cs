@@ -38,8 +38,15 @@ internal sealed class LegalDocumentConfiguration : IEntityTypeConfiguration<Lega
         builder.Property(d => d.PublishedAt).IsRequired();
         builder.Property(d => d.SupersededAt);
         builder.Property(d => d.IsRequiredForOnboarding).IsRequired();
+        builder.Property(d => d.IsRequiredForContinuedUse).IsRequired();
+        builder.Property(d => d.ContinuedUseRequiredAt);
+        builder.Property(d => d.BlockingLevel)
+            .HasConversion(l => l.ToString(), value => Enum.Parse<LegalDocumentBlockingLevel>(value))
+            .HasMaxLength(50)
+            .IsRequired();
 
         builder.HasIndex(d => new { d.DocumentType, d.Version }).IsUnique();
         builder.HasIndex(d => new { d.DocumentType, d.IsRequiredForOnboarding, d.SupersededAt });
+        builder.HasIndex(d => new { d.IsRequiredForContinuedUse, d.ContinuedUseRequiredAt, d.SupersededAt });
     }
 }

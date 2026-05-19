@@ -1,6 +1,6 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
-using Modulith.Modules.Users.Domain;
+using Modulith.Modules.Users.Legal;
 using Modulith.Modules.Users.Persistence;
 
 namespace Modulith.Modules.Users.Features.GetOnboardingLegalRequirements;
@@ -20,7 +20,7 @@ public sealed class GetOnboardingLegalRequirementsHandler(UsersDbContext db)
             .OrderBy(d => d.DocumentType)
             .Select(d => new OnboardingLegalDocumentResponse(
                 d.Id.Value,
-                ToWireType(d.DocumentType),
+                LegalDocumentMapper.ToWireType(d.DocumentType),
                 d.Title,
                 d.Version,
                 d.EffectiveAt,
@@ -30,12 +30,4 @@ public sealed class GetOnboardingLegalRequirementsHandler(UsersDbContext db)
 
         return new GetOnboardingLegalRequirementsResponse(documents);
     }
-
-    private static string ToWireType(LegalDocumentType documentType) =>
-        documentType switch
-        {
-            LegalDocumentType.TermsOfService => "termsOfService",
-            LegalDocumentType.PrivacyPolicy => "privacyPolicy",
-            _ => throw new ArgumentOutOfRangeException(nameof(documentType), documentType, "Unknown legal document type."),
-        };
 }

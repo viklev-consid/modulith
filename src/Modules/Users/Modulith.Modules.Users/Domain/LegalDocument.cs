@@ -13,7 +13,10 @@ public sealed class LegalDocument : Entity<LegalDocumentId>
         string contentHash,
         DateTimeOffset effectiveAt,
         DateTimeOffset publishedAt,
-        bool isRequiredForOnboarding) : base(id)
+        bool isRequiredForOnboarding,
+        bool isRequiredForContinuedUse,
+        DateTimeOffset? continuedUseRequiredAt,
+        LegalDocumentBlockingLevel blockingLevel) : base(id)
     {
         DocumentType = documentType;
         Version = version;
@@ -23,6 +26,9 @@ public sealed class LegalDocument : Entity<LegalDocumentId>
         EffectiveAt = effectiveAt;
         PublishedAt = publishedAt;
         IsRequiredForOnboarding = isRequiredForOnboarding;
+        IsRequiredForContinuedUse = isRequiredForContinuedUse;
+        ContinuedUseRequiredAt = continuedUseRequiredAt;
+        BlockingLevel = blockingLevel;
     }
 
     // Required by EF Core for materialization.
@@ -37,6 +43,9 @@ public sealed class LegalDocument : Entity<LegalDocumentId>
     public DateTimeOffset PublishedAt { get; private set; }
     public DateTimeOffset? SupersededAt { get; private set; }
     public bool IsRequiredForOnboarding { get; private set; }
+    public bool IsRequiredForContinuedUse { get; private set; }
+    public DateTimeOffset? ContinuedUseRequiredAt { get; private set; }
+    public LegalDocumentBlockingLevel BlockingLevel { get; private set; }
 
     public static LegalDocument Publish(
         LegalDocumentType documentType,
@@ -46,7 +55,10 @@ public sealed class LegalDocument : Entity<LegalDocumentId>
         string contentHash,
         DateTimeOffset effectiveAt,
         DateTimeOffset publishedAt,
-        bool isRequiredForOnboarding)
+        bool isRequiredForOnboarding,
+        bool isRequiredForContinuedUse = false,
+        DateTimeOffset? continuedUseRequiredAt = null,
+        LegalDocumentBlockingLevel blockingLevel = LegalDocumentBlockingLevel.None)
         => new(
             LegalDocumentId.New(),
             documentType,
@@ -56,7 +68,10 @@ public sealed class LegalDocument : Entity<LegalDocumentId>
             contentHash,
             effectiveAt,
             publishedAt,
-            isRequiredForOnboarding);
+            isRequiredForOnboarding,
+            isRequiredForContinuedUse,
+            continuedUseRequiredAt,
+            blockingLevel);
 
     public void Supersede(DateTimeOffset supersededAt)
     {
