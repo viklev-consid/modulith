@@ -171,9 +171,7 @@ public sealed class ChangeUserRoleTests(UsersApiFixture fixture) : IAsyncLifetim
         Assert.Equal(target.UserId, body.UserId);
         Assert.Equal("target@example.com", body.Email);
         Assert.Equal("user", body.Role);
-        Assert.True(body.HasPassword);
-        Assert.True(body.HasCompletedOnboarding);
-        Assert.Empty(body.LinkedProviders);
+        Assert.False(body.HasCompletedOnboarding);
     }
 
     [Fact]

@@ -8,15 +8,9 @@ public sealed record GetCurrentUserResponse(
     string Role,
     IReadOnlyCollection<string> Permissions,
     string PermissionsVersion,
-    bool HasPassword,
     bool HasCompletedOnboarding,
     bool TwoFactorEnabled,
-    CurrentUserAvatarResponse? Avatar,
-    IReadOnlyCollection<LinkedAccountResponse> LinkedAccounts);
-
-public sealed record LinkedAccountResponse(
-    string Provider,
-    string ProviderEmail);
+    CurrentUserAvatarResponse? Avatar);
 
 public sealed record CurrentUserAvatarResponse(
     string Url,

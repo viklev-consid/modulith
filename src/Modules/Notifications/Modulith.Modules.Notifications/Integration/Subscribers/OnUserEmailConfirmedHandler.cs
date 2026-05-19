@@ -7,23 +7,22 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
-
 using Wolverine.Attributes;
 
 namespace Modulith.Modules.Notifications.Integration.Subscribers;
 
 [NonTransactional]
-public sealed class OnUserRegisteredHandler(
+public sealed class OnUserEmailConfirmedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IConsentRegistry consentRegistry,
     IClock clock,
     NotificationSendGuard sendGuard)
 {
-    public async Task Handle(UserRegisteredV1 @event, CancellationToken ct)
+    public async Task Handle(UserEmailConfirmedV1 @event, CancellationToken ct)
     {
-        using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnUserRegisteredHandler));
-        NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
+        using var activity = NotificationsTelemetry.ActivitySource.StartActivity(nameof(OnUserEmailConfirmedHandler));
+        NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(UserEmailConfirmedV1)));
 
         if (!await consentRegistry.HasConsentedAsync(@event.UserId, ConsentKeys.WelcomeEmail, ct))
         {
@@ -73,6 +72,7 @@ public sealed class OnUserRegisteredHandler(
             await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
             throw;
         }
+
         await sendGuard.MarkSentAsync(@event.EventId, leaseToken, ct);
     }
 }

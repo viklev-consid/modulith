@@ -10,18 +10,13 @@ using Modulith.Modules.Users.ConsentManagement;
 using Modulith.Modules.Users.Contracts.Authorization;
 using Modulith.Modules.Users.Features.ChangePassword;
 using Modulith.Modules.Users.Features.ChangeUserRole;
+using Modulith.Modules.Users.Features.CompleteOnboarding;
 using Modulith.Modules.Users.Features.ConfirmEmail;
 using Modulith.Modules.Users.Features.ConfirmEmailChange;
 using Modulith.Modules.Users.Features.CreateInvitation;
 using Modulith.Modules.Users.Features.DeleteAccount;
 using Modulith.Modules.Users.Features.DeleteAvatar;
 using Modulith.Modules.Users.Features.ExportPersonalData;
-using Modulith.Modules.Users.Features.ExternalLogin.CompleteOnboarding;
-using Modulith.Modules.Users.Features.ExternalLogin.Google.Confirm;
-using Modulith.Modules.Users.Features.ExternalLogin.Google.Link;
-using Modulith.Modules.Users.Features.ExternalLogin.Google.Login;
-using Modulith.Modules.Users.Features.ExternalLogin.Google.Unlink;
-using Modulith.Modules.Users.Features.ExternalLogin.SetInitialPassword;
 using Modulith.Modules.Users.Features.ForgotPassword;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.GetUserAvatar;
@@ -82,11 +77,6 @@ public static class UsersModule
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddOptions<GoogleAuthOptions>()
-            .Bind(configuration.GetSection("Modules:Users:Google"))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
         services.AddHttpContextAccessor();
         services.AddPermissions(UsersPermissions.All);
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -102,7 +92,6 @@ public static class UsersModule
         });
 
         services.AddMemoryCache();
-        services.AddHttpClient<IGoogleIdTokenVerifier, GoogleIdTokenVerifier>();
 
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtGenerator, JwtGenerator>();
@@ -115,14 +104,6 @@ public static class UsersModule
         services.AddScoped<ITwoFactorChallengeIssuer, TwoFactorChallengeIssuer>();
         services.AddScoped<IAvatarImageInspector, MagickAvatarImageInspector>();
         services.AddScoped<IUserAvatarStorage, UserAvatarStorage>();
-        services.AddHttpClient<IGoogleAvatarImporter, GoogleAvatarImporter>(client =>
-            {
-                client.Timeout = AvatarConstants.GoogleImportTimeout;
-            })
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-            {
-                AllowAutoRedirect = false,
-            });
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
@@ -162,6 +143,7 @@ public static class UsersModule
         opts.Discovery.IncludeType<LoginHandler>();
         opts.Discovery.IncludeType<LoginTwoFactorHandler>();
         opts.Discovery.IncludeType<GetCurrentUserHandler>();
+        opts.Discovery.IncludeType<CompleteOnboardingHandler>();
         opts.Discovery.IncludeType<UpdateProfileHandler>();
         opts.Discovery.IncludeType<UpdateAvatarHandler>();
         opts.Discovery.IncludeType<DeleteAvatarHandler>();
@@ -190,14 +172,6 @@ public static class UsersModule
         opts.Discovery.IncludeType<CreateInvitationHandler>();
         opts.Discovery.IncludeType<RevokeInvitationHandler>();
 
-        // External login handlers — Phase 14
-        opts.Discovery.IncludeType<GoogleLoginHandler>();
-        opts.Discovery.IncludeType<GoogleLoginConfirmHandler>();
-        opts.Discovery.IncludeType<LinkGoogleLoginHandler>();
-        opts.Discovery.IncludeType<UnlinkGoogleLoginHandler>();
-        opts.Discovery.IncludeType<SetInitialPasswordHandler>();
-        opts.Discovery.IncludeType<CompleteOnboardingHandler>();
-
         // Two-factor authentication
         opts.Discovery.IncludeType<SetupTotpHandler>();
         opts.Discovery.IncludeType<ConfirmTotpHandler>();
@@ -222,6 +196,7 @@ public static class UsersModule
         LoginEndpoint.Map(app);
         LoginTwoFactorEndpoint.Map(app);
         GetCurrentUserEndpoint.Map(app);
+        CompleteOnboardingEndpoint.Map(app);
         UpdateProfileEndpoint.Map(app);
         UpdateAvatarEndpoint.Map(app);
         DeleteAvatarEndpoint.Map(app);
@@ -248,14 +223,6 @@ public static class UsersModule
         ListInvitationsEndpoint.Map(app);
         CreateInvitationEndpoint.Map(app);
         RevokeInvitationEndpoint.Map(app);
-
-        // External login endpoints — Phase 14
-        GoogleLoginEndpoint.Map(app);
-        GoogleLoginConfirmEndpoint.Map(app);
-        LinkGoogleLoginEndpoint.Map(app);
-        UnlinkGoogleLoginEndpoint.Map(app);
-        SetInitialPasswordEndpoint.Map(app);
-        CompleteOnboardingEndpoint.Map(app);
 
         // Two-factor authentication
         SetupTotpEndpoint.Map(app);

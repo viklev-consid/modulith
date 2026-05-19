@@ -12,16 +12,12 @@ public sealed class GetUserByIdHandler(UsersDbContext db)
 
     private async Task<ErrorOr<GetUserByIdResponse>> HandleCoreAsync(GetUserByIdQuery query, CancellationToken ct)
     {
-        var user = await db.Users
-            .Include(u => u.ExternalLogins)
-            .FirstOrDefaultAsync(u => u.Id == query.UserId, ct);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == query.UserId, ct);
 
         if (user is null)
         {
             return UsersErrors.UserNotFound;
         }
-
-        var linkedProviders = user.ExternalLogins.Select(e => e.Provider.ToString()).Order(StringComparer.Ordinal).ToList();
 
         return new GetUserByIdResponse(
             user.Id.Value,
@@ -29,8 +25,6 @@ public sealed class GetUserByIdHandler(UsersDbContext db)
             user.DisplayName,
             user.Role.Name,
             user.CreatedAt,
-            HasPassword: user.PasswordHash is not null,
-            HasCompletedOnboarding: user.HasCompletedOnboarding,
-            LinkedProviders: linkedProviders);
+            HasCompletedOnboarding: user.HasCompletedOnboarding);
     }
 }

@@ -2,7 +2,7 @@
 
 This module owns user notifications. It has two intentionally separate surfaces:
 
-- **Email notifications** for account/security/lifecycle communication such as password reset, password changed, email change, welcome, and external-login events.
+- **Email notifications** for account/security/lifecycle communication such as password reset, password changed, email change, and welcome events.
 - **Bell notifications** for product activity shown in-app, such as replies, mentions, assignments, follows, approvals, and workflow updates. SSE is only a live transport for bell updates; it is not a notification channel.
 
 Do not automatically mirror email notifications into bell notifications. Account/security notifications are email-only unless a product decision explicitly says otherwise.
@@ -26,8 +26,8 @@ Do not automatically mirror email notifications into bell notifications. Account
 
 1. Every handler is idempotent. Each `NotificationLog` row carries a unique `IdempotencyKey` (sourced from `@event.EventId`) backed by a DB-level unique constraint. On duplicate delivery the insert throws `DbUpdateException`; the handler detaches the entity and falls through to the claim step.
 2. `DeliveryStatus` uses a four-state protocol (`Pending → Sending → Sent` or `→ Failed`) to prevent duplicate sends. `RetryableSmtpException` resets to `Pending` via `MarkReadyAsync`. `TerminalSmtpException` transitions to `Failed` via `MarkFailedAsync`. Three recovery paths exist: (a) `MarkReadyAsync` for immediate transient retry, (b) stale-row reset after 5 minutes for crash recovery, (c) `Failed → Pending` reset for DLQ replay after root-cause fix.
-3. `IConsentRegistry` gates every notification type. Security notifications (`PasswordReset*`, `PasswordChanged`, `EmailChange*`, `ExternalLogin*`) bypass consent because they are security-critical.
-4. `PasswordResetRequestedV1`, `EmailChangeRequestedV1`, and `ExternalLoginPendingV1` carry a raw token — embed it in the email body link, never log it.
+3. `IConsentRegistry` gates every notification type. Security notifications (`PasswordReset*`, `PasswordChanged`, `EmailChange*`) bypass consent because they are security-critical.
+4. `PasswordResetRequestedV1` and `EmailChangeRequestedV1` carry a raw token — embed it in the email body link, never log it.
 5. Bell notifications are idempotent by `IdempotencyKey`. If a duplicate insert fails, detach the added entity before returning the existing row.
 6. Bell endpoints are current-user scoped under `/v1/me/...`; do not add `/users/{id}/notifications` without an explicit admin use case.
 7. Retention is stored per bell notification in `RetentionUntil`; cleanup deletes rows whose retention has elapsed.
@@ -40,7 +40,7 @@ Do not automatically mirror email notifications into bell notifications. Account
 
 1. Add an entry to the `NotificationType` enum.
 2. Add a template in `Templates/` (static class with `Subject`, `HtmlBody`, `PlainTextBody`).
-3. Write a handler in `Integration/Subscribers/` subscribing to the triggering event. Copy from any existing handler (e.g. `OnUserRegisteredHandler.cs`).
+3. Write a handler in `Integration/Subscribers/` subscribing to the triggering event. Copy from any existing handler (e.g. `OnUserEmailConfirmedHandler.cs`).
 4. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
 
 Key rules when writing the handler:
@@ -83,7 +83,7 @@ SSE clients must provide a stable per-tab `clientId` query parameter. Treat it a
 ## Known footguns
 
 - `SmtpEmailSender` is a real SMTP client — integration tests must override `IEmailSender` with a fake to avoid SMTP dial failures.
-- Raw tokens arrive in `PasswordResetRequestedV1.RawToken`, `EmailChangeRequestedV1.RawToken`, and `ExternalLoginPendingV1.RawToken`. Embed them in email body links; never log them. Serilog destructuring masks known token property names, but defense-in-depth means not calling the log statement at all.
+- Raw tokens arrive in `PasswordResetRequestedV1.RawToken` and `EmailChangeRequestedV1.RawToken`. Embed them in email body links; never log them. Serilog destructuring masks known token property names, but defense-in-depth means not calling the log statement at all.
 - The unique constraint on `NotificationLog.IdempotencyKey` makes duplicate-detection race-safe — catch `DbUpdateException.IsUniqueConstraintViolation()` rather than doing a pre-check with `AnyAsync`. But do NOT short-circuit on the constraint alone; always fall through to `TryClaimAsync`.
 - Adding a subscriber for a new event requires registering the handler in `NotificationsModule.AddNotificationsHandlers`; forgetting this means handlers are never discovered by Wolverine.
 - Adding a scheduled cleanup handler requires registering it in `AddNotificationsHandlers` and anchoring the TickerQ job in `AddNotificationsJobs`.

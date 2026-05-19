@@ -97,32 +97,6 @@ internal static class UsersErrors
     public static readonly Error ConcurrencyConflict =
         Error.Conflict("Users.ConcurrencyConflict", "The user record was modified concurrently. Please retry.");
 
-    // External login — Google verification
-    public static readonly Error InvalidIdToken =
-        Error.Unauthorized("Users.ExternalLogin.InvalidIdToken", "The identity token is invalid or could not be verified.");
-
-    public static readonly Error ExternalAuthUnavailable =
-        Error.Failure("Users.ExternalLogin.Unavailable", "External authentication is temporarily unavailable. Please try again later.");
-
-    // External login errors
-    public static readonly Error ExternalLoginAlreadyLinked =
-        Error.Conflict("Users.ExternalLogin.AlreadyLinked", "This external account is already linked to your account.");
-
-    public static readonly Error ExternalLoginNotLinked =
-        Error.NotFound("Users.ExternalLogin.NotLinked", "This external account is not linked to your account.");
-
-    public static readonly Error ExternalLoginLinkedToOtherUser =
-        Error.Conflict("Users.ExternalLogin.LinkedToOtherUser", "This external account is already linked to a different user.");
-
-    public static readonly Error CredentialRetentionViolation =
-        Error.Conflict("Users.ExternalLogin.CredentialRetention", "Cannot unlink: you must retain at least one login credential (password or external account).");
-
-    public static readonly Error PasswordAlreadySet =
-        Error.Conflict("Users.Password.AlreadySet", "A password is already set. Use the change password flow instead.");
-
-    public static readonly Error MaxPendingLoginsReached =
-        Error.Conflict("Users.ExternalLogin.MaxPendingReached", "Too many pending confirmation attempts for this email address. Please try again later.");
-
     public static readonly Error InvitationLifetimeInvalid =
         Error.Validation("Users.Invitation.LifetimeInvalid", "Invitation lifetime must be greater than zero.");
 

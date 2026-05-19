@@ -47,7 +47,6 @@ public sealed class FrontendOptionsValidatorTests
             Paths = new FrontendPathOptions
             {
                 ConfirmEmail = path,
-                GoogleConfirm = "/auth/google/confirm",
                 ResetPassword = "/reset-password",
             },
         };
@@ -65,7 +64,6 @@ public sealed class FrontendOptionsValidatorTests
             Paths = new FrontendPathOptions
             {
                 ConfirmEmail = "/confirm-email",
-                GoogleConfirm = "/auth/google/confirm",
                 ResetPassword = "/reset-password",
             },
         };

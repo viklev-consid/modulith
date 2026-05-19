@@ -8,12 +8,10 @@ namespace Modulith.Modules.Users.Domain;
 
 public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 {
-    private readonly List<ExternalLogin> externalLogins = [];
-
     private User(
         UserId id,
         Email email,
-        PasswordHash? passwordHash,
+        PasswordHash passwordHash,
         string displayName,
         Role role,
         bool hasCompletedOnboarding)
@@ -31,8 +29,7 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 
     public Email Email { get; private set; } = null!;
 
-    /// <summary>Null for external-only users who have not yet set a password.</summary>
-    public PasswordHash? PasswordHash { get; private set; }
+    public PasswordHash PasswordHash { get; private set; } = null!;
 
     public string DisplayName { get; private set; } = null!;
     public string? AvatarContainer { get; private set; }
@@ -46,8 +43,6 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
     public bool IsEmailConfirmed => EmailConfirmedAt is not null;
     public bool HasAvatar => AvatarContainer is not null && AvatarKey is not null;
 
-    public IReadOnlyList<ExternalLogin> ExternalLogins => externalLogins.AsReadOnly();
-
     public DateTimeOffset CreatedAt { get; private set; }
     public string? CreatedBy { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
@@ -55,7 +50,7 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 
     /// <summary>
     /// Creates a user registered with email and password.
-    /// HasCompletedOnboarding is true — the registration form is the onboarding step.
+    /// HasCompletedOnboarding is false — the client must call CompleteOnboarding.
     /// Raises UserRegistered.
     /// </summary>
     public static ErrorOr<User> CreateWithPassword(
@@ -72,36 +67,8 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
 
         var normalizedName = nameResult.Value;
         var role = initialRole ?? Role.User;
-        var user = new User(UserId.New(), email, passwordHash, normalizedName, role, hasCompletedOnboarding: true);
+        var user = new User(UserId.New(), email, passwordHash, normalizedName, role, hasCompletedOnboarding: false);
         user.RaiseEvent(new UserRegistered(user.Id, email.Value, normalizedName));
-        return user;
-    }
-
-    /// <summary>
-    /// Creates a user provisioned from an external login (e.g. Google).
-    /// HasCompletedOnboarding is false — the client must call CompleteOnboarding.
-    /// Raises UserProvisionedFromExternal (not UserRegistered).
-    /// </summary>
-    public static ErrorOr<User> CreateExternal(
-        Email email,
-        string displayName,
-        ExternalLoginProvider provider,
-        string subject,
-        IClock clock,
-        Role? initialRole = null)
-    {
-        var nameResult = NormalizeDisplayName(displayName);
-        if (nameResult.IsError)
-        {
-            return nameResult.Errors;
-        }
-
-        var normalizedName = nameResult.Value;
-        var role = initialRole ?? Role.User;
-        var user = new User(UserId.New(), email, passwordHash: null, normalizedName, role, hasCompletedOnboarding: false);
-        var now = clock.UtcNow;
-        user.ConfirmEmail(clock);
-        user.RaiseEvent(new UserProvisionedFromExternal(user.Id, provider, subject, email.Value, normalizedName, now));
         return user;
     }
 
@@ -205,84 +172,10 @@ public sealed class User : AggregateRoot<UserId>, IAuditableEntity
         return trimmed;
     }
 
-    /// <summary>
-    /// Updates the password. Used by ChangePassword and ResetPassword flows.
-    /// For external-only users setting their first password, use SetInitialPassword instead.
-    /// </summary>
     public ErrorOr<Success> SetPassword(PasswordHash newPasswordHash)
     {
         PasswordHash = newPasswordHash;
         RaiseEvent(new UserPasswordChanged(Id));
-        return Result.Success;
-    }
-
-    /// <summary>
-    /// Sets the first password for an external-only user.
-    /// Fails if the user already has a password — use ChangePassword / SetPassword instead.
-    /// </summary>
-    public ErrorOr<Success> SetInitialPassword(PasswordHash passwordHash)
-    {
-        if (PasswordHash is not null)
-        {
-            return UsersErrors.PasswordAlreadySet;
-        }
-
-        PasswordHash = passwordHash;
-        RaiseEvent(new UserPasswordChanged(Id));
-        return Result.Success;
-    }
-
-    /// <summary>
-    /// Links an external provider identity to this user.
-    /// Fails if any credential for this provider is already linked to this user —
-    /// the model enforces at most one external login per provider per user.
-    /// </summary>
-    public ErrorOr<Success> LinkExternalLogin(
-        ExternalLoginProvider provider,
-        string subject,
-        string providerEmail,
-        DateTimeOffset linkedAt)
-    {
-        // Check duplicate provider before validating the supplied provider email so callers cannot
-        // infer existing links through email-validation error shape.
-        if (externalLogins.Any(e => e.Provider == provider))
-        {
-            return UsersErrors.ExternalLoginAlreadyLinked;
-        }
-
-        var providerEmailResult = Email.Create(providerEmail);
-        if (providerEmailResult.IsError)
-        {
-            return providerEmailResult.Errors;
-        }
-
-        var login = ExternalLogin.Create(Id, provider, subject, providerEmailResult.Value, linkedAt);
-        externalLogins.Add(login);
-        RaiseEvent(new ExternalLoginLinked(Id, provider, subject, linkedAt));
-        return Result.Success;
-    }
-
-    /// <summary>
-    /// Unlinks an external provider identity from this user.
-    /// Enforces the credential-retention guardrail: the user must always retain at
-    /// least one credential (password or another external login).
-    /// </summary>
-    public ErrorOr<Success> UnlinkExternalLogin(ExternalLoginProvider provider)
-    {
-        var login = externalLogins.FirstOrDefault(e => e.Provider == provider);
-        if (login is null)
-        {
-            return UsersErrors.ExternalLoginNotLinked;
-        }
-
-        var hasOtherCredential = PasswordHash is not null || externalLogins.Count > 1;
-        if (!hasOtherCredential)
-        {
-            return UsersErrors.CredentialRetentionViolation;
-        }
-
-        externalLogins.Remove(login);
-        RaiseEvent(new ExternalLoginUnlinked(Id, provider));
         return Result.Success;
     }
 

@@ -11,8 +11,6 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options) : M
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<SingleUseToken> SingleUseTokens => Set<SingleUseToken>();
     public DbSet<PendingEmailChange> PendingEmailChanges => Set<PendingEmailChange>();
-    public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
-    public DbSet<PendingExternalLogin> PendingExternalLogins => Set<PendingExternalLogin>();
     public DbSet<TermsAcceptance> TermsAcceptances => Set<TermsAcceptance>();
     public DbSet<UserInvitation> UserInvitations => Set<UserInvitation>();
     public DbSet<TwoFactorCredential> TwoFactorCredentials => Set<TwoFactorCredential>();

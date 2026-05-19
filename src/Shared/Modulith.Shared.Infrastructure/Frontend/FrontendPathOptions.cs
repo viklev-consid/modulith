@@ -11,8 +11,5 @@ public sealed class FrontendPathOptions
     public string ConfirmEmailChange { get; init; } = "/confirm-email-change";
 
     [Required]
-    public string GoogleConfirm { get; init; } = "/auth/google/confirm";
-
-    [Required]
     public string ResetPassword { get; init; } = "/reset-password";
 }

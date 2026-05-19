@@ -6,6 +6,4 @@ public sealed record GetUserByIdResponse(
     string DisplayName,
     string Role,
     DateTimeOffset CreatedAt,
-    bool HasPassword,
-    bool HasCompletedOnboarding,
-    IReadOnlyCollection<string> LinkedProviders);
+    bool HasCompletedOnboarding);
