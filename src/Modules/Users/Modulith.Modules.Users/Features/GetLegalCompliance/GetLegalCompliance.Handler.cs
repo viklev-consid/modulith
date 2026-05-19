@@ -33,9 +33,9 @@ public sealed class GetLegalComplianceHandler(UsersDbContext db, ILegalComplianc
             acceptedDocuments);
     }
 
-    private static LegalComplianceDocumentResponse ToResponse(LegalDocument document) =>
+    private static LegalComplianceDocumentResponse ToResponse(LegalComplianceDocument document) =>
         new(
-            document.Id.Value,
+            document.Id,
             LegalDocumentMapper.ToWireType(document.DocumentType),
             document.Title,
             document.Version,

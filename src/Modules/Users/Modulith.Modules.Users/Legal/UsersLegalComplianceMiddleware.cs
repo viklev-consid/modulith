@@ -41,7 +41,7 @@ internal static class UsersLegalComplianceMiddleware
                     ["traceId"] = Activity.Current?.TraceId.ToString(),
                     ["missingDocuments"] = compliance.MissingDocuments.Select(document => new
                     {
-                        documentId = document.Id.Value,
+                        documentId = document.Id,
                         type = LegalDocumentMapper.ToWireType(document.DocumentType),
                         document.Version,
                         document.ContentHash,

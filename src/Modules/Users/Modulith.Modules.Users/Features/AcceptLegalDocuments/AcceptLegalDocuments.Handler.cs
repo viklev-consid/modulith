@@ -2,13 +2,14 @@ using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
+using Modulith.Modules.Users.Legal;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.Features.AcceptLegalDocuments;
 
-public sealed class AcceptLegalDocumentsHandler(UsersDbContext db, IClock clock)
+public sealed class AcceptLegalDocumentsHandler(UsersDbContext db, IClock clock, ILegalComplianceService complianceService)
 {
     public async Task<ErrorOr<Success>> Handle(AcceptLegalDocumentsCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(AcceptLegalDocumentsHandler), () => HandleCoreAsync(cmd, ct));
@@ -70,6 +71,7 @@ public sealed class AcceptLegalDocumentsHandler(UsersDbContext db, IClock clock)
         try
         {
             await db.SaveChangesAsync(ct);
+            await complianceService.InvalidateContinuedUseComplianceAsync(cmd.UserId, ct);
         }
         catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
