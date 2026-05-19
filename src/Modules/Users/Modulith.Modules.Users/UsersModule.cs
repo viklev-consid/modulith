@@ -109,6 +109,12 @@ public static class UsersModule
         services.AddScoped<IAvatarImageInspector, MagickAvatarImageInspector>();
         services.AddScoped<IUserAvatarStorage, UserAvatarStorage>();
         services.AddScoped<ILegalComplianceService, LegalComplianceService>();
+        services.AddScoped<LegalDocumentsSeeder>();
+
+        if (!environment.IsEnvironment("Test"))
+        {
+            services.AddHostedService<LegalDocumentsBootstrapper>();
+        }
 
         services.AddScoped<IConsentRegistry, UsersConsentRegistry>();
         services.AddScoped<IPersonalDataExporter, UsersPersonalDataExporter>();
@@ -132,7 +138,6 @@ public static class UsersModule
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
-            services.AddScoped<IModuleSeeder, LegalDocumentsSeeder>();
             services.AddScoped<IModuleSeeder, UsersDevSeeder>();
         }
         else

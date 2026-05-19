@@ -4,29 +4,33 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Modulith.Modules.Users.Domain;
+using Modulith.Modules.Users.Legal;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Users.Seeding;
 
-internal sealed class LegalDocumentsSeeder(
+public sealed class LegalDocumentsSeeder(
     UsersDbContext db,
     IOptions<UsersOptions> options,
-    IClock clock) : IModuleSeeder
+    IClock clock,
+    ILegalComplianceService complianceService) : IModuleSeeder
 {
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
         var optionsValue = options.Value;
 
-        await EnsureDocumentAsync(
+        var changed = false;
+
+        changed |= await EnsureDocumentAsync(
             LegalDocumentType.TermsOfService,
             optionsValue.TermsOfServiceVersion,
             "Terms of Service",
             $"terms-of-service.v{optionsValue.TermsOfServiceVersion}.md",
             cancellationToken);
 
-        await EnsureDocumentAsync(
+        changed |= await EnsureDocumentAsync(
             LegalDocumentType.PrivacyPolicy,
             optionsValue.PrivacyPolicyVersion,
             "Privacy Policy",
@@ -34,9 +38,14 @@ internal sealed class LegalDocumentsSeeder(
             cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
+
+        if (changed)
+        {
+            await complianceService.InvalidateAllContinuedUseComplianceAsync(cancellationToken);
+        }
     }
 
-    private async Task EnsureDocumentAsync(
+    private async Task<bool> EnsureDocumentAsync(
         LegalDocumentType documentType,
         string version,
         string title,
@@ -48,7 +57,7 @@ internal sealed class LegalDocumentsSeeder(
 
         if (exists)
         {
-            return;
+            return false;
         }
 
         var markdownContent = await ReadEmbeddedMarkdownAsync(resourceFileName, ct);
@@ -63,6 +72,8 @@ internal sealed class LegalDocumentsSeeder(
             effectiveAt: now,
             publishedAt: now,
             isRequiredForOnboarding: true));
+
+        return true;
     }
 
     private static async Task<string> ReadEmbeddedMarkdownAsync(string fileName, CancellationToken ct)
