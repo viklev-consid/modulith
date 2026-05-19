@@ -3,8 +3,8 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Features.GetLegalCompliance;
@@ -92,6 +92,25 @@ public sealed class LegalComplianceTests(UsersApiFixture fixture) : IAsyncLifeti
                 acceptedDocuments = new[]
                 {
                     new { documentId = document.Id, document.Version, ContentHash = new string('0', 64) },
+                },
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AcceptLegalDocuments_WithUnrequiredDocument_Returns400()
+    {
+        var document = await SeedLegalDocumentAsync("1.1", isRequiredForContinuedUse: false);
+        var (userId, email, displayName) = await SeedUserAsync("legal-unrequired@example.com", "Legal Unrequired");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/legal-acceptances",
+            new
+            {
+                acceptedDocuments = new[]
+                {
+                    new { documentId = document.Id, document.Version, document.ContentHash },
                 },
             });
 

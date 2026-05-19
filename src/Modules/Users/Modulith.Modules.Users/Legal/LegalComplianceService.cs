@@ -15,9 +15,12 @@ public sealed class LegalComplianceService(UsersDbContext db, IClock clock) : IL
             .Where(d => d.SupersededAt == null)
             .Where(d => d.IsRequiredForContinuedUse)
             .Where(d => d.ContinuedUseRequiredAt == null || d.ContinuedUseRequiredAt <= now)
+            .ToListAsync(ct);
+
+        requiredDocuments = requiredDocuments
             .OrderByDescending(d => d.BlockingLevel)
             .ThenBy(d => d.DocumentType)
-            .ToListAsync(ct);
+            .ToList();
 
         if (requiredDocuments.Count == 0)
         {

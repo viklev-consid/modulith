@@ -56,33 +56,21 @@ public sealed class CompleteOnboardingHandler(
             }
         }
 
-        var trackerCleared = false;
+        var versionKeys = requiredDocuments
+            .Select(document => $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}")
+            .ToArray();
+        var acceptedVersionKeys = await db.TermsAcceptances
+            .Where(t => t.UserId == user.Id && versionKeys.Contains(t.Version))
+            .Select(t => t.Version)
+            .ToListAsync(ct);
+        var acceptedVersionKeySet = acceptedVersionKeys.ToHashSet(StringComparer.Ordinal);
+
         foreach (var document in requiredDocuments)
         {
-            var alreadyAccepted = await db.TermsAcceptances
-                .AnyAsync(t => t.UserId == user.Id && t.Version == $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}", ct);
-
-            if (!alreadyAccepted)
+            var versionKey = $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}";
+            if (!acceptedVersionKeySet.Contains(versionKey))
             {
                 db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, document, now, cmd.IpAddress, cmd.UserAgent));
-                try
-                {
-                    await db.SaveChangesAsync(ct);
-                }
-                catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
-                {
-                    db.ChangeTracker.Clear();
-                    trackerCleared = true;
-                }
-            }
-        }
-
-        if (trackerCleared)
-        {
-            user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
-            if (user is null)
-            {
-                return UsersErrors.UserNotFound;
             }
         }
 

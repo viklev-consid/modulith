@@ -25,9 +25,10 @@ public sealed class AcceptLegalDocumentsHandler(UsersDbContext db, IClock clock)
             .GroupBy(d => d.DocumentId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        var documents = (await db.LegalDocuments.ToListAsync(ct))
-            .Where(d => acceptedById.ContainsKey(d.Id.Value))
-            .ToList();
+        var acceptedDocumentIds = acceptedById.Keys.Select(id => new LegalDocumentId(id)).ToArray();
+        var documents = await db.LegalDocuments
+            .Where(d => acceptedDocumentIds.Contains(d.Id))
+            .ToListAsync(ct);
 
         if (documents.Count != acceptedById.Count)
         {
@@ -38,6 +39,7 @@ public sealed class AcceptLegalDocumentsHandler(UsersDbContext db, IClock clock)
         {
             var accepted = acceptedById[document.Id.Value];
             if (document.SupersededAt is not null ||
+                (!document.IsRequiredForOnboarding && !document.IsRequiredForContinuedUse) ||
                 !string.Equals(accepted.Version, document.Version, StringComparison.Ordinal) ||
                 !string.Equals(accepted.ContentHash, document.ContentHash, StringComparison.Ordinal))
             {
@@ -46,14 +48,18 @@ public sealed class AcceptLegalDocumentsHandler(UsersDbContext db, IClock clock)
         }
 
         var now = clock.UtcNow;
+        var versionKeys = documents
+            .Select(document => $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}")
+            .ToArray();
+        var acceptedVersionKeys = await db.TermsAcceptances
+            .Where(a => a.UserId == cmd.UserId && versionKeys.Contains(a.Version))
+            .Select(a => a.Version)
+            .ToHashSetAsync(StringComparer.Ordinal, ct);
+
         foreach (var document in documents)
         {
             var versionKey = $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}";
-            var alreadyAccepted = await db.TermsAcceptances.AnyAsync(
-                a => a.UserId == cmd.UserId && a.Version == versionKey,
-                ct);
-
-            if (alreadyAccepted)
+            if (acceptedVersionKeys.Contains(versionKey))
             {
                 continue;
             }

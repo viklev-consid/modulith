@@ -18,6 +18,7 @@ public sealed class GetLegalComplianceHandler(UsersDbContext db, ILegalComplianc
             .AsNoTracking()
             .Where(a => a.UserId == query.UserId)
             .OrderByDescending(a => a.AcceptedAt)
+            .Take(50)
             .Select(a => new AcceptedLegalDocumentResponse(
                 a.DocumentType == null ? "termsOfService" : LegalDocumentMapper.ToWireType(a.DocumentType.Value),
                 a.Version,
