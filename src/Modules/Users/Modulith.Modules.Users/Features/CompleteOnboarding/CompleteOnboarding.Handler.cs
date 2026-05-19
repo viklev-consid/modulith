@@ -32,7 +32,7 @@ public sealed class CompleteOnboardingHandler(
             return UsersErrors.UserNotFound;
         }
 
-        if (!cmd.AcceptTerms && cmd.AcceptedDocuments.Count == 0)
+        if (cmd.AcceptedDocuments.Count == 0)
         {
             return UsersErrors.TermsNotAccepted;
         }
@@ -47,13 +47,10 @@ public sealed class CompleteOnboardingHandler(
             return UsersErrors.LegalDocumentsUnavailable;
         }
 
-        if (cmd.AcceptedDocuments.Count > 0)
+        var validationResult = ValidateAcceptedDocuments(requiredDocuments, cmd.AcceptedDocuments);
+        if (validationResult.IsError)
         {
-            var validationResult = ValidateAcceptedDocuments(requiredDocuments, cmd.AcceptedDocuments);
-            if (validationResult.IsError)
-            {
-                return validationResult.Errors;
-            }
+            return validationResult.Errors;
         }
 
         var versionKeys = requiredDocuments

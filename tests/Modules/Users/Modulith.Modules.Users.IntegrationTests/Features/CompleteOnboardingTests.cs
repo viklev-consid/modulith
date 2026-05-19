@@ -44,7 +44,7 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
     }
 
     [Fact]
-    public async Task CompleteOnboarding_WithAcceptTermsTrue_Returns204()
+    public async Task CompleteOnboarding_WithLegacyAcceptTermsTrue_Returns422()
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboard@example.com", "Onboard User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
@@ -52,7 +52,7 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
             new { acceptTerms = true, acceptMarketingEmails = false });
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
@@ -73,8 +73,9 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var (userId, email, displayName) = await RegisterUserAsync("onboarddb@example.com", "Database User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -88,8 +89,9 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var (userId, email, displayName) = await RegisterUserAsync("onboardterms@example.com", "Terms User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -148,8 +150,9 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var (userId, email, displayName) = await RegisterUserAsync("onboardmarketing@example.com", "Marketing User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = true });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = true });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -166,8 +169,9 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var (userId, email, displayName) = await RegisterUserAsync("onboardnomarketing@example.com", "No Marketing User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -181,7 +185,8 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboardidempotent@example.com", "Idempotent User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
-        var body = new { acceptTerms = true, acceptMarketingEmails = false };
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
+        var body = new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false };
 
         var first = await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);
         var second = await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);

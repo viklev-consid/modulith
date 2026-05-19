@@ -6,10 +6,9 @@ internal sealed class CompleteOnboardingValidator : AbstractValidator<CompleteOn
 {
     public CompleteOnboardingValidator()
     {
-        RuleFor(x => x.AcceptTerms)
-            .Equal(true)
-            .When(x => x.AcceptedDocuments is null || x.AcceptedDocuments.Count == 0)
-            .WithMessage("Terms of service must be accepted.");
+        RuleFor(x => x.AcceptedDocuments)
+            .NotEmpty()
+            .WithMessage("Accepted legal documents are required.");
 
         RuleForEach(x => x.AcceptedDocuments).ChildRules(document =>
         {
