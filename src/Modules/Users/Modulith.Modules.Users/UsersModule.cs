@@ -19,6 +19,7 @@ using Modulith.Modules.Users.Features.DeleteAvatar;
 using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ForgotPassword;
 using Modulith.Modules.Users.Features.GetCurrentUser;
+using Modulith.Modules.Users.Features.GetOnboardingLegalRequirements;
 using Modulith.Modules.Users.Features.GetUserAvatar;
 using Modulith.Modules.Users.Features.GetUserById;
 using Modulith.Modules.Users.Features.ListInvitations;
@@ -127,6 +128,7 @@ public static class UsersModule
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
+            services.AddScoped<IModuleSeeder, LegalDocumentsSeeder>();
             services.AddScoped<IModuleSeeder, UsersDevSeeder>();
         }
         else
@@ -143,6 +145,7 @@ public static class UsersModule
         opts.Discovery.IncludeType<LoginHandler>();
         opts.Discovery.IncludeType<LoginTwoFactorHandler>();
         opts.Discovery.IncludeType<GetCurrentUserHandler>();
+        opts.Discovery.IncludeType<GetOnboardingLegalRequirementsHandler>();
         opts.Discovery.IncludeType<CompleteOnboardingHandler>();
         opts.Discovery.IncludeType<UpdateProfileHandler>();
         opts.Discovery.IncludeType<UpdateAvatarHandler>();
@@ -196,6 +199,7 @@ public static class UsersModule
         LoginEndpoint.Map(app);
         LoginTwoFactorEndpoint.Map(app);
         GetCurrentUserEndpoint.Map(app);
+        GetOnboardingLegalRequirementsEndpoint.Map(app);
         CompleteOnboardingEndpoint.Map(app);
         UpdateProfileEndpoint.Map(app);
         UpdateAvatarEndpoint.Map(app);
