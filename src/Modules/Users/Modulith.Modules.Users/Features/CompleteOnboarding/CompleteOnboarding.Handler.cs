@@ -5,8 +5,8 @@ using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
+using Modulith.Modules.Users.Legal;
 using Modulith.Modules.Users.Persistence;
-using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
@@ -16,7 +16,8 @@ public sealed class CompleteOnboardingHandler(
     UsersDbContext db,
     IOptions<UsersOptions> options,
     IMessageBus bus,
-    IClock clock)
+    IClock clock,
+    ILegalComplianceService complianceService)
 {
     public async Task<ErrorOr<Success>> Handle(CompleteOnboardingCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(CompleteOnboardingHandler), () => HandleCoreAsync(cmd, ct));
@@ -32,38 +33,42 @@ public sealed class CompleteOnboardingHandler(
             return UsersErrors.UserNotFound;
         }
 
-        if (!cmd.AcceptTerms)
+        if (cmd.AcceptedDocuments.Count == 0)
         {
             return UsersErrors.TermsNotAccepted;
         }
 
         var now = clock.UtcNow;
-        var termsKey = $"tos:{optionsValue.TermsOfServiceVersion}";
+        var requiredDocuments = await db.LegalDocuments
+            .Where(d => d.IsRequiredForOnboarding && d.SupersededAt == null)
+            .ToListAsync(ct);
 
-        var alreadyAccepted = await db.TermsAcceptances
-            .AnyAsync(t => t.UserId == user.Id && t.Version == termsKey, ct);
-
-        var trackerCleared = false;
-        if (!alreadyAccepted)
+        if (requiredDocuments.Count == 0)
         {
-            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, termsKey, now, cmd.IpAddress, cmd.UserAgent));
-            try
-            {
-                await db.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
-            {
-                db.ChangeTracker.Clear();
-                trackerCleared = true;
-            }
+            return UsersErrors.LegalDocumentsUnavailable;
         }
 
-        if (trackerCleared)
+        var validationResult = ValidateAcceptedDocuments(requiredDocuments, cmd.AcceptedDocuments);
+        if (validationResult.IsError)
         {
-            user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
-            if (user is null)
+            return validationResult.Errors;
+        }
+
+        var versionKeys = requiredDocuments
+            .Select(document => $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}")
+            .ToArray();
+        var acceptedVersionKeys = await db.TermsAcceptances
+            .Where(t => t.UserId == user.Id && versionKeys.Contains(t.Version))
+            .Select(t => t.Version)
+            .ToListAsync(ct);
+        var acceptedVersionKeySet = acceptedVersionKeys.ToHashSet(StringComparer.Ordinal);
+
+        foreach (var document in requiredDocuments)
+        {
+            var versionKey = $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}";
+            if (!acceptedVersionKeySet.Contains(versionKey))
             {
-                return UsersErrors.UserNotFound;
+                db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, document, now, cmd.IpAddress, cmd.UserAgent));
             }
         }
 
@@ -75,7 +80,8 @@ public sealed class CompleteOnboardingHandler(
                 now,
                 cmd.IpAddress,
                 cmd.UserAgent,
-                optionsValue.PrivacyPolicyVersion));
+                requiredDocuments.FirstOrDefault(d => d.DocumentType == LegalDocumentType.PrivacyPolicy)?.Version
+                    ?? optionsValue.PrivacyPolicyVersion));
         }
 
         var wasAlreadyCompleted = user.HasCompletedOnboarding;
@@ -87,11 +93,37 @@ public sealed class CompleteOnboardingHandler(
         }
 
         await db.SaveChangesAsync(ct);
+        await complianceService.InvalidateContinuedUseComplianceAsync(user.Id, ct);
 
         if (!wasAlreadyCompleted)
         {
             await bus.PublishAsync(new UserOnboardingCompletedV1(user.Id.Value, Guid.NewGuid()));
             UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserOnboardingCompletedV1)));
+        }
+
+        return Result.Success;
+    }
+
+    private static ErrorOr<Success> ValidateAcceptedDocuments(
+        IReadOnlyCollection<LegalDocument> requiredDocuments,
+        IReadOnlyCollection<AcceptedLegalDocumentCommand> acceptedDocuments)
+    {
+        var acceptedById = acceptedDocuments
+            .GroupBy(d => d.DocumentId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var document in requiredDocuments)
+        {
+            if (!acceptedById.TryGetValue(document.Id.Value, out var accepted))
+            {
+                return UsersErrors.RequiredLegalDocumentMissing;
+            }
+
+            if (!string.Equals(accepted.Version, document.Version, StringComparison.Ordinal) ||
+                !string.Equals(accepted.ContentHash, document.ContentHash, StringComparison.Ordinal))
+            {
+                return UsersErrors.LegalDocumentAcceptanceInvalid;
+            }
         }
 
         return Result.Success;

@@ -2,19 +2,22 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Modulith.Modules.Users.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Modulith.Modules.Users.Persistence.Migrations
+namespace Modulith.Modules.Users.Persistence.Migrations;
+
+[DbContext(typeof(UsersDbContext))]
+[Migration("20260519113016_AddLegalDocumentContinuedUsePolicy")]
+partial class AddLegalDocumentContinuedUsePolicy
 {
-    [DbContext(typeof(UsersDbContext))]
-    partial class UsersDbContextModelSnapshot : ModelSnapshot
+    /// <inheritdoc />
+    protected override void BuildTargetModel(ModelBuilder modelBuilder)
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
-        {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("users")
@@ -735,6 +738,5 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasConstraintName("fk_terms_acceptances_users_user_id");
                 });
 #pragma warning restore 612, 618
-        }
     }
 }

@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Users.Domain;
+using Modulith.Modules.Users.Features.GetOnboardingLegalRequirements;
 using Modulith.Modules.Users.Features.GetCurrentUser;
 using Modulith.Modules.Users.Features.Register;
 using Modulith.Modules.Users.Persistence;
@@ -15,29 +18,51 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
 {
     private readonly HttpClient anonymous = fixture.CreateAnonymousClient();
 
-    public Task InitializeAsync() => fixture.ResetDatabaseAsync();
+    public async Task InitializeAsync()
+    {
+        await fixture.ResetDatabaseAsync();
+        await SeedLegalDocumentsAsync();
+    }
+
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task CompleteOnboarding_WithAcceptTermsTrue_Returns204()
+    public async Task GetOnboardingLegalRequirements_ReturnsRequiredDocumentsWithMarkdown()
+    {
+        var (userId, email, displayName) = await RegisterUserAsync("legaldocs@example.com", "Legal Docs User");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+
+        var response = await auth.GetAsync("/v1/users/me/onboarding/legal-requirements");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GetOnboardingLegalRequirementsResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Documents.Count);
+        Assert.Contains(body.Documents, d => string.Equals(d.Type, "termsOfService", StringComparison.Ordinal) && d.Markdown.Contains("Terms of Service", StringComparison.Ordinal));
+        Assert.Contains(body.Documents, d => string.Equals(d.Type, "privacyPolicy", StringComparison.Ordinal) && d.Markdown.Contains("Privacy Policy", StringComparison.Ordinal));
+        Assert.All(body.Documents, d => Assert.Equal(64, d.ContentHash.Length));
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WithoutAcceptedDocuments_Returns422()
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboard@example.com", "Onboard User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptMarketingEmails = false });
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
-    public async Task CompleteOnboarding_WithAcceptTermsFalse_Returns422()
+    public async Task CompleteOnboarding_WithEmptyAcceptedDocuments_Returns422()
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboardreject@example.com", "Reject User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = false, acceptMarketingEmails = false });
+            new { acceptedDocuments = Array.Empty<object>(), acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -48,8 +73,9 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var (userId, email, displayName) = await RegisterUserAsync("onboarddb@example.com", "Database User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -58,21 +84,64 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
     }
 
     [Fact]
-    public async Task CompleteOnboarding_RecordsSingleTosAcceptanceInDatabase()
+    public async Task CompleteOnboarding_RecordsRequiredLegalAcceptancesInDatabase()
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboardterms@example.com", "Terms User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
         var acceptances = await db.TermsAcceptances
             .Where(t => t.UserId == new UserId(userId))
+            .OrderBy(t => t.Version)
             .ToListAsync();
-        Assert.Single(acceptances);
-        Assert.Equal("tos:1.0", acceptances[0].Version);
+        Assert.Equal(2, acceptances.Count);
+        Assert.Contains(acceptances, a => string.Equals(a.Version, "tos:1.0", StringComparison.Ordinal) && a.DocumentType == LegalDocumentType.TermsOfService && a.ContentHash is not null);
+        Assert.Contains(acceptances, a => string.Equals(a.Version, "privacy:1.0", StringComparison.Ordinal) && a.DocumentType == LegalDocumentType.PrivacyPolicy && a.ContentHash is not null);
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WithAcceptedDocuments_RecordsAcceptances()
+    {
+        var (userId, email, displayName) = await RegisterUserAsync("onboardaccepteddocs@example.com", "Accepted Docs User");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WithMissingRequiredDocument_Returns400()
+    {
+        var (userId, email, displayName) = await RegisterUserAsync("onboardmissingdoc@example.com", "Missing Docs User");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+        var legalDocuments = (await GetLegalDocumentPayloadsAsync()).Take(1).ToArray();
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WithStaleDocumentHash_Returns400()
+    {
+        var (userId, email, displayName) = await RegisterUserAsync("onboardstaledoc@example.com", "Stale Docs User");
+        var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
+        legalDocuments[0] = legalDocuments[0] with { ContentHash = new string('0', 64) };
+
+        var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -81,8 +150,9 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var (userId, email, displayName) = await RegisterUserAsync("onboardmarketing@example.com", "Marketing User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = true });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = true });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -99,8 +169,9 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
         var (userId, email, displayName) = await RegisterUserAsync("onboardnomarketing@example.com", "No Marketing User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
         await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false });
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -114,7 +185,8 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboardidempotent@example.com", "Idempotent User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
-        var body = new { acceptTerms = true, acceptMarketingEmails = false };
+        var legalDocuments = await GetLegalDocumentPayloadsAsync();
+        var body = new { acceptedDocuments = legalDocuments, acceptMarketingEmails = false };
 
         var first = await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);
         var second = await auth.PostAsJsonAsync("/v1/users/me/onboarding", body);
@@ -127,7 +199,7 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
     public async Task CompleteOnboarding_WhenUnauthenticated_Returns401()
     {
         var response = await anonymous.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -157,4 +229,53 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
 
         return (body.UserId, email, displayName);
     }
+
+    private async Task SeedLegalDocumentsAsync()
+    {
+        await fixture.ExecuteDbAsync<UsersDbContext>(async (db, ct) =>
+        {
+            var now = fixture.Clock.UtcNow;
+            db.LegalDocuments.Add(LegalDocument.Publish(
+                LegalDocumentType.TermsOfService,
+                "1.0",
+                "Terms of Service",
+                "# Terms of Service\n\nVersion 1.0\n",
+                ComputeSha256("# Terms of Service\n\nVersion 1.0\n"),
+                now,
+                now,
+                isRequiredForOnboarding: true));
+            db.LegalDocuments.Add(LegalDocument.Publish(
+                LegalDocumentType.PrivacyPolicy,
+                "1.0",
+                "Privacy Policy",
+                "# Privacy Policy\n\nVersion 1.0\n",
+                ComputeSha256("# Privacy Policy\n\nVersion 1.0\n"),
+                now,
+                now,
+                isRequiredForOnboarding: true));
+            await db.SaveChangesAsync(ct);
+        });
+    }
+
+    private async Task<AcceptedLegalDocumentPayload[]> GetLegalDocumentPayloadsAsync()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+        var documents = await db.LegalDocuments
+            .AsNoTracking()
+            .Where(d => d.IsRequiredForOnboarding && d.SupersededAt == null)
+            .OrderBy(d => d.DocumentType)
+            .Select(d => new AcceptedLegalDocumentPayload(d.Id.Value, d.Version, d.ContentHash))
+            .ToArrayAsync();
+
+        return documents;
+    }
+
+    private static string ComputeSha256(string content)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    public sealed record AcceptedLegalDocumentPayload(Guid DocumentId, string Version, string ContentHash);
 }

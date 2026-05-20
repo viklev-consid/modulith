@@ -1,15 +1,12 @@
 using FluentValidation;
 
-namespace Modulith.Modules.Users.Features.CompleteOnboarding;
+namespace Modulith.Modules.Users.Features.AcceptLegalDocuments;
 
-internal sealed class CompleteOnboardingValidator : AbstractValidator<CompleteOnboardingRequest>
+internal sealed class AcceptLegalDocumentsValidator : AbstractValidator<AcceptLegalDocumentsRequest>
 {
-    public CompleteOnboardingValidator()
+    public AcceptLegalDocumentsValidator()
     {
-        RuleFor(x => x.AcceptedDocuments)
-            .NotEmpty()
-            .WithMessage("Accepted legal documents are required.");
-
+        RuleFor(x => x.AcceptedDocuments).NotEmpty();
         RuleForEach(x => x.AcceptedDocuments).ChildRules(document =>
         {
             document.RuleFor(x => x.DocumentId).NotEmpty();

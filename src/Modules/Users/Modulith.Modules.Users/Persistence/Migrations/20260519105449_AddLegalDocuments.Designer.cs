@@ -2,19 +2,22 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Modulith.Modules.Users.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Modulith.Modules.Users.Persistence.Migrations
+namespace Modulith.Modules.Users.Persistence.Migrations;
+
+[DbContext(typeof(UsersDbContext))]
+[Migration("20260519105449_AddLegalDocuments")]
+partial class AddLegalDocuments
 {
-    [DbContext(typeof(UsersDbContext))]
-    partial class UsersDbContextModelSnapshot : ModelSnapshot
+    /// <inheritdoc />
+    protected override void BuildTargetModel(ModelBuilder modelBuilder)
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
-        {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("users")
@@ -77,21 +80,11 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("BlockingLevel")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("blocking_level");
-
                     b.Property<string>("ContentHash")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("content_hash");
-
-                    b.Property<DateTimeOffset?>("ContinuedUseRequiredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("continued_use_required_at");
 
                     b.Property<string>("DocumentType")
                         .IsRequired()
@@ -102,10 +95,6 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                     b.Property<DateTimeOffset>("EffectiveAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("effective_at");
-
-                    b.Property<bool>("IsRequiredForContinuedUse")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_required_for_continued_use");
 
                     b.Property<bool>("IsRequiredForOnboarding")
                         .HasColumnType("boolean")
@@ -145,9 +134,6 @@ namespace Modulith.Modules.Users.Persistence.Migrations
 
                     b.HasIndex("DocumentType", "IsRequiredForOnboarding", "SupersededAt")
                         .HasDatabaseName("ix_legal_documents_document_type_is_required_for_onboarding_su");
-
-                    b.HasIndex("IsRequiredForContinuedUse", "ContinuedUseRequiredAt", "SupersededAt")
-                        .HasDatabaseName("ix_legal_documents_is_required_for_continued_use_continued_use");
 
                     b.ToTable("legal_documents", "users");
                 });
@@ -735,6 +721,5 @@ namespace Modulith.Modules.Users.Persistence.Migrations
                         .HasConstraintName("fk_terms_acceptances_users_user_id");
                 });
 #pragma warning restore 612, 618
-        }
     }
 }

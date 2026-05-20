@@ -3,19 +3,20 @@ using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Modulith.Modules.Users.Domain;
 using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
-namespace Modulith.Modules.Users.Features.CompleteOnboarding;
+namespace Modulith.Modules.Users.Features.AcceptLegalDocuments;
 
-internal static class CompleteOnboardingEndpoint
+internal static class AcceptLegalDocumentsEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
-        app.MapPost(UsersRoutes.CompleteOnboarding,
+        app.MapPost(UsersRoutes.LegalAcceptances,
             async (
-                CompleteOnboardingRequest request,
-                [Microsoft.AspNetCore.Mvc.FromServices] IValidator<CompleteOnboardingRequest> validator,
+                AcceptLegalDocumentsRequest request,
+                [Microsoft.AspNetCore.Mvc.FromServices] IValidator<AcceptLegalDocumentsRequest> validator,
                 ICurrentUser currentUser,
                 HttpContext httpContext,
                 IMessageBus bus,
@@ -32,22 +33,17 @@ internal static class CompleteOnboardingEndpoint
                     return Results.ValidationProblem(validation.ToDictionary(), statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
-                var ip = httpContext.Connection.RemoteIpAddress?.ToString();
-                var userAgent = httpContext.Request.Headers.UserAgent.ToString();
-                var acceptedDocuments = request.AcceptedDocuments?
-                    .Select(d => new AcceptedLegalDocumentCommand(d.DocumentId, d.Version, d.ContentHash))
-                    .ToArray() ?? [];
-                var command = new CompleteOnboardingCommand(
-                    userId,
-                    request.AcceptMarketingEmails,
-                    acceptedDocuments,
-                    ip,
-                    userAgent);
+                var command = new AcceptLegalDocumentsCommand(
+                    new UserId(userId),
+                    request.AcceptedDocuments.Select(d => new AcceptedLegalDocumentCommand(d.DocumentId, d.Version, d.ContentHash)).ToArray(),
+                    httpContext.Connection.RemoteIpAddress?.ToString(),
+                    httpContext.Request.Headers.UserAgent.ToString());
+
                 var result = await bus.InvokeAsync<ErrorOr<Success>>(command, ct);
                 return result.ToProblemDetailsOr(_ => Results.NoContent());
             })
-        .WithName("CompleteOnboarding")
-        .WithSummary("Accept the terms of service to complete account setup.")
+        .WithName("AcceptLegalDocuments")
+        .WithSummary("Accept one or more published legal document versions.")
         .Produces(StatusCodes.Status204NoContent)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)

@@ -1,8 +1,9 @@
-namespace Modulith.Modules.Users.Features.CompleteOnboarding;
+using Modulith.Modules.Users.Domain;
 
-public sealed record CompleteOnboardingCommand(
-    Guid UserId,
-    bool AcceptMarketingEmails,
+namespace Modulith.Modules.Users.Features.AcceptLegalDocuments;
+
+public sealed record AcceptLegalDocumentsCommand(
+    UserId UserId,
     IReadOnlyList<AcceptedLegalDocumentCommand> AcceptedDocuments,
     string? IpAddress,
     string? UserAgent);

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Modulith.Modules.Users.Legal;
 using Modulith.Shared.Infrastructure.Modules;
 using TickerQ.Utilities;
 using TickerQ.Utilities.Entities;
@@ -29,5 +30,10 @@ public sealed class UsersModuleInstaller : IModuleInstaller
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapUsersEndpoints();
+    }
+
+    public void Use(WebApplication app)
+    {
+        app.UseUsersLegalCompliance();
     }
 }
