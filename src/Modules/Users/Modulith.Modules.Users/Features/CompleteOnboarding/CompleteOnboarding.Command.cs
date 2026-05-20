@@ -2,7 +2,6 @@ namespace Modulith.Modules.Users.Features.CompleteOnboarding;
 
 public sealed record CompleteOnboardingCommand(
     Guid UserId,
-    bool AcceptTerms,
     bool AcceptMarketingEmails,
     IReadOnlyList<AcceptedLegalDocumentCommand> AcceptedDocuments,
     string? IpAddress,

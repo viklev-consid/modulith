@@ -15,7 +15,9 @@ public sealed partial class LegalComplianceService(
 {
     private static readonly HybridCacheEntryOptions CacheOptions = new()
     {
-        Expiration = TimeSpan.FromMinutes(5),
+        Expiration = TimeSpan.FromHours(1),
+        // Legal documents change rarely, but per-replica L1 entries stay short so a
+        // user's newly recorded acceptance cannot remain stale for long on another node.
         LocalCacheExpiration = TimeSpan.FromMinutes(1),
     };
 

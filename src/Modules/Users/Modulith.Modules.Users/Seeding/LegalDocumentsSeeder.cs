@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Legal;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Infrastructure.Seeding;
 using Modulith.Shared.Kernel.Interfaces;
 
@@ -37,7 +38,15 @@ public sealed class LegalDocumentsSeeder(
             $"privacy-policy.v{optionsValue.PrivacyPolicyVersion}.md",
             cancellationToken);
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            db.ChangeTracker.Clear();
+            changed = false;
+        }
 
         if (changed)
         {

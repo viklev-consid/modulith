@@ -5,8 +5,8 @@ using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Errors;
+using Modulith.Modules.Users.Legal;
 using Modulith.Modules.Users.Persistence;
-using Modulith.Shared.Infrastructure.Persistence;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
@@ -16,7 +16,8 @@ public sealed class CompleteOnboardingHandler(
     UsersDbContext db,
     IOptions<UsersOptions> options,
     IMessageBus bus,
-    IClock clock)
+    IClock clock,
+    ILegalComplianceService complianceService)
 {
     public async Task<ErrorOr<Success>> Handle(CompleteOnboardingCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(CompleteOnboardingHandler), () => HandleCoreAsync(cmd, ct));
@@ -92,6 +93,7 @@ public sealed class CompleteOnboardingHandler(
         }
 
         await db.SaveChangesAsync(ct);
+        await complianceService.InvalidateContinuedUseComplianceAsync(user.Id, ct);
 
         if (!wasAlreadyCompleted)
         {

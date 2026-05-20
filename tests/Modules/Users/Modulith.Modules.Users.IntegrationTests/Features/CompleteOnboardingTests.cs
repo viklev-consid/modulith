@@ -44,25 +44,25 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
     }
 
     [Fact]
-    public async Task CompleteOnboarding_WithLegacyAcceptTermsTrue_Returns422()
+    public async Task CompleteOnboarding_WithoutAcceptedDocuments_Returns422()
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboard@example.com", "Onboard User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
-    public async Task CompleteOnboarding_WithAcceptTermsFalse_Returns422()
+    public async Task CompleteOnboarding_WithEmptyAcceptedDocuments_Returns422()
     {
         var (userId, email, displayName) = await RegisterUserAsync("onboardreject@example.com", "Reject User");
         var auth = fixture.CreateAuthenticatedClient(userId, email, displayName);
 
         var response = await auth.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = false, acceptMarketingEmails = false });
+            new { acceptedDocuments = Array.Empty<object>(), acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -199,7 +199,7 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
     public async Task CompleteOnboarding_WhenUnauthenticated_Returns401()
     {
         var response = await anonymous.PostAsJsonAsync("/v1/users/me/onboarding",
-            new { acceptTerms = true, acceptMarketingEmails = false });
+            new { acceptMarketingEmails = false });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

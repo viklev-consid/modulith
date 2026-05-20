@@ -39,7 +39,6 @@ internal static class CompleteOnboardingEndpoint
                     .ToArray() ?? [];
                 var command = new CompleteOnboardingCommand(
                     userId,
-                    request.AcceptTerms == true,
                     request.AcceptMarketingEmails,
                     acceptedDocuments,
                     ip,
