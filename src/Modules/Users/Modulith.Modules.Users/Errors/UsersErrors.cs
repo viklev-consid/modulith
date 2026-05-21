@@ -130,6 +130,9 @@ internal static class UsersErrors
     public static readonly Error LegalDocumentAcceptanceInvalid =
         Error.Validation("Users.Onboarding.LegalDocumentAcceptanceInvalid", "One or more accepted legal documents are stale or invalid.");
 
+    public static readonly Error LegalDocumentNotFound =
+        Error.NotFound("Users.LegalDocument.NotFound", "The requested legal document was not found.");
+
     // Two-factor authentication
     public static readonly Error TwoFactorRequired =
         Error.Unauthorized("Users.TwoFactor.Required", "Two-factor authentication is required to complete sign-in.");

@@ -20,6 +20,7 @@ using Modulith.Modules.Users.Features.DeleteAvatar;
 using Modulith.Modules.Users.Features.ExportPersonalData;
 using Modulith.Modules.Users.Features.ForgotPassword;
 using Modulith.Modules.Users.Features.GetCurrentUser;
+using Modulith.Modules.Users.Features.GetLegalDocument;
 using Modulith.Modules.Users.Features.GetLegalCompliance;
 using Modulith.Modules.Users.Features.GetOnboardingLegalRequirements;
 using Modulith.Modules.Users.Features.GetUserAvatar;
@@ -154,6 +155,7 @@ public static class UsersModule
         opts.Discovery.IncludeType<LoginHandler>();
         opts.Discovery.IncludeType<LoginTwoFactorHandler>();
         opts.Discovery.IncludeType<GetCurrentUserHandler>();
+        opts.Discovery.IncludeType<GetLegalDocumentHandler>();
         opts.Discovery.IncludeType<GetLegalComplianceHandler>();
         opts.Discovery.IncludeType<GetOnboardingLegalRequirementsHandler>();
         opts.Discovery.IncludeType<AcceptLegalDocumentsHandler>();
@@ -210,6 +212,7 @@ public static class UsersModule
         LoginEndpoint.Map(app);
         LoginTwoFactorEndpoint.Map(app);
         GetCurrentUserEndpoint.Map(app);
+        GetLegalDocumentEndpoint.Map(app);
         GetLegalComplianceEndpoint.Map(app);
         GetOnboardingLegalRequirementsEndpoint.Map(app);
         AcceptLegalDocumentsEndpoint.Map(app);
