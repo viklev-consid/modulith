@@ -55,7 +55,7 @@ return result.ToProblemDetailsOr(Results.Created);
 Use platform override only when the endpoint is truly an operator/support endpoint:
 
 ```csharp
-ScopedAuthorizationOptions.AllowPlatformOverride
+ScopedAuthorizationOptions.WithPlatformOverride
 ```
 
 ## Cross-module rules

@@ -40,7 +40,7 @@ Global admins may bypass organization membership only when the endpoint explicit
 Use the explicit option:
 
 ```csharp
-ScopedAuthorizationOptions.AllowPlatformOverride
+ScopedAuthorizationOptions.WithPlatformOverride
 ```
 
 Do not model platform admins as hidden organization members. They must not appear in member lists, owner counts, membership history, or organization notifications unless they are real members.

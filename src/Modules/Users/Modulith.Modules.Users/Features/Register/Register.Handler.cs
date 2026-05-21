@@ -1,6 +1,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Modulith.Modules.Organizations.Contracts.Commands;
 using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
@@ -113,6 +114,21 @@ public sealed class RegisterHandler(
             rawConfirmationToken,
             Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailConfirmationRequestedV1)));
+
+        if (!string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
+        {
+            var orgInviteResult = await bus.InvokeAsync<ErrorOr<Success>>(
+                new AcceptOrganizationInvitationForUserCommand(
+                    cmd.OrganizationInvitationToken,
+                    user.Id.Value,
+                    user.Email.Value),
+                ct);
+
+            if (orgInviteResult.IsError)
+            {
+                return orgInviteResult.Errors;
+            }
+        }
 
         return new RegisterResponse(user.Id.Value);
     }

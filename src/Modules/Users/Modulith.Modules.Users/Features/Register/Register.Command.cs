@@ -1,3 +1,8 @@
 namespace Modulith.Modules.Users.Features.Register;
 
-public sealed record RegisterCommand(string Email, string Password, string DisplayName, string? InvitationToken);
+public sealed record RegisterCommand(
+    string Email,
+    string Password,
+    string DisplayName,
+    string? InvitationToken,
+    string? OrganizationInvitationToken);

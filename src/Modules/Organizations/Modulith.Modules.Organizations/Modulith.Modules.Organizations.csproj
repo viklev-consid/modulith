@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- CA1707: underscores in test/migration method names; CA1716: namespace conflicts with keywords -->
     <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
@@ -10,32 +9,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="LegalDocuments\*.md" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Modulith.Modules.Users.Contracts\Modulith.Modules.Users.Contracts.csproj" />
-    <ProjectReference Include="..\..\Organizations\Modulith.Modules.Organizations.Contracts\Modulith.Modules.Organizations.Contracts.csproj" />
+    <ProjectReference Include="..\Modulith.Modules.Organizations.Contracts\Modulith.Modules.Organizations.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\Modulith.Shared.Infrastructure\Modulith.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Shared\Modulith.Shared.Kernel\Modulith.Shared.Kernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="ErrorOr" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
-    <PackageReference Include="Magick.NET-Q8-AnyCPU" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
-    <PackageReference Include="TickerQ" />
     <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.EntityFrameworkCore" />
   </ItemGroup>
