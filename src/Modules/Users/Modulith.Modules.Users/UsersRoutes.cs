@@ -12,6 +12,8 @@ internal static class UsersRoutes
     public const string OnboardingLegalRequirements = $"{Me}/onboarding/legal-requirements";
     public const string LegalCompliance = $"{Me}/legal-compliance";
     public const string LegalAcceptances = $"{Me}/legal-acceptances";
+    public const string LegalDocuments = $"{Prefix}/legal-documents";
+    public const string LegalDocumentByTypeAndVersion = $"{LegalDocuments}/{{type:length(1,50)}}/{{version:length(1,50)}}";
     public const string MyAvatar = $"{Me}/avatar";
     public const string UserAvatar = $"{Prefix}/{{userId:guid}}/avatar";
     public const string PersonalData = $"{Me}/personal-data";

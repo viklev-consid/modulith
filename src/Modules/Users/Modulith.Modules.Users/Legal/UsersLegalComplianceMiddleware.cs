@@ -63,6 +63,9 @@ internal static class UsersLegalComplianceMiddleware
 
         return path.StartsWithSegments(UsersRoutes.LegalCompliance, StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments(UsersRoutes.LegalAcceptances, StringComparison.OrdinalIgnoreCase) ||
+            // Only the read endpoint is an escape hatch; future writes under this prefix must stay gated.
+            (HttpMethods.IsGet(method) &&
+                path.StartsWithSegments(UsersRoutes.LegalDocuments, StringComparison.OrdinalIgnoreCase)) ||
             path.StartsWithSegments(UsersRoutes.OnboardingLegalRequirements, StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments(UsersRoutes.CompleteOnboarding, StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments(UsersRoutes.Logout, StringComparison.OrdinalIgnoreCase) ||

@@ -12,6 +12,22 @@ public static class LegalDocumentMapper
             _ => throw new ArgumentOutOfRangeException(nameof(documentType), documentType, "Unknown legal document type."),
         };
 
+    public static bool TryFromWireType(string type, out LegalDocumentType documentType)
+    {
+        switch (type)
+        {
+            case "termsOfService":
+                documentType = LegalDocumentType.TermsOfService;
+                return true;
+            case "privacyPolicy":
+                documentType = LegalDocumentType.PrivacyPolicy;
+                return true;
+            default:
+                documentType = default;
+                return false;
+        }
+    }
+
     public static string ToWireBlockingLevel(LegalDocumentBlockingLevel blockingLevel) =>
         blockingLevel switch
         {
