@@ -5,4 +5,5 @@ public sealed record UserInvitationCreatedV1(
     string Email,
     string Token,
     DateTimeOffset ExpiresAt,
+    Guid InvitedByUserId,
     Guid MessageId);

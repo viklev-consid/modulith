@@ -21,6 +21,8 @@ public sealed class FrontendOptionsValidator : IValidateOptions<FrontendOptions>
         ValidatePath(options.Paths.ConfirmEmail, "Frontend:Paths:ConfirmEmail", failures);
         ValidatePath(options.Paths.ConfirmEmailChange, "Frontend:Paths:ConfirmEmailChange", failures);
         ValidatePath(options.Paths.ResetPassword, "Frontend:Paths:ResetPassword", failures);
+        ValidatePath(options.Paths.UserInvitation, "Frontend:Paths:UserInvitation", failures);
+        ValidatePath(options.Paths.OrganizationInvitation, "Frontend:Paths:OrganizationInvitation", failures);
 
         return failures.Count == 0
             ? ValidateOptionsResult.Success

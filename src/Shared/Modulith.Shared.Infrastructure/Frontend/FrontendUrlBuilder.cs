@@ -26,6 +26,20 @@ public sealed class FrontendUrlBuilder(IOptions<FrontendOptions> options) : IFro
             ["token"] = token,
         });
 
+    public string AcceptUserInvitation(string token) =>
+        Build(options.Value.Paths.UserInvitation, new Dictionary<string, string?>
+        (StringComparer.Ordinal)
+        {
+            ["token"] = token,
+        });
+
+    public string AcceptOrganizationInvitation(string token) =>
+        Build(options.Value.Paths.OrganizationInvitation, new Dictionary<string, string?>
+        (StringComparer.Ordinal)
+        {
+            ["token"] = token,
+        });
+
     private string Build(string path, IDictionary<string, string?> query)
     {
         var baseUrl = options.Value.BaseUrl.TrimEnd('/');

@@ -7,4 +7,8 @@ public interface IFrontendUrlBuilder
     string ConfirmEmailChange(string token);
 
     string ResetPassword(string token);
+
+    string AcceptUserInvitation(string token);
+
+    string AcceptOrganizationInvitation(string token);
 }

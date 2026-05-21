@@ -70,6 +70,7 @@ public sealed class CreateInvitationHandler(
             invitation.Email,
             rawToken,
             invitation.ExpiresAt,
+            cmd.InvitedByUserId,
             Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserInvitationCreatedV1)));
 
