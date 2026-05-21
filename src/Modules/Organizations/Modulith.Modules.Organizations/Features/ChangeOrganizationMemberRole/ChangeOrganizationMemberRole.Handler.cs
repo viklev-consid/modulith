@@ -33,7 +33,7 @@ public sealed class ChangeOrganizationMemberRoleHandler(OrganizationsDbContext d
         }
 
         var oldRole = member.Role.Name;
-        var change = organization.ChangeMemberRole(cmd.UserId, roleResult.Value);
+        var change = organization.ChangeMemberRole(cmd.ChangedByUserId, cmd.UserId, roleResult.Value);
         if (change.IsError)
         {
             return change.Errors;

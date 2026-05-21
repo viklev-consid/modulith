@@ -12,6 +12,7 @@ internal static class OrganizationRolePermissionMap
             [
                 OrganizationsPermissions.OrganizationsRead,
                 OrganizationsPermissions.OrganizationsWrite,
+                OrganizationsPermissions.OrganizationsDelete,
                 OrganizationsPermissions.MembersRead,
                 OrganizationsPermissions.MembersManage,
                 OrganizationsPermissions.InvitationsManage,

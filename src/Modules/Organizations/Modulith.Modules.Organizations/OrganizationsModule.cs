@@ -22,6 +22,7 @@ using Modulith.Modules.Organizations.Features.ListOrganizationMembers;
 using Modulith.Modules.Organizations.Features.RemoveOrganizationMember;
 using Modulith.Modules.Organizations.Features.RevokeOrganizationInvitation;
 using Modulith.Modules.Organizations.Features.UpdateOrganization;
+using Modulith.Modules.Organizations.Features.ValidateOrganizationInvitationForRegistration;
 using Modulith.Modules.Organizations.Gdpr;
 using Modulith.Modules.Organizations.Integration.Subscribers;
 using Modulith.Modules.Organizations.Persistence;
@@ -44,6 +45,11 @@ public static class OrganizationsModule
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
+        services.AddOptions<OrganizationsOptions>()
+            .Bind(configuration.GetSection("Modules:Organizations"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.TryAddSingleton<IClock, SystemClock>();
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
         services.AddPermissions(OrganizationsPermissions.All);
@@ -95,6 +101,7 @@ public static class OrganizationsModule
         opts.Discovery.IncludeType<ListOrganizationInvitationsHandler>();
         opts.Discovery.IncludeType<RevokeOrganizationInvitationHandler>();
         opts.Discovery.IncludeType<EnsureUserCanBeErasedFromOrganizationsHandler>();
+        opts.Discovery.IncludeType<ValidateOrganizationInvitationForRegistrationHandler>();
         opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         return opts;
     }

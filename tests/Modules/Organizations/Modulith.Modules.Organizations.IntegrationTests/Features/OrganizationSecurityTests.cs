@@ -1,0 +1,247 @@
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Modulith.Modules.Audit.Persistence;
+using Modulith.Modules.Organizations.Domain;
+using Modulith.Modules.Organizations.Features.ChangeOrganizationMemberRole;
+using Modulith.Modules.Organizations.Features.CreateOrganization;
+using Modulith.Modules.Organizations.Features.CreateOrganizationInvitation;
+using Modulith.Modules.Organizations.Features.ListOrganizationMembers;
+using Modulith.Modules.Organizations.Persistence;
+using Modulith.Modules.Users.Features.Register;
+using Wolverine;
+using Wolverine.Tracking;
+
+namespace Modulith.Modules.Organizations.IntegrationTests.Features;
+
+[Collection("OrganizationsModule")]
+[Trait("Category", "Integration")]
+public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) : IAsyncLifetime
+{
+    public Task InitializeAsync() => fixture.ResetDatabaseAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task MemberOfAnotherOrganization_CannotReadMembers()
+    {
+        var ownerA = Guid.NewGuid();
+        var ownerB = Guid.NewGuid();
+        var orgA = await CreateOrganizationAsync(ownerA, "Org A", "org-a");
+        await CreateOrganizationAsync(ownerB, "Org B", "org-b");
+        using var client = fixture.CreateAuthenticatedClient(ownerA, "a@example.com", "A");
+
+        var response = await client.GetAsync($"/v1/organizations/org-b/members");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var ownResponse = await client.GetAsync($"/v1/organizations/{orgA.Slug}/members");
+        Assert.Equal(HttpStatusCode.OK, ownResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_CannotPromoteSelfToOwner()
+    {
+        var ownerId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        await AddMemberAsync(org.Id, adminId, OrganizationRole.Admin);
+        using var adminClient = fixture.CreateAuthenticatedClient(adminId, "admin@example.com", "Admin");
+
+        var response = await adminClient.PutAsJsonAsync(
+            $"/v1/organizations/{org.Slug}/members/{adminId}/role",
+            new ChangeOrganizationMemberRoleRequest("owner"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_CannotCreateOwnerInvitation()
+    {
+        var ownerId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        await AddMemberAsync(org.Id, adminId, OrganizationRole.Admin);
+        using var adminClient = fixture.CreateAuthenticatedClient(adminId, "admin@example.com", "Admin");
+
+        var response = await adminClient.PostAsJsonAsync(
+            $"/v1/organizations/{org.Slug}/invitations",
+            new CreateOrganizationInvitationRequest("alt@example.com", "owner"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_CannotDeleteOrganization()
+    {
+        var ownerId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        await AddMemberAsync(org.Id, adminId, OrganizationRole.Admin);
+        using var adminClient = fixture.CreateAuthenticatedClient(adminId, "admin@example.com", "Admin");
+
+        var response = await adminClient.DeleteAsync($"/v1/organizations/{org.Slug}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OrganizationInvite_CanRegisterUserAndCannotBeReplayed()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var ownerClient = fixture.CreateAuthenticatedClient(ownerId, "owner@example.com", "Owner");
+        var inviteResponse = await ownerClient.PostAsJsonAsync(
+            $"/v1/organizations/{org.Slug}/invitations",
+            new CreateOrganizationInvitationRequest("new@example.com", "member"));
+        inviteResponse.EnsureSuccessStatusCode();
+        var invite = await inviteResponse.Content.ReadFromJsonAsync<CreateOrganizationInvitationResponse>();
+        Assert.NotNull(invite);
+
+        using var anonymous = fixture.CreateAnonymousClient();
+        var register = await anonymous.PostAsJsonAsync(
+            "/v1/users/register",
+            new RegisterRequest("new@example.com", "Password1!", "New User", OrganizationInvitationToken: invite.RawToken));
+
+        Assert.Equal(HttpStatusCode.Created, register.StatusCode);
+        var replay = await anonymous.PostAsJsonAsync(
+            "/v1/users/register",
+            new RegisterRequest("another@example.com", "Password1!", "Another", OrganizationInvitationToken: invite.RawToken));
+        Assert.NotEqual(HttpStatusCode.Created, replay.StatusCode);
+
+        var members = await fixture.QueryDbAsync<OrganizationsDbContext, int>((db, ct) =>
+            db.Memberships.CountAsync(m => m.OrganizationId == org.Id && m.IsActive, ct));
+        Assert.Equal(2, members);
+    }
+
+    [Fact]
+    public async Task UserErasureCheck_BlocksOwners()
+    {
+        using var anonymous = fixture.CreateAnonymousClient();
+        var register = await anonymous.PostAsJsonAsync(
+            "/v1/users/register",
+            new RegisterRequest("owner@example.com", "Password1!", "Owner"));
+        register.EnsureSuccessStatusCode();
+        var registered = await register.Content.ReadFromJsonAsync<RegisterResponse>();
+        Assert.NotNull(registered);
+
+        using var client = fixture.CreateAuthenticatedClient(registered.UserId, "owner@example.com", "Owner");
+        var create = await client.PostAsJsonAsync(
+            "/v1/organizations",
+            new CreateOrganizationRequest("Acme", "acme"));
+        create.EnsureSuccessStatusCode();
+
+        var response = await client.DeleteAsync("/v1/users/me");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LastOwner_CannotLeaveOrganization()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var client = fixture.CreateAuthenticatedClient(ownerId, "owner@example.com", "Owner");
+
+        var response = await client.DeleteAsync($"/v1/organizations/{org.Slug}/members/{ownerId}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AcceptExpiredInvitation_ReturnsValidationFailure()
+    {
+        var ownerId = Guid.NewGuid();
+        var invitedId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        var rawToken = await CreateExpiredInvitationAsync(org.Id, "expired@example.com", ownerId);
+        using var client = fixture.CreateAuthenticatedClient(invitedId, "expired@example.com", "Expired");
+
+        var response = await client.PostAsJsonAsync(
+            "/v1/organizations/invitations/accept",
+            new { InvitationToken = rawToken });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreatingOrganization_PersistsAuditEntryWithOrganizationScope()
+    {
+        var ownerId = Guid.NewGuid();
+        using var client = fixture.CreateAuthenticatedClient(ownerId, "owner@example.com", "Owner");
+        HttpResponseMessage? response = null;
+
+        Func<IMessageContext, Task> act = async _ =>
+        {
+            response = await client.PostAsJsonAsync(
+                "/v1/organizations",
+                new CreateOrganizationRequest("Audited", "audited"));
+        };
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
+
+        Assert.Equal(HttpStatusCode.Created, response!.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateOrganizationResponse>();
+        Assert.NotNull(body);
+
+        var audit = await fixture.QueryDbAsync<AuditDbContext, bool>((db, ct) =>
+            db.AuditEntries.AnyAsync(
+                e => e.OrganizationId == body.OrganizationId && e.EventType == "organization.created",
+                ct));
+        Assert.True(audit);
+    }
+
+    private async Task<(OrganizationId Id, string Slug)> CreateOrganizationAsync(Guid ownerId, string name, string slug)
+    {
+        await fixture.ExecuteDbAsync<OrganizationsDbContext>(async (db, ct) =>
+        {
+            var clock = fixture.Services.GetRequiredService<Modulith.Shared.Kernel.Interfaces.IClock>();
+            var organization = Organization.Create(name, OrganizationSlug.Create(slug).Value, ownerId, clock).Value;
+            db.Organizations.Add(organization);
+            await db.SaveChangesAsync(ct);
+        });
+
+        var organizationId = await fixture.QueryDbAsync<OrganizationsDbContext, OrganizationId>((db, ct) =>
+            db.Organizations
+                .Where(o => o.Slug == OrganizationSlug.Create(slug).Value)
+                .Select(o => o.Id)
+                .SingleAsync(ct));
+
+        return (organizationId, slug);
+    }
+
+    private async Task AddMemberAsync(OrganizationId organizationId, Guid userId, OrganizationRole role)
+    {
+        await fixture.ExecuteDbAsync<OrganizationsDbContext>(async (db, ct) =>
+        {
+            var clock = fixture.Services.GetRequiredService<Modulith.Shared.Kernel.Interfaces.IClock>();
+            var organization = await db.Organizations.Include(o => o.Memberships).SingleAsync(o => o.Id == organizationId, ct);
+            var add = organization.AddMember(userId, role, clock);
+            Assert.False(add.IsError);
+            await db.SaveChangesAsync(ct);
+        });
+    }
+
+    private async Task<string> CreateExpiredInvitationAsync(OrganizationId organizationId, string email, Guid invitedByUserId)
+    {
+        string? rawToken = null;
+        await fixture.ExecuteDbAsync<OrganizationsDbContext>(async (db, ct) =>
+        {
+            var clock = fixture.Services.GetRequiredService<Modulith.Shared.Kernel.Interfaces.IClock>();
+            var invitation = OrganizationInvitation.Create(
+                organizationId,
+                email,
+                OrganizationRole.Member,
+                TimeSpan.FromMilliseconds(1),
+                invitedByUserId,
+                clock).Value;
+            rawToken = invitation.RawToken;
+            db.Invitations.Add(invitation.Invitation);
+            await db.SaveChangesAsync(ct);
+            await Task.Delay(20, ct);
+        });
+
+        return rawToken!;
+    }
+}

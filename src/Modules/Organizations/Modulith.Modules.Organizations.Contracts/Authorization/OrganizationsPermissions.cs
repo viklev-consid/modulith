@@ -4,6 +4,7 @@ public static class OrganizationsPermissions
 {
     public const string OrganizationsRead = "organizations.organizations.read";
     public const string OrganizationsWrite = "organizations.organizations.write";
+    public const string OrganizationsDelete = "organizations.organizations.delete";
     public const string MembersRead = "organizations.members.read";
     public const string MembersManage = "organizations.members.manage";
     public const string InvitationsManage = "organizations.invitations.manage";
@@ -14,6 +15,7 @@ public static class OrganizationsPermissions
         [
             OrganizationsRead,
             OrganizationsWrite,
+            OrganizationsDelete,
             MembersRead,
             MembersManage,
             InvitationsManage,

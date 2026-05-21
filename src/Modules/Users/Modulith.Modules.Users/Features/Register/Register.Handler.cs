@@ -2,6 +2,7 @@ using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Modulith.Modules.Organizations.Contracts.Commands;
+using Modulith.Modules.Organizations.Contracts.Queries;
 using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
@@ -36,6 +37,7 @@ public sealed class RegisterHandler(
         var email = emailResult.Value;
 
         UserInvitation? invitation = null;
+        ErrorOr<ValidateOrganizationInvitationForRegistrationResponse>? organizationInvitation = null;
         var registration = options.Value.Registration;
         if (registration.Mode == RegistrationMode.Disabled)
         {
@@ -44,15 +46,43 @@ public sealed class RegisterHandler(
 
         if (registration.Mode == RegistrationMode.InviteOnly)
         {
-            if (string.IsNullOrWhiteSpace(cmd.InvitationToken))
+            if (string.IsNullOrWhiteSpace(cmd.InvitationToken) &&
+                string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
             {
                 return UsersErrors.RegistrationUnavailable;
             }
 
-            invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
-            if (invitation is null)
+            if (!string.IsNullOrWhiteSpace(cmd.InvitationToken))
             {
-                return UsersErrors.RegistrationUnavailable;
+                invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
+                if (invitation is null)
+                {
+                    return UsersErrors.RegistrationUnavailable;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
+            {
+                organizationInvitation = await ValidateOrganizationInvitationAsync(
+                    cmd.OrganizationInvitationToken,
+                    email.Value,
+                    ct);
+                if (organizationInvitation.Value.IsError)
+                {
+                    return UsersErrors.RegistrationUnavailable;
+                }
+            }
+        }
+
+        if (registration.Mode != RegistrationMode.InviteOnly &&
+            !string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
+        {
+            organizationInvitation = await ValidateOrganizationInvitationAsync(
+                cmd.OrganizationInvitationToken,
+                email.Value,
+                ct);
+            if (organizationInvitation.Value.IsError)
+            {
+                return organizationInvitation.Value.Errors;
             }
         }
 
@@ -104,6 +134,16 @@ public sealed class RegisterHandler(
                 : UsersErrors.EmailAlreadyRegistered;
         }
 
+        if (!string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
+        {
+            _ = await bus.InvokeAsync<ErrorOr<Success>>(
+                new AcceptOrganizationInvitationForUserCommand(
+                    cmd.OrganizationInvitationToken,
+                    user.Id.Value,
+                    user.Email.Value),
+                ct);
+        }
+
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
 
@@ -115,23 +155,16 @@ public sealed class RegisterHandler(
             Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailConfirmationRequestedV1)));
 
-        if (!string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
-        {
-            var orgInviteResult = await bus.InvokeAsync<ErrorOr<Success>>(
-                new AcceptOrganizationInvitationForUserCommand(
-                    cmd.OrganizationInvitationToken,
-                    user.Id.Value,
-                    user.Email.Value),
-                ct);
-
-            if (orgInviteResult.IsError)
-            {
-                return orgInviteResult.Errors;
-            }
-        }
-
         return new RegisterResponse(user.Id.Value);
     }
+
+    private async Task<ErrorOr<ValidateOrganizationInvitationForRegistrationResponse>> ValidateOrganizationInvitationAsync(
+        string rawToken,
+        string email,
+        CancellationToken ct) =>
+        await bus.InvokeAsync<ErrorOr<ValidateOrganizationInvitationForRegistrationResponse>>(
+            new ValidateOrganizationInvitationForRegistrationQuery(rawToken, email),
+            ct);
 
     private async Task<UserInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)
     {

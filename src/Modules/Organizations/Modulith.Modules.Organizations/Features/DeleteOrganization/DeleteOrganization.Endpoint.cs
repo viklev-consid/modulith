@@ -36,7 +36,7 @@ internal static class DeleteOrganizationEndpoint
                 var access = await authorization.AuthorizeAsync(
                     currentUser,
                     organization.Value,
-                    OrganizationsPermissions.OrganizationsWrite,
+                    OrganizationsPermissions.OrganizationsDelete,
                     ScopedAuthorizationOptions.WithPlatformOverride,
                     ct);
                 if (!access.Succeeded)

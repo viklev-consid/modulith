@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using System.Security.Claims;
 using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
@@ -18,7 +19,8 @@ internal static class AcceptOrganizationInvitationEndpoint
                 IMessageBus bus,
                 CancellationToken ct) =>
             {
-                var email = httpContext.User.FindFirst("email")?.Value;
+                var email = httpContext.User.FindFirst("email")?.Value
+                    ?? httpContext.User.FindFirst(ClaimTypes.Email)?.Value;
                 if (currentUser.Id is null || email is null || !Guid.TryParse(currentUser.Id, out var userId))
                 {
                     return Results.Unauthorized();

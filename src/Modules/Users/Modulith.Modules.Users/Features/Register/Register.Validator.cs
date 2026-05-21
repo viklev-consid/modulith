@@ -22,5 +22,8 @@ internal sealed class RegisterValidator : AbstractValidator<RegisterRequest>
 
         RuleFor(x => x.InvitationToken)
             .MaximumLength(64);
+
+        RuleFor(x => x.OrganizationInvitationToken)
+            .MaximumLength(64);
     }
 }

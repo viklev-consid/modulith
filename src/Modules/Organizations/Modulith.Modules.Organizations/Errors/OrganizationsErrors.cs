@@ -41,6 +41,9 @@ internal static class OrganizationsErrors
     public static readonly ErrorOr.Error RoleInvalid =
         ErrorOr.Error.Validation("Organizations.Role.Invalid", "Organization role is not valid.");
 
+    public static readonly ErrorOr.Error RoleEscalationForbidden =
+        ErrorOr.Error.Forbidden("Organizations.Role.EscalationForbidden", "Cannot grant or modify an organization role at or above your authority.");
+
     public static readonly ErrorOr.Error InvitationInvalid =
         ErrorOr.Error.Validation("Organizations.Invitation.Invalid", "Organization invitation is invalid.");
 

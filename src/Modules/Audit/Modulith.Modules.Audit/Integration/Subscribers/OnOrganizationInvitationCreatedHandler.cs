@@ -9,7 +9,7 @@ public sealed class OnOrganizationInvitationCreatedHandler(OrganizationAuditWrit
 {
     public async Task Handle(OrganizationInvitationCreatedV1 @event, CancellationToken ct)
     {
-        var payload = JsonSerializer.Serialize(new { @event.OrganizationId, @event.InvitationId, @event.Email, @event.Role });
+        var payload = JsonSerializer.Serialize(new { @event.OrganizationId, @event.InvitationId, @event.Role });
         await writer.WriteAsync(
             "organization.invitation_created",
             @event.InvitedByUserId,

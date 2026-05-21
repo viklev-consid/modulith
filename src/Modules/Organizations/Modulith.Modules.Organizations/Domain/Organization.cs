@@ -110,6 +110,42 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
         return Result.Success;
     }
 
+    public ErrorOr<Success> ChangeMemberRole(Guid actorUserId, Guid targetUserId, OrganizationRole role)
+    {
+        var actor = FindActiveMembership(actorUserId);
+        if (actor is null)
+        {
+            return OrganizationsErrors.MemberNotFound;
+        }
+
+        var target = FindActiveMembership(targetUserId);
+        if (target is null)
+        {
+            return OrganizationsErrors.MemberNotFound;
+        }
+
+        var requiredRank = Math.Max(target.Role.Rank, role.Rank);
+        if (actor.Role.Rank < requiredRank)
+        {
+            return OrganizationsErrors.RoleEscalationForbidden;
+        }
+
+        return ChangeMemberRole(targetUserId, role);
+    }
+
+    public ErrorOr<Success> EnsureCanInviteRole(Guid actorUserId, OrganizationRole role)
+    {
+        var actor = FindActiveMembership(actorUserId);
+        if (actor is null)
+        {
+            return OrganizationsErrors.MemberNotFound;
+        }
+
+        return actor.Role.Rank >= role.Rank
+            ? Result.Success
+            : OrganizationsErrors.RoleEscalationForbidden;
+    }
+
     public ErrorOr<Success> RemoveMember(Guid userId, Guid removedByUserId, IClock clock)
     {
         if (IsDeleted)

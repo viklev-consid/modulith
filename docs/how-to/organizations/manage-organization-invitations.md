@@ -4,6 +4,8 @@ Organization invitations invite an email address into one organization with one 
 
 They are separate from global account invitations. The global user role created through an organization invite is still `user` unless a platform admin changes it.
 
+Invitation lifetime is configured through `Modules:Organizations:InvitationLifetimeDays`.
+
 ## Flow
 
 1. An organization owner/admin creates an invitation for an email and role.

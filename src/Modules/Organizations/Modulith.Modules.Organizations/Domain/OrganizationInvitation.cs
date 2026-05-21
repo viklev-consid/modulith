@@ -74,6 +74,7 @@ public sealed class OrganizationInvitation : Entity<OrganizationInvitationId>
 
     public ErrorOr<Success> Accept(Guid userId, string email, IClock clock)
     {
+        // Both values are normalized to lowercase before comparison.
         if (!string.Equals(Email, email.Trim().ToLowerInvariant(), StringComparison.Ordinal))
         {
             return OrganizationsErrors.InvitationInvalid;
