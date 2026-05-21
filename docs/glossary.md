@@ -34,7 +34,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Contract.** A type in a module's `.Contracts` project — a public command, query, event, or DTO that other modules may depend on. Contracts are the module's API surface. Changing a contract is a breaking change.
 
-**Consent.** A record of a user granting or revoking permission for a specific purpose (marketing emails, data processing). Stored in the Users module. Separate from notification preferences, though wired together. Distinct from *Terms Acceptance* — consent gates optional behaviour (e.g. marketing), whereas terms acceptance records legal agreement to a document version.
+**Consent.** A record of a user granting or revoking permission for a specific purpose (marketing emails, data processing). Stored in the Users module. Separate from notification preferences, though wired together. Distinct from *Terms Acceptance* — consent gates optional behaviour (e.g. marketing), whereas terms acceptance records legal agreement to a legal document version.
 
 **Credential Retention Guardrail.** A domain invariant enforced by `User.UnlinkExternalLogin`: a user must always retain at least one login credential (a password or another external login). Unlinking the last credential returns a `Conflict` error, preventing account lock-out.
 
@@ -124,7 +124,7 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **Scheduled Job.** A time-based Wolverine message handler scheduled for future execution. Used for delayed or recurring work such as cleanup sweeps, retries, and token-expiry processing.
 
-**Seeder.** An implementation of `IModuleSeeder` that populates a module's database with deterministic local-dev data on first run. Not used in production.
+**Seeder.** An implementation of `IModuleSeeder` that populates a module's database with deterministic data on first run. Most seeders are local-dev or test data only; `SeedEnvironment.All` seeders may run in production for application-owned reference data. Legal document Markdown in the Users module is one such application-data seeding flow.
 
 **SensitivePersonalData.** A stricter GDPR classification attribute than `[PersonalData]`, used for fields that need tighter handling or masking. It participates in the same export and erasure flows while signaling stronger protection requirements.
 
@@ -146,7 +146,9 @@ Terms as used in this codebase. Some terms are industry-standard; others are cod
 
 **TickerQ.** The recurring scheduler used for operator-visible cron jobs. TickerQ jobs should usually dispatch Wolverine commands so module behavior still flows through the normal handler pipeline.
 
-**Terms Acceptance.** An immutable record that a user accepted a specific version of a legal document (e.g. `"tos:1.0"`). Created by the `CompleteOnboarding` slice, which writes a single ToS row keyed to the current `UsersOptions.TermsOfServiceVersion`. Keyed by `(UserId, Version)` with a unique constraint — re-submitting `CompleteOnboarding` when a row for the current version already exists is a no-op. Distinct from *Consent*, which gates optional processing (e.g. `marketing-emails`); terms acceptance is required for account activation.
+**Legal Document.** Backend-owned Markdown for Terms of Service or Privacy Policy, versioned and stored in the Users module. Current document versions are seeded from embedded Markdown resources and served to clients for onboarding or continued-use acceptance. Superseded documents are retained in the database but are not exposed as a public historical archive.
+
+**Terms Acceptance.** An immutable record that a user accepted a specific version of a legal document. Created during onboarding or through the legal-acceptances endpoint when a current required document is missing. Each acceptance stores document type, version, content hash, timestamp, IP address, and user agent. Distinct from *Consent*, which gates optional processing such as `marketing-emails`; legal document acceptance records agreement to required Terms of Service and Privacy Policy artifacts.
 
 **Transport.** The layer that physically delivers a notification: `IEmailSender`, `ISmsSender`. Lives in `Shared.Infrastructure`. Distinct from orchestration (templates, preferences), which is the Notifications module's job.
 

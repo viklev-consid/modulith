@@ -38,7 +38,7 @@ Those same properties also make the codebase easier for AI agents to work in. Cl
 - **Audit module** consuming domain events for change history
 - **Per-module health checks** registered under the `ready` tag, visible in the Aspire dashboard
 - **Per-module OpenTelemetry activity sources** with full handler instrumentation
-- **GDPR primitives**: data classification attributes, exporter/eraser contracts, consent tracking
+- **GDPR and legal primitives**: data classification attributes, exporter/eraser contracts, consent tracking, backend-owned legal Markdown, audited Terms/Privacy acceptance, and continued-use re-acceptance gates
 - **Testing**: xUnit v3, Shouldly, Verify, Bogus, Testcontainers, NetArchTest, WireMock.Net
 - **Agent-ready**: layered agent guidance (`AGENTS.md` + `CLAUDE.md`), comprehensive ADRs, `dotnet new` item templates, and repo-local automation/skills for common workflows
 
@@ -186,6 +186,8 @@ Supported `Modules:Users:Registration:Mode` values:
 - `Disabled` — new account registration/provisioning is closed; existing users can still log in.
 
 The Notifications module separates account/security email from product-facing bell notifications. Password reset, password changed, email change, welcome, and external-login notifications stay email-first. Bell notifications are for in-app product activity such as replies, mentions, assignments, approvals, and workflow updates. The bell API is scoped to the current user under `/v1/me/notifications`, with unread counts, read/archive actions, SSE live updates, preferences under `/v1/me/notification-preferences`, and scheduled retention cleanup.
+
+The Users module owns legal document content and acceptance state. Terms of Service and Privacy Policy copy lives as backend Markdown under `src/Modules/Users/Modulith.Modules.Users/LegalDocuments/`, is seeded into the Users database from `Modules:Users:TermsOfServiceVersion` and `Modules:Users:PrivacyPolicyVersion`, and is served to clients for onboarding and re-acceptance flows. Clients must echo document ID, version, and content hash when accepting; the backend records immutable acceptances and can return HTTP 428 `ProblemDetails` when a blocking current document is missing. See [Manage legal documents](docs/how-to/auth/manage-legal-documents.md).
 
 ## Working with AI agents
 

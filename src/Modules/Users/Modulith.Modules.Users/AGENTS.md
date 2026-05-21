@@ -16,6 +16,7 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 - **PendingEmailChange** - requested-but-unconfirmed new email plus token hash.
 - **Consent** - tracks user agreement to processing purposes.
 - **TermsAcceptance** - immutable record of a legal document version accepted by a user.
+- **LegalDocument** - backend-owned Markdown for Terms of Service and Privacy Policy versions.
 - **TwoFactorCredential** - optional per-user TOTP credential; the protected secret uses ASP.NET Core Data Protection.
 - **RecoveryCode** - hashed, single-use fallback code for 2FA login and disable flows.
 - **PendingTwoFactorChallenge** - short-lived, hashed login challenge issued after first-factor success when local 2FA is enabled.
@@ -28,7 +29,7 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 - Get current user, list users, get user by ID, change user role.
 - Forgot password, reset password, change password.
 - Request and confirm email change.
-- Consent tracking, GDPR export, GDPR erasure.
+- Consent tracking, legal document onboarding/continued-use acceptance, GDPR export, GDPR erasure.
 - Optional per-user TOTP two-factor authentication with recovery codes.
 
 ---
@@ -80,6 +81,7 @@ Sensitive values, especially `JwtOptions.SigningKey`, live in user-secrets or a 
 
 - Shared JWT options: `JwtOptions`, bound from `Jwt:`.
 - Users options: `UsersOptions`, bound from `Modules:Users:`. Includes access-token lifetime, refresh-token lifetime, session cap, password policy, token lifetimes, two-factor settings, and legal document versions.
+- Current Terms of Service and Privacy Policy Markdown lives under `LegalDocuments/` and is seeded from `Modules:Users:TermsOfServiceVersion` and `Modules:Users:PrivacyPolicyVersion`. See `docs/how-to/auth/manage-legal-documents.md`.
 - TOTP secrets are protected with ASP.NET Core Data Protection. Production deployments must persist and share the Data Protection key ring across API instances; losing the key ring makes existing TOTP secrets undecryptable.
 
 ---
@@ -104,6 +106,8 @@ Important events include registration, login/logout, password reset/change, emai
 - `SweepExpiredTokensHandler` also sweeps pending 2FA challenges. Do not add a separate cleanup.
 - Do not reveal the 2FA failed-attempt cap. Return invalid-code errors until the consumed challenge naturally becomes invalid/expired on the next request.
 - Do not remove `xmin` from `PendingTwoFactorChallenge`; failed-attempt counting is security-sensitive.
+- Do not reintroduce a boolean-only legal acceptance path. Clients must accept legal documents by ID, version, and content hash.
+- Do not block GDPR export, account deletion, logout, or legal acceptance endpoints in the continued-use legal-compliance middleware.
 
 ---
 

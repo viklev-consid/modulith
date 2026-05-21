@@ -165,7 +165,7 @@ For anything more complex than a UPDATE-SET, consider a separate code-driven dat
 
 **Migrations** change schema. They may include small data fixes (e.g., backfilling a new non-null column), but should not insert business data.
 
-**Seeders** ([`../adr/0026-module-seeders.md`](../adr/0026-module-seeders.md)) populate development or test data. They run separately from migrations, per environment, and are idempotent.
+**Seeders** ([`../adr/0026-module-seeders.md`](../adr/0026-module-seeders.md)) populate deterministic module-owned data. Most seeders are development or test data only; `SeedEnvironment.All` seeders can also publish application-owned reference data such as Users legal documents. They run separately from migrations, per environment, and are idempotent.
 
 Don't insert "default" business data (roles, categories, feature defaults) from migrations unless they are genuinely structural (e.g., "Admin" role is required for the app to function). Prefer seeders.
 

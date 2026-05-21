@@ -39,6 +39,7 @@ This directory contains ADRs documenting every significant design decision in Mo
 | [0031](0031-third-party-authentication.md) | Third-party Authentication | Accepted |
 | [0032](0032-tickerq-for-recurring-scheduled-jobs.md) | TickerQ for Recurring Scheduled Jobs | Accepted |
 | [0033](0033-two-factor-authentication.md) | TOTP Two-Factor Authentication | Accepted |
+| [0034](0034-backend-owned-versioned-legal-documents.md) | Backend-Owned Versioned Legal Documents | Accepted |
 
 ## Reading order
 
