@@ -35,6 +35,9 @@ internal static class OrganizationsErrors
     public static readonly ErrorOr.Error LastOwnerRequired =
         ErrorOr.Error.Conflict("Organizations.Owner.LastOwnerRequired", "An active organization must have at least one owner.");
 
+    public static readonly ErrorOr.Error OwnedOrganizationsBlockUserErasure =
+        ErrorOr.Error.Conflict("Organizations.Owner.UserErasureBlocked", "Transfer ownership or delete owned organizations before deleting this user.");
+
     public static readonly ErrorOr.Error RoleInvalid =
         ErrorOr.Error.Validation("Organizations.Role.Invalid", "Organization role is not valid.");
 

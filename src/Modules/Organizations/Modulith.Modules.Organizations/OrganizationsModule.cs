@@ -13,6 +13,7 @@ using Modulith.Modules.Organizations.Features.ChangeOrganizationMemberRole;
 using Modulith.Modules.Organizations.Features.CreateOrganization;
 using Modulith.Modules.Organizations.Features.CreateOrganizationInvitation;
 using Modulith.Modules.Organizations.Features.DeleteOrganization;
+using Modulith.Modules.Organizations.Features.EnsureUserCanBeErasedFromOrganizations;
 using Modulith.Modules.Organizations.Features.GetOrganization;
 using Modulith.Modules.Organizations.Features.GetOrganizationAudit;
 using Modulith.Modules.Organizations.Features.ListMyOrganizations;
@@ -22,6 +23,7 @@ using Modulith.Modules.Organizations.Features.RemoveOrganizationMember;
 using Modulith.Modules.Organizations.Features.RevokeOrganizationInvitation;
 using Modulith.Modules.Organizations.Features.UpdateOrganization;
 using Modulith.Modules.Organizations.Gdpr;
+using Modulith.Modules.Organizations.Integration.Subscribers;
 using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Organizations.Seeding;
 using Modulith.Shared.Infrastructure.Authorization;
@@ -92,6 +94,8 @@ public static class OrganizationsModule
         opts.Discovery.IncludeType<AcceptOrganizationInvitationHandler>();
         opts.Discovery.IncludeType<ListOrganizationInvitationsHandler>();
         opts.Discovery.IncludeType<RevokeOrganizationInvitationHandler>();
+        opts.Discovery.IncludeType<EnsureUserCanBeErasedFromOrganizationsHandler>();
+        opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
         return opts;
     }
 

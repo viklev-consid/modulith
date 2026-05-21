@@ -1,4 +1,5 @@
 using ErrorOr;
+using Modulith.Modules.Organizations.Contracts.Commands;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Errors;
 using Modulith.Modules.Users.Gdpr;
@@ -25,6 +26,14 @@ public sealed class DeleteAccountHandler(
         }
 
         var userRef = new UserRef(user.Id.Value, user.DisplayName);
+
+        var organizationCheck = await bus.InvokeAsync<ErrorOr<Success>>(
+            new EnsureUserCanBeErasedFromOrganizationsCommand(user.Id.Value),
+            ct);
+        if (organizationCheck.IsError)
+        {
+            return organizationCheck.Errors;
+        }
 
         await eraser.EraseAsync(userRef, ErasureStrategy.HardDelete, ct);
 
