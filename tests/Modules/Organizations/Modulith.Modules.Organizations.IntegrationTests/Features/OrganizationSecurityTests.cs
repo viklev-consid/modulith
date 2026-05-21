@@ -231,6 +231,16 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
                 e => e.OrganizationId == body.OrganizationId && e.EventType == "organization.created",
                 ct));
         Assert.True(audit);
+
+        var auditResponse = await client.GetAsync($"/v1/organizations/{body.Slug}/audit");
+
+        Assert.Equal(HttpStatusCode.OK, auditResponse.StatusCode);
+        using var auditBody = JsonDocument.Parse(await auditResponse.Content.ReadAsStringAsync());
+        Assert.Equal(body.OrganizationId, auditBody.RootElement.GetProperty("organizationId").GetGuid());
+        Assert.Equal(1, auditBody.RootElement.GetProperty("total").GetInt32());
+        var entry = Assert.Single(auditBody.RootElement.GetProperty("entries").EnumerateArray());
+        Assert.Equal("organization.created", entry.GetProperty("eventType").GetString());
+        Assert.True(entry.TryGetProperty("payload", out _));
     }
 
     private async Task<(OrganizationId Id, string Slug)> CreateOrganizationAsync(Guid ownerId, string name, string slug)

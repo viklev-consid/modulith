@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Authorization;
 using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Modules.Audit.Features.GetAuditTrail;
+using Modulith.Modules.Audit.Features.ListOrganizationAuditEntries;
 using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
 using Modulith.Modules.Audit.Persistence;
@@ -53,6 +54,7 @@ public static class AuditModule
     public static WolverineOptions AddAuditHandlers(this WolverineOptions opts)
     {
         opts.Discovery.IncludeType<GetAuditTrailHandler>();
+        opts.Discovery.IncludeType<ListOrganizationAuditEntriesHandler>();
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
         opts.Discovery.IncludeType<OnUserEmailChangedHandler>();
         opts.Discovery.IncludeType<OnUserLoggedInHandler>();

@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Modulith.Modules.Audit.Contracts.Queries;
 using Modulith.Modules.Organizations.Authorization;
 using Modulith.Modules.Organizations.Contracts.Authorization;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Kernel.Interfaces;
+using Wolverine;
 
 namespace Modulith.Modules.Organizations.Features.GetOrganizationAudit;
 
@@ -18,6 +20,9 @@ internal static class GetOrganizationAuditEndpoint
                 IOrganizationRefResolver resolver,
                 IScopedAuthorizationService<OrganizationScope> authorization,
                 ICurrentUser currentUser,
+                IMessageBus bus,
+                int? page,
+                int? pageSize,
                 CancellationToken ct) =>
             {
                 var organization = await resolver.ResolveAsync(organizationRef, ct);
@@ -37,12 +42,20 @@ internal static class GetOrganizationAuditEndpoint
                     return Results.Forbid();
                 }
 
-                return Results.Ok(new GetOrganizationAuditResponse(
-                    organization.Value.Id.Value,
-                    access.AccessMode.ToString()));
+                var audit = await bus.InvokeAsync<ErrorOr.ErrorOr<ListOrganizationAuditEntriesResponse>>(
+                    new ListOrganizationAuditEntriesQuery(organization.Value.Id.Value, page ?? 1, pageSize ?? 20),
+                    ct);
+
+                return audit.ToProblemDetailsOr(response => Results.Ok(new GetOrganizationAuditResponse(
+                        organization.Value.Id.Value,
+                        access.AccessMode.ToString(),
+                        response.Entries,
+                        response.Total,
+                        response.Page,
+                        response.PageSize)));
             })
         .WithName("GetOrganizationAudit")
-        .WithSummary("Get organization audit metadata. Full audit projection is owned by the Audit module.")
+        .WithSummary("Get organization audit entries.")
         .Produces<GetOrganizationAuditResponse>()
         .RequireAuthorization();
 }
