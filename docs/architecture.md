@@ -27,8 +27,8 @@ The architecture is designed to be easy to split into separate services later, b
 │                    TickerQ recurring jobs + admin dashboard           │
 │                                  │                                    │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐          │
-│  │  Users   │   │ Catalog  │   │  Notifi- │   │  Audit   │   ...    │
-│  │ Module   │   │  Module  │   │ cations  │   │  Module  │          │
+│  │  Users   │   │  Orgs    │   │ Catalog  │   │  Notifi- │   ...    │
+│  │ Module   │   │  Module  │   │  Module  │   │ cations  │          │
 │  │          │   │          │   │  Module  │   │          │          │
 │  │  own DB  │   │  own DB  │   │  own DB  │   │  own DB  │          │
 │  │  schema  │   │  schema  │   │  schema  │   │  schema  │          │
@@ -65,6 +65,9 @@ Modulith.sln
 │       ├── Users/
 │       │   ├── Modulith.Modules.Users/                # Internal
 │       │   └── Modulith.Modules.Users.Contracts/      # Public messages
+│       ├── Organizations/
+│       │   ├── Modulith.Modules.Organizations/        # Internal
+│       │   └── Modulith.Modules.Organizations.Contracts/
 │       ├── Catalog/
 │       │   ├── Modulith.Modules.Catalog/
 │       │   └── Modulith.Modules.Catalog.Contracts/
@@ -215,6 +218,22 @@ See [`adr/0005-module-communication-patterns.md`](adr/0005-module-communication-
 - Shared EF Core interceptors
 
 The rule of thumb: if more than one module needs it and it has no domain meaning, it lives in `Shared.Infrastructure`. If it has domain meaning, it's a module.
+
+## Organization scope
+
+Organizations are the template's workspace/account primitive. They support collaboration products and B2B-style apps without forcing full infrastructure-level multi-tenancy.
+
+Organization-scoped routes use:
+
+```text
+/v1/organizations/{organizationRef}/...
+```
+
+`organizationRef` may be an organization ID or slug. Endpoints resolve it at the HTTP boundary, then handlers, persistence, and integration events use the durable `OrganizationId`.
+
+Modules that opt into organization ownership store `OrganizationId` in their own schema. They do not add cross-schema foreign keys, query Organizations tables, or reference Organizations internals. They authorize through shared scoped-authorization abstractions and the public `OrganizationScope` contract.
+
+Global RBAC remains for platform capabilities. Organization membership roles are scoped and can differ by organization. A global admin may use platform override only when an endpoint explicitly opts in; this does not create hidden organization membership.
 
 ---
 

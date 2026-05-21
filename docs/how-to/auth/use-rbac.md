@@ -131,4 +131,5 @@ This is the standard stateless-JWT tradeoff. If your threat model requires immed
 ## See also
 
 - [Bootstrap the first admin account](bootstrap-admin.md)
+- [Global vs scoped authorization](global-vs-scoped-authorization.md)
 - ADR-0030: RBAC design rationale
