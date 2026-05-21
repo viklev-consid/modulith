@@ -7,6 +7,7 @@ using Modulith.Modules.Organizations.Domain;
 using Modulith.Modules.Organizations.Features.ChangeOrganizationMemberRole;
 using Modulith.Modules.Organizations.Features.CreateOrganization;
 using Modulith.Modules.Organizations.Features.CreateOrganizationInvitation;
+using Modulith.Modules.Organizations.Features.GetOrganization;
 using Modulith.Modules.Organizations.Features.ListMyOrganizations;
 using Modulith.Modules.Organizations.Features.ListOrganizationMembers;
 using Modulith.Modules.Organizations.Persistence;
@@ -130,6 +131,21 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
         Assert.Equal(org.Id.Value, organization.OrganizationId);
         Assert.Equal("owner", organization.Role);
         Assert.Contains("organizations.members.manage", organization.Permissions);
+    }
+
+    [Fact]
+    public async Task PlatformAdminWhoIsMember_GetsScopedPermissionAccessMode()
+    {
+        var userId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(userId, "Acme", "acme");
+        using var client = fixture.CreateAuthenticatedClient(userId, "admin@example.com", "Admin", role: "admin");
+
+        var response = await client.GetAsync($"/v1/organizations/{org.Slug}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GetOrganizationResponse>();
+        Assert.NotNull(body);
+        Assert.Equal("ScopedPermission", body.AccessMode);
     }
 
     [Fact]

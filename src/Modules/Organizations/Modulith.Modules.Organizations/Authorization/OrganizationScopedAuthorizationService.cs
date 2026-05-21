@@ -22,12 +22,6 @@ internal sealed class OrganizationScopedAuthorizationService(OrganizationsDbCont
             return ScopedAuthorizationResult.Denied;
         }
 
-        if (options.AllowPlatformOverride &&
-            currentUser.HasPermission(OrganizationsPermissions.PlatformOverride))
-        {
-            return ScopedAuthorizationResult.PlatformOverride;
-        }
-
         if (!Guid.TryParse(currentUser.Id, out var userId))
         {
             return ScopedAuthorizationResult.Denied;
@@ -40,13 +34,18 @@ internal sealed class OrganizationScopedAuthorizationService(OrganizationsDbCont
             .Select(m => new { m.Role })
             .FirstOrDefaultAsync(ct);
 
-        if (membership is null)
+        if (membership is not null &&
+            OrganizationRolePermissionMap.GetPermissions(membership.Role).Contains(permission, StringComparer.Ordinal))
         {
-            return ScopedAuthorizationResult.Denied;
+            return ScopedAuthorizationResult.ScopedPermission;
         }
 
-        return OrganizationRolePermissionMap.GetPermissions(membership.Role).Contains(permission, StringComparer.Ordinal)
-            ? ScopedAuthorizationResult.ScopedPermission
-            : ScopedAuthorizationResult.Denied;
+        if (options.AllowPlatformOverride &&
+            currentUser.HasPermission(OrganizationsPermissions.PlatformOverride))
+        {
+            return ScopedAuthorizationResult.PlatformOverride;
+        }
+
+        return ScopedAuthorizationResult.Denied;
     }
 }
