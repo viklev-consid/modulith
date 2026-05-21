@@ -48,8 +48,8 @@ public sealed class FrontendOptionsValidatorTests
             {
                 ConfirmEmail = path,
                 ResetPassword = "/reset-password",
-                UserInvitation = "/register/invitation",
-                OrganizationInvitation = "/register/organization-invitation",
+                UserInvitation = "/register",
+                OrganizationInvitation = "/invite",
             },
         };
 
@@ -67,8 +67,8 @@ public sealed class FrontendOptionsValidatorTests
             {
                 ConfirmEmail = "/confirm-email",
                 ResetPassword = "/reset-password",
-                UserInvitation = "/register/invitation",
-                OrganizationInvitation = "/register/organization-invitation",
+                UserInvitation = "/register",
+                OrganizationInvitation = "/invite",
             },
         };
 }

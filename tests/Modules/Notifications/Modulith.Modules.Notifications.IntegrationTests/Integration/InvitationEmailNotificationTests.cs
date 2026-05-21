@@ -34,7 +34,10 @@ public sealed class InvitationEmailNotificationTests(NotificationsCrossModuleFix
 
         var sent = fixture.EmailSender.SentMessages.Single(m =>
             string.Equals(m.To, "invitee@example.com", StringComparison.Ordinal));
-        Assert.Contains("https://app.test/register/invitation?token=user-token", sent.PlainTextBody, StringComparison.Ordinal);
+        Assert.Contains("https://app.test/register?", sent.PlainTextBody, StringComparison.Ordinal);
+        Assert.Contains("token=user-token", sent.PlainTextBody, StringComparison.Ordinal);
+        Assert.Contains("email=invitee@example.com", sent.PlainTextBody, StringComparison.Ordinal);
+        Assert.Contains("lockEmail=1", sent.PlainTextBody, StringComparison.Ordinal);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
@@ -64,7 +67,9 @@ public sealed class InvitationEmailNotificationTests(NotificationsCrossModuleFix
 
         var sent = fixture.EmailSender.SentMessages.Single(m =>
             string.Equals(m.To, "org-invitee@example.com", StringComparison.Ordinal));
-        Assert.Contains("https://app.test/register/organization-invitation?token=org-token", sent.PlainTextBody, StringComparison.Ordinal);
+        Assert.Contains("https://app.test/invite?", sent.PlainTextBody, StringComparison.Ordinal);
+        Assert.Contains("token=org-token", sent.PlainTextBody, StringComparison.Ordinal);
+        Assert.Contains("email=org-invitee@example.com", sent.PlainTextBody, StringComparison.Ordinal);
         Assert.Contains("member", sent.PlainTextBody, StringComparison.Ordinal);
 
         using var scope = fixture.Services.CreateScope();

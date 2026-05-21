@@ -14,8 +14,8 @@ public sealed class FrontendPathOptions
     public string ResetPassword { get; init; } = "/reset-password";
 
     [Required]
-    public string UserInvitation { get; init; } = "/register/invitation";
+    public string UserInvitation { get; init; } = "/register";
 
     [Required]
-    public string OrganizationInvitation { get; init; } = "/register/organization-invitation";
+    public string OrganizationInvitation { get; init; } = "/invite";
 }

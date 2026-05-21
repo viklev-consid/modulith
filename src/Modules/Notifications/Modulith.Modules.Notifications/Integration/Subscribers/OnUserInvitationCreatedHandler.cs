@@ -47,7 +47,7 @@ public sealed class OnUserInvitationCreatedHandler(
             return;
         }
 
-        var invitationUrl = frontendUrls.AcceptUserInvitation(@event.Token);
+        var invitationUrl = frontendUrls.AcceptUserInvitation(@event.Token, @event.Email);
         var message = new EmailMessage(
             To: @event.Email,
             Subject: UserInvitationTemplate.Subject,

@@ -47,7 +47,7 @@ public sealed class OnOrganizationInvitationCreatedHandler(
             return;
         }
 
-        var invitationUrl = frontendUrls.AcceptOrganizationInvitation(@event.RawToken);
+        var invitationUrl = frontendUrls.AcceptOrganizationInvitation(@event.RawToken, @event.Email);
         var message = new EmailMessage(
             To: @event.Email,
             Subject: OrganizationInvitationTemplate.Subject,
