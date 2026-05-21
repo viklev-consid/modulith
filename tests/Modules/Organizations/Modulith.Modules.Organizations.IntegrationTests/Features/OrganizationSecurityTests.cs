@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Persistence;
@@ -168,6 +169,11 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
         var response = await client.DeleteAsync("/v1/users/me");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Organizations.Owner.UserErasureBlocked", problem.RootElement.GetProperty("errorCode").GetString());
+        var blocker = Assert.Single(problem.RootElement.GetProperty("blockingOrganizations").EnumerateArray());
+        Assert.Equal("acme", blocker.GetProperty("slug").GetString());
+        Assert.True(blocker.GetProperty("isSoleOwner").GetBoolean());
     }
 
     [Fact]
