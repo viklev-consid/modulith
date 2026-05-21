@@ -24,6 +24,11 @@ internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEn
 
         builder.Property(e => e.ResourceId);
 
+        builder.Property(e => e.OrganizationId);
+
+        builder.Property(e => e.AccessMode)
+            .HasMaxLength(64);
+
         builder.Property(e => e.Payload)
             .HasColumnType("jsonb")
             .IsRequired();
@@ -34,6 +39,7 @@ internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEn
         builder.Property(e => e.IdempotencyKey);
 
         builder.HasIndex(e => e.ActorId);
+        builder.HasIndex(e => e.OrganizationId);
         builder.HasIndex(e => e.OccurredAt);
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique()

@@ -36,6 +36,7 @@ public static class AuditModule
         services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
         services.AddScoped<AuditPersonalDataEraser>();
         services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<AuditPersonalDataEraser>());
+        services.AddScoped<OrganizationAuditWriter>();
 
         services.AddSingleton<IResourcePolicy<AuditTrailResource>, AuditTrailPolicy>();
 
@@ -71,6 +72,12 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnTwoFactorEnabledHandler>();
         opts.Discovery.IncludeType<OnTwoFactorDisabledHandler>();
         opts.Discovery.IncludeType<OnRecoveryCodesRegeneratedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationCreatedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationDeletedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationInvitationCreatedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationMemberAddedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationMemberRemovedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationMemberRoleChangedHandler>();
         return opts;
     }
 
