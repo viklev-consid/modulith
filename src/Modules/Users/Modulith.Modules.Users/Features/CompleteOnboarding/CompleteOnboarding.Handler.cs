@@ -54,22 +54,15 @@ public sealed class CompleteOnboardingHandler(
             return validationResult.Errors;
         }
 
-        var versionKeys = requiredDocuments
-            .Select(document => $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}")
-            .ToArray();
-        var acceptedVersionKeys = await db.TermsAcceptances
-            .Where(t => t.UserId == user.Id && versionKeys.Contains(t.Version))
-            .Select(t => t.Version)
-            .ToListAsync(ct);
-        var acceptedVersionKeySet = acceptedVersionKeys.ToHashSet(StringComparer.Ordinal);
+        var requiredDocumentIds = requiredDocuments.Select(d => d.Id).ToArray();
+        var alreadyAccepted = await db.TermsAcceptances
+            .Where(t => t.UserId == user.Id && t.LegalDocumentId != null && requiredDocumentIds.Contains(t.LegalDocumentId!))
+            .Select(t => t.LegalDocumentId!.Value)
+            .ToHashSetAsync(ct);
 
-        foreach (var document in requiredDocuments)
+        foreach (var document in requiredDocuments.Where(d => !alreadyAccepted.Contains(d.Id.Value)))
         {
-            var versionKey = $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}";
-            if (!acceptedVersionKeySet.Contains(versionKey))
-            {
-                db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, document, now, cmd.IpAddress, cmd.UserAgent));
-            }
+            db.TermsAcceptances.Add(TermsAcceptance.Record(user.Id, document, now, cmd.IpAddress, cmd.UserAgent));
         }
 
         if (cmd.AcceptMarketingEmails)

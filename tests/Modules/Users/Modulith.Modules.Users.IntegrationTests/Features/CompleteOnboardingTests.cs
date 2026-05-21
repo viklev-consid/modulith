@@ -100,8 +100,8 @@ public sealed class CompleteOnboardingTests(UsersApiFixture fixture) : IAsyncLif
             .OrderBy(t => t.Version)
             .ToListAsync();
         Assert.Equal(2, acceptances.Count);
-        Assert.Contains(acceptances, a => string.Equals(a.Version, "tos:1.0", StringComparison.Ordinal) && a.DocumentType == LegalDocumentType.TermsOfService && a.ContentHash is not null);
-        Assert.Contains(acceptances, a => string.Equals(a.Version, "privacy:1.0", StringComparison.Ordinal) && a.DocumentType == LegalDocumentType.PrivacyPolicy && a.ContentHash is not null);
+        Assert.Contains(acceptances, a => string.Equals(a.Version, "1.0", StringComparison.Ordinal) && a.DocumentType == LegalDocumentType.TermsOfService && a.ContentHash is not null);
+        Assert.Contains(acceptances, a => string.Equals(a.Version, "1.0", StringComparison.Ordinal) && a.DocumentType == LegalDocumentType.PrivacyPolicy && a.ContentHash is not null);
     }
 
     [Fact]

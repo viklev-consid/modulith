@@ -61,13 +61,14 @@ public sealed partial class LegalComplianceService(
             .Select(a => new
             {
                 LegalDocumentId = a.LegalDocumentId == null ? (Guid?)null : a.LegalDocumentId.Value,
+                a.DocumentType,
                 a.Version,
                 a.ContentHash,
             })
             .ToListAsync(ct);
 
         var missingDocuments = requiredDocuments
-            .Where(document => !acceptances.Any(acceptance => IsAccepted(document, acceptance.LegalDocumentId, acceptance.Version, acceptance.ContentHash)))
+            .Where(document => !acceptances.Any(acceptance => IsAccepted(document, acceptance.LegalDocumentId, acceptance.DocumentType, acceptance.Version, acceptance.ContentHash)))
             .Select(ToComplianceDocument)
             .ToList();
 
@@ -80,15 +81,20 @@ public sealed partial class LegalComplianceService(
 
     private static string GetCacheKey(UserId userId) => $"users:legal-compliance:{userId.Value}";
 
-    private static bool IsAccepted(LegalDocument document, Guid? legalDocumentId, string version, string? contentHash)
+    private static bool IsAccepted(
+        LegalDocument document,
+        Guid? legalDocumentId,
+        LegalDocumentType? documentType,
+        string version,
+        string? contentHash)
     {
         if (legalDocumentId == document.Id.Value)
         {
             return true;
         }
 
-        var versionKey = $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}";
-        return string.Equals(version, versionKey, StringComparison.Ordinal) &&
+        return documentType == document.DocumentType &&
+            string.Equals(version, document.Version, StringComparison.Ordinal) &&
             string.Equals(contentHash, document.ContentHash, StringComparison.Ordinal);
     }
 

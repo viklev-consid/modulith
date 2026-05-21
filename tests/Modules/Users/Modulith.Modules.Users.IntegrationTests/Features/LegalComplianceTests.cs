@@ -76,7 +76,7 @@ public sealed class LegalComplianceTests(UsersApiFixture fixture) : IAsyncLifeti
         var body = await compliance.Content.ReadFromJsonAsync<GetLegalComplianceResponse>();
         Assert.NotNull(body);
         Assert.True(body.IsCompliant);
-        Assert.Contains(body.AcceptedDocuments, d => string.Equals(d.Version, "tos:1.1", StringComparison.Ordinal));
+        Assert.Contains(body.AcceptedDocuments, d => string.Equals(d.Version, "1.1", StringComparison.Ordinal));
     }
 
     [Fact]

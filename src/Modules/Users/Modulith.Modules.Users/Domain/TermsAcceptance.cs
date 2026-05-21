@@ -40,20 +40,10 @@ public sealed class TermsAcceptance : Entity<TermsAcceptanceId>
     public string? UserAgent { get; private set; }
 
     /// <summary>
-    /// Records a ToS acceptance. This is a contract-agreement artefact (GDPR Art. 6(1)(b)),
-    /// distinct from marketing consent in the Consents table (Art. 6(1)(a)).
+    /// Records a legal document acceptance. This is a contract-agreement artefact
+    /// (GDPR Art. 6(1)(b)), distinct from marketing consent in the Consents table
+    /// (Art. 6(1)(a)). Identity is (UserId, DocumentType, Version).
     /// </summary>
-    public static TermsAcceptance Record(
-        UserId userId,
-        string version,
-        DateTimeOffset acceptedAt,
-        string? acceptedFromIp,
-        string? userAgent)
-    {
-        var ua = userAgent?.Length > maxUserAgentLength ? userAgent[..maxUserAgentLength] : userAgent;
-        return new(TermsAcceptanceId.New(), userId, version, null, null, null, acceptedAt, acceptedFromIp, ua);
-    }
-
     public static TermsAcceptance Record(
         UserId userId,
         LegalDocument legalDocument,
@@ -62,11 +52,10 @@ public sealed class TermsAcceptance : Entity<TermsAcceptanceId>
         string? userAgent)
     {
         var ua = userAgent?.Length > maxUserAgentLength ? userAgent[..maxUserAgentLength] : userAgent;
-        var version = $"{LegalDocumentKeys.GetPrefix(legalDocument.DocumentType)}:{legalDocument.Version}";
         return new(
             TermsAcceptanceId.New(),
             userId,
-            version,
+            legalDocument.Version,
             legalDocument.DocumentType,
             legalDocument.Id,
             legalDocument.ContentHash,

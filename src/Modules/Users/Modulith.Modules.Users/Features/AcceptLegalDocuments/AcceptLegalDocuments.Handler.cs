@@ -49,18 +49,14 @@ public sealed class AcceptLegalDocumentsHandler(UsersDbContext db, IClock clock,
         }
 
         var now = clock.UtcNow;
-        var versionKeys = documents
-            .Select(document => $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}")
-            .ToArray();
-        var acceptedVersionKeys = await db.TermsAcceptances
-            .Where(a => a.UserId == cmd.UserId && versionKeys.Contains(a.Version))
-            .Select(a => a.Version)
-            .ToHashSetAsync(StringComparer.Ordinal, ct);
+        var alreadyAccepted = await db.TermsAcceptances
+            .Where(a => a.UserId == cmd.UserId && a.LegalDocumentId != null && acceptedDocumentIds.Contains(a.LegalDocumentId!))
+            .Select(a => a.LegalDocumentId!.Value)
+            .ToHashSetAsync(ct);
 
         foreach (var document in documents)
         {
-            var versionKey = $"{LegalDocumentKeys.GetPrefix(document.DocumentType)}:{document.Version}";
-            if (acceptedVersionKeys.Contains(versionKey))
+            if (alreadyAccepted.Contains(document.Id.Value))
             {
                 continue;
             }

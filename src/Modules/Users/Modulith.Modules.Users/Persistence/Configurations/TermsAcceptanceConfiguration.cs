@@ -46,7 +46,7 @@ internal sealed class TermsAcceptanceConfiguration : IEntityTypeConfiguration<Te
             .HasForeignKey(t => t.LegalDocumentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // A user cannot accept the same version of the ToS twice.
-        builder.HasIndex(t => new { t.UserId, t.Version }).IsUnique();
+        // A user cannot accept the same version of the same document type twice.
+        builder.HasIndex(t => new { t.UserId, t.DocumentType, t.Version }).IsUnique();
     }
 }
