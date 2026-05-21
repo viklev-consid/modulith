@@ -7,6 +7,7 @@ using Modulith.Modules.Organizations.Domain;
 using Modulith.Modules.Organizations.Features.ChangeOrganizationMemberRole;
 using Modulith.Modules.Organizations.Features.CreateOrganization;
 using Modulith.Modules.Organizations.Features.CreateOrganizationInvitation;
+using Modulith.Modules.Organizations.Features.ListMyOrganizations;
 using Modulith.Modules.Organizations.Features.ListOrganizationMembers;
 using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Features.Register;
@@ -111,6 +112,24 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
         var members = await fixture.QueryDbAsync<OrganizationsDbContext, int>((db, ct) =>
             db.Memberships.CountAsync(m => m.OrganizationId == org.Id && m.IsActive, ct));
         Assert.Equal(2, members);
+    }
+
+    [Fact]
+    public async Task ListMyOrganizations_ReturnsMembershipPermissions()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var client = fixture.CreateAuthenticatedClient(ownerId, "owner@example.com", "Owner");
+
+        var response = await client.GetAsync("/v1/organizations/my");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ListMyOrganizationsResponse>();
+        Assert.NotNull(body);
+        var organization = Assert.Single(body.Organizations);
+        Assert.Equal(org.Id.Value, organization.OrganizationId);
+        Assert.Equal("owner", organization.Role);
+        Assert.Contains("organizations.members.manage", organization.Permissions);
     }
 
     [Fact]
