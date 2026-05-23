@@ -38,12 +38,21 @@ internal static class OrganizationRolePermissionMap
             ]
         };
 
+    private static readonly Dictionary<string, string> versions =
+        permissions.ToDictionary(
+            pair => pair.Key,
+            pair => ComputeVersion(pair.Value),
+            StringComparer.OrdinalIgnoreCase);
+
     public static IReadOnlyCollection<string> GetPermissions(OrganizationRole role) =>
         permissions.TryGetValue(role.Name, out var rolePermissions) ? rolePermissions : [];
 
-    public static string GetVersion(OrganizationRole role)
+    public static string GetVersion(OrganizationRole role) =>
+        versions.TryGetValue(role.Name, out var version) ? version : ComputeVersion([]);
+
+    private static string ComputeVersion(IReadOnlyCollection<string> rolePermissions)
     {
-        var joined = string.Join('\n', GetPermissions(role).Order(StringComparer.Ordinal));
+        var joined = string.Join('\n', rolePermissions.Order(StringComparer.Ordinal));
         var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(joined));
         return Convert.ToBase64String(hash)[..16].Replace('+', '-').Replace('/', '_');
     }

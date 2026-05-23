@@ -34,9 +34,7 @@ internal static class RemoveOrganizationMemberEndpoint
                     return organization.ToProblemDetailsOr(_ => Results.Empty);
                 }
 
-                var permission = userId == removedByUserId
-                    ? OrganizationsPermissions.OrganizationsRead
-                    : OrganizationsPermissions.MembersManage;
+                var permission = GetRequiredPermission(userId, removedByUserId);
                 var access = await authorization.AuthorizeAsync(currentUser, organization.Value, permission, ScopedAuthorizationOptions.WithPlatformOverride, ct);
                 if (!access.Succeeded)
                 {
@@ -52,4 +50,9 @@ internal static class RemoveOrganizationMemberEndpoint
         .WithSummary("Remove a member or leave an organization.")
         .Produces(StatusCodes.Status204NoContent)
         .RequireAuthorization();
+
+    private static string GetRequiredPermission(Guid targetUserId, Guid actorUserId) =>
+        targetUserId == actorUserId
+            ? OrganizationsPermissions.OrganizationsRead
+            : OrganizationsPermissions.MembersManage;
 }

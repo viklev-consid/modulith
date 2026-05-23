@@ -22,7 +22,7 @@ public sealed class OrganizationMembership : Entity<OrganizationMembershipId>, I
     private OrganizationMembership() : base(default!) { }
 
     public OrganizationId OrganizationId { get; private set; } = null!;
-    public Guid UserId { get; private set; }
+    public Guid? UserId { get; private set; }
     public OrganizationRole Role { get; private set; } = OrganizationRole.Member;
     public DateTimeOffset JoinedAt { get; private set; }
     public DateTimeOffset? RemovedAt { get; private set; }
@@ -60,6 +60,8 @@ public sealed class OrganizationMembership : Entity<OrganizationMembershipId>, I
 
     public void Anonymize()
     {
+        UserId = null;
+        RemovedByUserId = null;
         IsAnonymized = true;
     }
 }

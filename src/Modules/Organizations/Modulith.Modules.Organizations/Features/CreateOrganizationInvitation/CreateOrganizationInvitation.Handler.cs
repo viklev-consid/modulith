@@ -40,6 +40,7 @@ public sealed class CreateOrganizationInvitationHandler(
         }
 
         var normalizedEmail = cmd.Email.Trim().ToLowerInvariant();
+        // The pre-check gives a fast, readable result; the unique index still owns race protection.
         if (await db.Invitations.AnyAsync(i => i.OrganizationId == cmd.OrganizationId && i.Email == normalizedEmail && i.IsPending, ct))
         {
             return OrganizationsErrors.InvitationInvalid;

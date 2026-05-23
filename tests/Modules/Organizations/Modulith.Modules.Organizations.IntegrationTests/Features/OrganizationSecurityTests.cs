@@ -189,6 +189,57 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
     }
 
     [Fact]
+    public async Task Viewer_CanLeaveOrganization()
+    {
+        var ownerId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        await AddMemberAsync(org.Id, viewerId, OrganizationRole.Viewer);
+        using var client = fixture.CreateAuthenticatedClient(viewerId, "viewer@example.com", "Viewer");
+
+        var response = await client.DeleteAsync($"/v1/organizations/{org.Slug}/members/{viewerId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var isActive = await fixture.QueryDbAsync<OrganizationsDbContext, bool>((db, ct) =>
+            db.Memberships.AnyAsync(m => m.OrganizationId == org.Id && m.UserId == viewerId && m.IsActive, ct));
+        Assert.False(isActive);
+    }
+
+    [Fact]
+    public async Task DeletingMemberAccount_AnonymizesOrganizationMembership()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var anonymous = fixture.CreateAnonymousClient();
+        var register = await anonymous.PostAsJsonAsync(
+            "/v1/users/register",
+            new RegisterRequest("member@example.com", "Password1!", "Member"));
+        register.EnsureSuccessStatusCode();
+        var registered = await register.Content.ReadFromJsonAsync<RegisterResponse>();
+        Assert.NotNull(registered);
+        await AddMemberAsync(org.Id, registered.UserId, OrganizationRole.Member);
+        using var memberClient = fixture.CreateAuthenticatedClient(registered.UserId, "member@example.com", "Member");
+        HttpResponseMessage? response = null;
+
+        Func<IMessageContext, Task> act = async _ =>
+        {
+            response = await memberClient.DeleteAsync("/v1/users/me");
+        };
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
+
+        Assert.Equal(HttpStatusCode.NoContent, response!.StatusCode);
+        var membership = await fixture.QueryDbAsync<OrganizationsDbContext, OrganizationMembership>((db, ct) =>
+            db.Memberships.SingleAsync(m => m.OrganizationId == org.Id && m.JoinedAt != default && m.Role == OrganizationRole.Member, ct));
+        Assert.False(membership.IsActive);
+        Assert.True(membership.IsAnonymized);
+        Assert.Null(membership.UserId);
+        Assert.Null(membership.RemovedByUserId);
+    }
+
+    [Fact]
     public async Task AcceptExpiredInvitation_ReturnsValidationFailure()
     {
         var ownerId = Guid.NewGuid();
@@ -240,7 +291,45 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
         Assert.Equal(1, auditBody.RootElement.GetProperty("total").GetInt32());
         var entry = Assert.Single(auditBody.RootElement.GetProperty("entries").EnumerateArray());
         Assert.Equal("organization.created", entry.GetProperty("eventType").GetString());
-        Assert.True(entry.TryGetProperty("payload", out _));
+        var payload = entry.GetProperty("payload").GetString();
+        Assert.NotNull(payload);
+        Assert.Contains("OrganizationId", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("Audited", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("audited", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreatingOrganizationInvitation_PersistsAuditEntryWithoutRawTokenOrEmail()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var client = fixture.CreateAuthenticatedClient(ownerId, "owner@example.com", "Owner");
+        HttpResponseMessage? response = null;
+
+        Func<IMessageContext, Task> act = async _ =>
+        {
+            response = await client.PostAsJsonAsync(
+                $"/v1/organizations/{org.Slug}/invitations",
+                new CreateOrganizationInvitationRequest("invitee@example.com", "member"));
+        };
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync(act);
+
+        Assert.Equal(HttpStatusCode.OK, response!.StatusCode);
+        var invitation = await response.Content.ReadFromJsonAsync<CreateOrganizationInvitationResponse>();
+        Assert.NotNull(invitation);
+
+        var payload = await fixture.QueryDbAsync<AuditDbContext, string>((db, ct) =>
+            db.AuditEntries
+                .Where(e => e.OrganizationId == org.Id.Value && e.EventType == "organization.invitation_created")
+                .Select(e => e.Payload)
+                .SingleAsync(ct));
+
+        Assert.Contains(invitation.InvitationId.ToString(), payload, StringComparison.Ordinal);
+        Assert.DoesNotContain(invitation.RawToken, payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("invitee@example.com", payload, StringComparison.Ordinal);
     }
 
     private async Task<(OrganizationId Id, string Slug)> CreateOrganizationAsync(Guid ownerId, string name, string slug)

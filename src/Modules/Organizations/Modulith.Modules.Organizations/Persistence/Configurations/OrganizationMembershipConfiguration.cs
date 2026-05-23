@@ -18,8 +18,7 @@ internal sealed class OrganizationMembershipConfiguration : IEntityTypeConfigura
         builder.Property(m => m.OrganizationId)
             .HasConversion(id => id.Value, value => new OrganizationId(value));
 
-        builder.Property(m => m.UserId)
-            .IsRequired();
+        builder.Property(m => m.UserId);
 
         builder.Property(m => m.Role)
             .HasConversion(role => role.Name, value => OrganizationRole.Create(value).Value)

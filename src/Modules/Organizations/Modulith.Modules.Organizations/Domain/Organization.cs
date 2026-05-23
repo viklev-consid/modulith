@@ -110,7 +110,7 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
         return Result.Success;
     }
 
-    public ErrorOr<Success> ChangeMemberRole(Guid actorUserId, Guid targetUserId, OrganizationRole role)
+    public ErrorOr<string> ChangeMemberRole(Guid actorUserId, Guid targetUserId, OrganizationRole role)
     {
         var actor = FindActiveMembership(actorUserId);
         if (actor is null)
@@ -130,7 +130,9 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
             return OrganizationsErrors.RoleEscalationForbidden;
         }
 
-        return ChangeMemberRole(targetUserId, role);
+        var oldRole = target.Role.Name;
+        var change = ChangeMemberRole(targetUserId, role);
+        return change.IsError ? change.Errors : oldRole;
     }
 
     public ErrorOr<Success> EnsureCanInviteRole(Guid actorUserId, OrganizationRole role)
@@ -189,6 +191,14 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
 
     public OrganizationMembership? FindActiveMembership(Guid userId) =>
         memberships.FirstOrDefault(m => m.UserId == userId && m.IsActive);
+
+    public void AnonymizeUserReferences(Guid userId)
+    {
+        if (DeletedByUserId == userId)
+        {
+            DeletedByUserId = null;
+        }
+    }
 
     private int CountActiveOwners() =>
         memberships.Count(m => m.IsActive && m.Role == OrganizationRole.Owner);

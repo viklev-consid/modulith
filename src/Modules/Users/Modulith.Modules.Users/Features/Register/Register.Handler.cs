@@ -1,5 +1,6 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Modulith.Modules.Organizations.Contracts.Commands;
 using Modulith.Modules.Organizations.Contracts.Queries;
@@ -21,8 +22,15 @@ public sealed class RegisterHandler(
     IOptions<UsersOptions> options,
     ISingleUseTokenService tokenService,
     IMessageBus bus,
+    ILogger<RegisterHandler> logger,
     IClock clock)
 {
+    private static readonly Action<ILogger, Guid, string, Exception?> registrationCompensated =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Warning,
+            new EventId(1001, nameof(registrationCompensated)),
+            "Compensated registration for user {UserId} after organization invitation acceptance failed with {ErrorCodes}");
+
     public async Task<ErrorOr<RegisterResponse>> Handle(RegisterCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(RegisterHandler), () => HandleCoreAsync(cmd, ct));
 
@@ -136,12 +144,14 @@ public sealed class RegisterHandler(
 
         if (!string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
         {
-            _ = await bus.InvokeAsync<ErrorOr<Success>>(
-                new AcceptOrganizationInvitationForUserCommand(
-                    cmd.OrganizationInvitationToken,
-                    user.Id.Value,
-                    user.Email.Value),
+            var acceptOrganizationInvitation = await AcceptOrganizationInvitationOrCompensateAsync(
+                cmd.OrganizationInvitationToken,
+                user,
                 ct);
+            if (acceptOrganizationInvitation.IsError)
+            {
+                return acceptOrganizationInvitation.Errors;
+            }
         }
 
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
@@ -156,6 +166,53 @@ public sealed class RegisterHandler(
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(EmailConfirmationRequestedV1)));
 
         return new RegisterResponse(user.Id.Value);
+    }
+
+    private async Task<ErrorOr<Success>> AcceptOrganizationInvitationOrCompensateAsync(
+        string organizationInvitationToken,
+        User user,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await bus.InvokeAsync<ErrorOr<AcceptedOrganizationInvitationForUserResponse>>(
+                new AcceptOrganizationInvitationForUserCommand(
+                    organizationInvitationToken,
+                    user.Id.Value,
+                    user.Email.Value),
+                ct);
+
+            if (!result.IsError)
+            {
+                return Result.Success;
+            }
+
+            await CompensateRegisteredUserAsync(user, ct);
+            registrationCompensated(
+                logger,
+                user.Id.Value,
+                string.Join(",", result.Errors.Select(error => error.Code)),
+                null);
+            return result.Errors;
+        }
+        catch
+        {
+            await CompensateRegisteredUserAsync(user, ct);
+            throw;
+        }
+    }
+
+    private async Task CompensateRegisteredUserAsync(User user, CancellationToken ct)
+    {
+        await db.Consents
+            .Where(consent => consent.UserId == user.Id.Value)
+            .ExecuteDeleteAsync(ct);
+        await db.SingleUseTokens
+            .Where(token => token.UserId == user.Id)
+            .ExecuteDeleteAsync(ct);
+
+        db.Users.Remove(user);
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task<ErrorOr<ValidateOrganizationInvitationForRegistrationResponse>> ValidateOrganizationInvitationAsync(

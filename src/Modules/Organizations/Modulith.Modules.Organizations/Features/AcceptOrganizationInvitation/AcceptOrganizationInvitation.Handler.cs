@@ -12,7 +12,7 @@ namespace Modulith.Modules.Organizations.Features.AcceptOrganizationInvitation;
 
 public sealed class AcceptOrganizationInvitationHandler(OrganizationsDbContext db, IClock clock, IMessageBus bus)
 {
-    public async Task<ErrorOr<Success>> Handle(AcceptOrganizationInvitationForUserCommand cmd, CancellationToken ct)
+    public async Task<ErrorOr<AcceptedOrganizationInvitationForUserResponse>> Handle(AcceptOrganizationInvitationForUserCommand cmd, CancellationToken ct)
     {
         var invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
         if (invitation is null)
@@ -47,7 +47,7 @@ public sealed class AcceptOrganizationInvitationHandler(OrganizationsDbContext d
             invitation.Role.Name,
             Guid.NewGuid()));
 
-        return Result.Success;
+        return new AcceptedOrganizationInvitationForUserResponse(organization.Id.Value, invitation.Role.Name);
     }
 
     public async Task<ErrorOr<AcceptOrganizationInvitationResponse>> Handle(AcceptOrganizationInvitationCommand cmd, CancellationToken ct)
@@ -60,13 +60,7 @@ public sealed class AcceptOrganizationInvitationHandler(OrganizationsDbContext d
             return result.Errors;
         }
 
-        var invitation = await LoadAcceptedInvitationForUserAsync(cmd.UserId, ct);
-        if (invitation is null)
-        {
-            return OrganizationsErrors.InvitationInvalid;
-        }
-
-        return new AcceptOrganizationInvitationResponse(invitation.OrganizationId.Value, invitation.Role.Name);
+        return new AcceptOrganizationInvitationResponse(result.Value.OrganizationId, result.Value.Role);
     }
 
     private async Task<OrganizationInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)
@@ -81,10 +75,4 @@ public sealed class AcceptOrganizationInvitationHandler(OrganizationsDbContext d
             .FirstOrDefaultAsync(ct);
     }
 
-    private async Task<OrganizationInvitation?> LoadAcceptedInvitationForUserAsync(Guid userId, CancellationToken ct) =>
-        await db.Invitations
-            .AsNoTracking()
-            .Where(i => i.AcceptedUserId == userId && i.AcceptedAt != null)
-            .OrderByDescending(i => i.AcceptedAt)
-            .FirstOrDefaultAsync(ct);
 }

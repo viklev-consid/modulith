@@ -1,10 +1,12 @@
+using Modulith.Shared.Kernel.Gdpr;
+
 namespace Modulith.Modules.Organizations.Contracts.Events;
 
 public sealed record OrganizationInvitationCreatedV1(
     Guid OrganizationId,
     Guid InvitationId,
-    string Email,
+    [property: PersonalData] string Email,
     string Role,
-    string RawToken,
+    [property: SensitivePersonalData] string RawToken,
     Guid InvitedByUserId,
     Guid EventId);

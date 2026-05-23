@@ -109,7 +109,7 @@ namespace Modulith.Modules.Organizations.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("invited_at");
 
-                    b.Property<Guid>("InvitedByUserId")
+                    b.Property<Guid?>("InvitedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("invited_by_user_id");
 
@@ -209,7 +209,7 @@ namespace Modulith.Modules.Organizations.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("updated_by");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 

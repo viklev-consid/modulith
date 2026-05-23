@@ -33,6 +33,8 @@ None
 
 Audit code should preserve that access mode for organization-related actions.
 
+When a user has both membership permission and global platform override, the evaluator reports `ScopedPermission`. `PlatformOverride` means the caller was allowed without active organization membership.
+
 ## Platform override
 
 Global admins may bypass organization membership only when the endpoint explicitly opts in.

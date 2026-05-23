@@ -25,6 +25,7 @@ using Modulith.Modules.Users.Features.GetLegalCompliance;
 using Modulith.Modules.Users.Features.GetOnboardingLegalRequirements;
 using Modulith.Modules.Users.Features.GetUserAvatar;
 using Modulith.Modules.Users.Features.GetUserById;
+using Modulith.Modules.Users.Features.GetUserSummariesByIds;
 using Modulith.Modules.Users.Features.ListInvitations;
 using Modulith.Modules.Users.Features.ListUsers;
 using Modulith.Modules.Users.Features.Login;
@@ -184,6 +185,7 @@ public static class UsersModule
         opts.Discovery.IncludeType<ChangeUserRoleHandler>();
         opts.Discovery.IncludeType<ListUsersHandler>();
         opts.Discovery.IncludeType<GetUserByIdHandler>();
+        opts.Discovery.IncludeType<GetUserSummariesByIdsHandler>();
         opts.Discovery.IncludeType<ListInvitationsHandler>();
         opts.Discovery.IncludeType<CreateInvitationHandler>();
         opts.Discovery.IncludeType<RevokeInvitationHandler>();

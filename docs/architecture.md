@@ -235,6 +235,8 @@ Modules that opt into organization ownership store `OrganizationId` in their own
 
 Global RBAC remains for platform capabilities. Organization membership roles are scoped and can differ by organization. A global admin may use platform override only when an endpoint explicitly opts in; this does not create hidden organization membership.
 
+User erasure keeps organization business records where needed, but removes personal identity from retained organization history. Membership erasure removes active access, clears the retained membership `UserId`, and lets audit keep organization scope without email, display name, raw token, or organization name snapshots in payloads.
+
 ---
 
 ## Cross-cutting concerns and where they live

@@ -12,7 +12,7 @@ public sealed class GetOrganizationHandler(OrganizationsDbContext db)
         var organization = await db.Organizations
             .AsNoTracking()
             .Where(o => o.Id == query.OrganizationId && !o.IsDeleted)
-            .Select(o => new GetOrganizationResponse(o.Id.Value, o.Name, o.Slug.Value))
+            .Select(o => new GetOrganizationResponse(o.Id.Value, o.Name, o.Slug.Value, query.AccessMode.ToString()))
             .FirstOrDefaultAsync(ct);
 
         return organization is null ? OrganizationsErrors.OrganizationNotFound : organization;

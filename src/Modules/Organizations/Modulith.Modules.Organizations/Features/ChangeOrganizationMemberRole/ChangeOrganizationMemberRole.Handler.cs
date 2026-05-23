@@ -26,13 +26,6 @@ public sealed class ChangeOrganizationMemberRoleHandler(OrganizationsDbContext d
             return OrganizationsErrors.OrganizationNotFound;
         }
 
-        var member = organization.FindActiveMembership(cmd.UserId);
-        if (member is null)
-        {
-            return OrganizationsErrors.MemberNotFound;
-        }
-
-        var oldRole = member.Role.Name;
         var change = organization.ChangeMemberRole(cmd.ChangedByUserId, cmd.UserId, roleResult.Value);
         if (change.IsError)
         {
@@ -43,7 +36,7 @@ public sealed class ChangeOrganizationMemberRoleHandler(OrganizationsDbContext d
         await bus.PublishAsync(new OrganizationMemberRoleChangedV1(
             organization.Id.Value,
             cmd.UserId,
-            oldRole,
+            change.Value,
             roleResult.Value.Name,
             cmd.ChangedByUserId,
             Guid.NewGuid()));

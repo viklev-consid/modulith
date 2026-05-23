@@ -37,7 +37,7 @@ public sealed class OrganizationInvitation : Entity<OrganizationInvitationId>
     public byte[] TokenHash { get; private set; } = [];
     public DateTimeOffset InvitedAt { get; private set; }
     public DateTimeOffset ExpiresAt { get; private set; }
-    public Guid InvitedByUserId { get; private set; }
+    public Guid? InvitedByUserId { get; private set; }
     public DateTimeOffset? AcceptedAt { get; private set; }
     public Guid? AcceptedUserId { get; private set; }
     public DateTimeOffset? RevokedAt { get; private set; }
@@ -111,6 +111,24 @@ public sealed class OrganizationInvitation : Entity<OrganizationInvitationId>
 
     public bool CanBeAccepted(IClock clock) =>
         IsPending && ExpiresAt > clock.UtcNow;
+
+    public void AnonymizeUserReferences(Guid userId)
+    {
+        if (InvitedByUserId == userId)
+        {
+            InvitedByUserId = null;
+        }
+
+        if (AcceptedUserId == userId)
+        {
+            AcceptedUserId = null;
+        }
+
+        if (RevokedByUserId == userId)
+        {
+            RevokedByUserId = null;
+        }
+    }
 
     public static byte[] HashRawValue(string rawValue) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(rawValue));

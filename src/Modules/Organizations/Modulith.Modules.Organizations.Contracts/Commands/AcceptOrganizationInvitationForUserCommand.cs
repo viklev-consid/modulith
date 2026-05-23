@@ -6,3 +6,7 @@ public sealed record AcceptOrganizationInvitationForUserCommand(
     string InvitationToken,
     Guid UserId,
     string Email);
+
+public sealed record AcceptedOrganizationInvitationForUserResponse(
+    Guid OrganizationId,
+    string Role);

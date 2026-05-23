@@ -25,7 +25,7 @@ internal static class GetOrganizationEndpoint
                 var organization = await resolver.ResolveAsync(organizationRef, ct);
                 if (organization.IsError)
                 {
-                    return organization.ToProblemDetailsOr(_ => Results.Empty);
+                    return organization.ToProblemDetailsOr(_ => Results.NotFound());
                 }
 
                 var access = await authorization.AuthorizeAsync(
@@ -40,7 +40,7 @@ internal static class GetOrganizationEndpoint
                 }
 
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<GetOrganizationResponse>>(
-                    new GetOrganizationQuery(organization.Value.Id),
+                    new GetOrganizationQuery(organization.Value.Id, access.AccessMode),
                     ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })

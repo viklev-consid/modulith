@@ -92,15 +92,17 @@ The platform override permission is:
 organizations.platform.override
 ```
 
-Scoped authorization results expose the access mode (`ScopedPermission` vs. `PlatformOverride`) so audit trails can record how access was granted.
+Scoped authorization results expose the access mode (`ScopedPermission` vs. `PlatformOverride`) so audit trails can record how access was granted. If a platform admin is also an active organization member, membership wins and the access mode is `ScopedPermission`; `PlatformOverride` is reserved for access that truly bypassed membership.
 
 ### Organization invitations may onboard users
 
 Organization invitations are scoped to an organization, email, and requested organization role.
 
-If the invitee already has an account, accepting the invitation creates the membership. If the email does not belong to an existing account, the invite flow routes through Users-owned registration. Users creates a normal global `user` account, then the organization invitation is consumed to create membership.
+If the invitee already has an account, accepting the invitation creates the membership. If the email does not belong to an existing account, the invite flow routes through Users-owned registration. Users creates a normal global `user` account, then the organization invitation is consumed to create membership. Registration must not silently succeed if consuming the organization invitation fails; the API surfaces the failure and compensates the just-created user record where possible.
 
 Organizations does not create users through internal Users APIs. Any synchronous cross-module interaction goes through public contracts.
+
+Raw invitation tokens may appear in the invitation-created integration event so Notifications can build the email link. They are marked sensitive, stored only as hashes in Organizations, omitted from Audit payloads, and should not be logged by subscribers.
 
 ### Organization deletion is soft-delete in v1
 
@@ -114,7 +116,8 @@ When deleting a user:
 
 - if the user owns active organizations, deletion is blocked until ownership is transferred or the organization is deleted
 - if the user is only a member, active memberships are removed
-- membership history and audit records are retained where appropriate but personal identity fields are anonymized
+- membership history and audit records are retained where appropriate, but personal identity fields are anonymized
+- retained membership rows clear the erased user's `UserId`; they are no longer queryable as that user
 - organization-owned business records remain unless a separate organization deletion/retention policy removes them
 
 ### Audit and notifications carry organization context
