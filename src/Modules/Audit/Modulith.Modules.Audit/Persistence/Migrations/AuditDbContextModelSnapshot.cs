@@ -18,7 +18,7 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("audit")
-                .HasAnnotation("ProductVersion", "10.0.7")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -28,6 +28,11 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("AccessMode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("access_mode");
 
                     b.Property<Guid?>("ActorId")
                         .HasColumnType("uuid")
@@ -46,6 +51,10 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
 
                     b.Property<string>("Payload")
                         .IsRequired()
@@ -74,6 +83,9 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
 
                     b.HasIndex("OccurredAt")
                         .HasDatabaseName("ix_audit_entries_occurred_at");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_audit_entries_organization_id");
 
                     b.ToTable("audit_entries", "audit");
                 });

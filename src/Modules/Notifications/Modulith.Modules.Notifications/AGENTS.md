@@ -87,7 +87,7 @@ SSE clients must provide a stable per-tab `clientId` query parameter. Treat it a
 ## Known footguns
 
 - `SmtpEmailSender` is a real SMTP client. Integration tests must override `IEmailSender` with a fake.
-- Raw tokens arrive in `PasswordResetRequestedV1.RawToken` and `EmailChangeRequestedV1.RawToken`. Embed them in email body links; never log them.
+- Raw tokens arrive in `PasswordResetRequestedV1.RawToken`, `EmailChangeRequestedV1.RawToken`, `EmailConfirmationRequestedV1.RawToken`, user invitation events, and organization invitation events. Embed them in email body links; never log them.
 - The `NotificationLog.IdempotencyKey` unique constraint makes duplicate detection race-safe. Catch `DbUpdateException.IsUniqueConstraintViolation()` rather than pre-checking with `AnyAsync`, then still fall through to `TryClaimAsync`.
 - Adding a subscriber for a new event requires registering the handler in `NotificationsModule.AddNotificationsHandlers`.
 - Adding a scheduled cleanup handler requires registering it in `AddNotificationsHandlers` and anchoring the TickerQ job in `AddNotificationsJobs`.

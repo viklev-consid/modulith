@@ -21,8 +21,19 @@ internal static class DeleteAccountEndpoint
                 }
 
                 var command = new DeleteAccountCommand(new UserId(userId));
-                var result = await bus.InvokeAsync<ErrorOr.ErrorOr<Deleted>>(command, ct);
-                return result.ToProblemDetailsOr(_ => Results.NoContent());
+                var result = await bus.InvokeAsync<ErrorOr.ErrorOr<DeleteAccountResponse>>(command, ct);
+                return result.ToProblemDetailsOr(response =>
+                    response.CanDelete
+                        ? Results.NoContent()
+                        : Results.Problem(
+                            title: "Conflict",
+                            detail: "Transfer ownership or delete owned organizations before deleting this user.",
+                            statusCode: StatusCodes.Status409Conflict,
+                            extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
+                            {
+                                ["errorCode"] = "Organizations.Owner.UserErasureBlocked",
+                                ["blockingOrganizations"] = response.BlockingOrganizations
+                            }));
             })
         .WithName("DeleteAccount")
         .WithSummary("Permanently delete the authenticated user's account and all associated personal data.")

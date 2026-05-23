@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Modulith.Modules.Users.Contracts\Modulith.Modules.Users.Contracts.csproj" />
+    <ProjectReference Include="..\..\Organizations\Modulith.Modules.Organizations.Contracts\Modulith.Modules.Organizations.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\Modulith.Shared.Infrastructure\Modulith.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Shared\Modulith.Shared.Kernel\Modulith.Shared.Kernel.csproj" />
   </ItemGroup>

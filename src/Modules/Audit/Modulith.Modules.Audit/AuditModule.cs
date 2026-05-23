@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Authorization;
 using Modulith.Modules.Audit.Contracts.Authorization;
 using Modulith.Modules.Audit.Features.GetAuditTrail;
+using Modulith.Modules.Audit.Features.ListOrganizationAuditEntries;
 using Modulith.Modules.Audit.Gdpr;
 using Modulith.Modules.Audit.Integration.Subscribers;
 using Modulith.Modules.Audit.Persistence;
@@ -36,6 +37,7 @@ public static class AuditModule
         services.AddScoped<IPersonalDataExporter, AuditPersonalDataExporter>();
         services.AddScoped<AuditPersonalDataEraser>();
         services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<AuditPersonalDataEraser>());
+        services.AddScoped<OrganizationAuditWriter>();
 
         services.AddSingleton<IResourcePolicy<AuditTrailResource>, AuditTrailPolicy>();
 
@@ -52,6 +54,7 @@ public static class AuditModule
     public static WolverineOptions AddAuditHandlers(this WolverineOptions opts)
     {
         opts.Discovery.IncludeType<GetAuditTrailHandler>();
+        opts.Discovery.IncludeType<ListOrganizationAuditEntriesHandler>();
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
         opts.Discovery.IncludeType<OnUserEmailChangedHandler>();
         opts.Discovery.IncludeType<OnUserLoggedInHandler>();
@@ -71,6 +74,12 @@ public static class AuditModule
         opts.Discovery.IncludeType<OnTwoFactorEnabledHandler>();
         opts.Discovery.IncludeType<OnTwoFactorDisabledHandler>();
         opts.Discovery.IncludeType<OnRecoveryCodesRegeneratedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationCreatedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationDeletedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationInvitationCreatedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationMemberAddedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationMemberRemovedHandler>();
+        opts.Discovery.IncludeType<OnOrganizationMemberRoleChangedHandler>();
         return opts;
     }
 

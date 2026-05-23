@@ -1,6 +1,9 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Modulith.Modules.Organizations.Contracts.Commands;
+using Modulith.Modules.Organizations.Contracts.Queries;
 using Modulith.Modules.Users.Contracts;
 using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
@@ -19,8 +22,15 @@ public sealed class RegisterHandler(
     IOptions<UsersOptions> options,
     ISingleUseTokenService tokenService,
     IMessageBus bus,
+    ILogger<RegisterHandler> logger,
     IClock clock)
 {
+    private static readonly Action<ILogger, Guid, string, Exception?> registrationCompensated =
+        LoggerMessage.Define<Guid, string>(
+            LogLevel.Warning,
+            new EventId(1001, nameof(registrationCompensated)),
+            "Compensated registration for user {UserId} after organization invitation acceptance failed with {ErrorCodes}");
+
     public async Task<ErrorOr<RegisterResponse>> Handle(RegisterCommand cmd, CancellationToken ct)
         => await UsersTelemetry.InstrumentAsync(nameof(RegisterHandler), () => HandleCoreAsync(cmd, ct));
 
@@ -35,6 +45,7 @@ public sealed class RegisterHandler(
         var email = emailResult.Value;
 
         UserInvitation? invitation = null;
+        ErrorOr<ValidateOrganizationInvitationForRegistrationResponse>? organizationInvitation = null;
         var registration = options.Value.Registration;
         if (registration.Mode == RegistrationMode.Disabled)
         {
@@ -43,15 +54,43 @@ public sealed class RegisterHandler(
 
         if (registration.Mode == RegistrationMode.InviteOnly)
         {
-            if (string.IsNullOrWhiteSpace(cmd.InvitationToken))
+            if (string.IsNullOrWhiteSpace(cmd.InvitationToken) &&
+                string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
             {
                 return UsersErrors.RegistrationUnavailable;
             }
 
-            invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
-            if (invitation is null)
+            if (!string.IsNullOrWhiteSpace(cmd.InvitationToken))
             {
-                return UsersErrors.RegistrationUnavailable;
+                invitation = await LoadInvitationForTokenAsync(cmd.InvitationToken, ct);
+                if (invitation is null)
+                {
+                    return UsersErrors.RegistrationUnavailable;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
+            {
+                organizationInvitation = await ValidateOrganizationInvitationAsync(
+                    cmd.OrganizationInvitationToken,
+                    email.Value,
+                    ct);
+                if (organizationInvitation.Value.IsError)
+                {
+                    return UsersErrors.RegistrationUnavailable;
+                }
+            }
+        }
+
+        if (registration.Mode != RegistrationMode.InviteOnly &&
+            !string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
+        {
+            organizationInvitation = await ValidateOrganizationInvitationAsync(
+                cmd.OrganizationInvitationToken,
+                email.Value,
+                ct);
+            if (organizationInvitation.Value.IsError)
+            {
+                return organizationInvitation.Value.Errors;
             }
         }
 
@@ -103,6 +142,18 @@ public sealed class RegisterHandler(
                 : UsersErrors.EmailAlreadyRegistered;
         }
 
+        if (!string.IsNullOrWhiteSpace(cmd.OrganizationInvitationToken))
+        {
+            var acceptOrganizationInvitation = await AcceptOrganizationInvitationOrCompensateAsync(
+                cmd.OrganizationInvitationToken,
+                user,
+                ct);
+            if (acceptOrganizationInvitation.IsError)
+            {
+                return acceptOrganizationInvitation.Errors;
+            }
+        }
+
         await bus.PublishAsync(new UserRegisteredV1(user.Id.Value, user.Email.Value, user.DisplayName, Guid.NewGuid()));
         UsersTelemetry.EventsPublished.Add(1, new KeyValuePair<string, object?>("event", nameof(UserRegisteredV1)));
 
@@ -116,6 +167,61 @@ public sealed class RegisterHandler(
 
         return new RegisterResponse(user.Id.Value);
     }
+
+    private async Task<ErrorOr<Success>> AcceptOrganizationInvitationOrCompensateAsync(
+        string organizationInvitationToken,
+        User user,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await bus.InvokeAsync<ErrorOr<AcceptedOrganizationInvitationForUserResponse>>(
+                new AcceptOrganizationInvitationForUserCommand(
+                    organizationInvitationToken,
+                    user.Id.Value,
+                    user.Email.Value),
+                ct);
+
+            if (!result.IsError)
+            {
+                return Result.Success;
+            }
+
+            await CompensateRegisteredUserAsync(user, ct);
+            registrationCompensated(
+                logger,
+                user.Id.Value,
+                string.Join(",", result.Errors.Select(error => error.Code)),
+                null);
+            return result.Errors;
+        }
+        catch
+        {
+            await CompensateRegisteredUserAsync(user, ct);
+            throw;
+        }
+    }
+
+    private async Task CompensateRegisteredUserAsync(User user, CancellationToken ct)
+    {
+        await db.Consents
+            .Where(consent => consent.UserId == user.Id.Value)
+            .ExecuteDeleteAsync(ct);
+        await db.SingleUseTokens
+            .Where(token => token.UserId == user.Id)
+            .ExecuteDeleteAsync(ct);
+
+        db.Users.Remove(user);
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task<ErrorOr<ValidateOrganizationInvitationForRegistrationResponse>> ValidateOrganizationInvitationAsync(
+        string rawToken,
+        string email,
+        CancellationToken ct) =>
+        await bus.InvokeAsync<ErrorOr<ValidateOrganizationInvitationForRegistrationResponse>>(
+            new ValidateOrganizationInvitationForRegistrationQuery(rawToken, email),
+            ct);
 
     private async Task<UserInvitation?> LoadInvitationForTokenAsync(string rawToken, CancellationToken ct)
     {

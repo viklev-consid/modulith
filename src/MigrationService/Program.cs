@@ -8,6 +8,7 @@ using Modulith.Api.Infrastructure.Scheduling;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Persistence;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -37,6 +38,11 @@ builder.Services.AddDbContext<NotificationsDbContext>(opts =>
         connectionString,
         npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", "notifications")));
 
+builder.Services.AddDbContext<OrganizationsDbContext>(opts =>
+    opts.UseNpgsql(
+        connectionString,
+        npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", "organizations")));
+
 builder.Services.AddDbContext<TickerQOperationalDbContext>(opts =>
     opts.UseNpgsql(
         connectionString,
@@ -53,6 +59,7 @@ await MigrateAsync<UsersDbContext>(scope.ServiceProvider, logger);
 await MigrateAsync<CatalogDbContext>(scope.ServiceProvider, logger);
 await MigrateAsync<AuditDbContext>(scope.ServiceProvider, logger);
 await MigrateAsync<NotificationsDbContext>(scope.ServiceProvider, logger);
+await MigrateAsync<OrganizationsDbContext>(scope.ServiceProvider, logger);
 await MigrateAsync<TickerQOperationalDbContext>(scope.ServiceProvider, logger);
 
 MigrationLog.Completed(logger);
