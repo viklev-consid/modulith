@@ -36,6 +36,21 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
         var activeRecoveryCodeCount = await db.RecoveryCodes
             .CountAsync(c => c.UserId == userId && c.ConsumedAt == null, ct);
 
+        var invitations = await db.UserInvitations
+            .Where(i => i.InvitedByUserId == userId || i.AcceptedUserId == userId || i.Email == dbUser.Email.Value)
+            .Select(i => new
+            {
+                i.Email,
+                i.InvitedAt,
+                i.ExpiresAt,
+                invitedByUserId = i.InvitedByUserId == null ? null : (Guid?)i.InvitedByUserId.Value,
+                acceptedUserId = i.AcceptedUserId == null ? null : (Guid?)i.AcceptedUserId.Value,
+                i.AcceptedAt,
+                i.RevokedAt,
+                i.IsPending,
+            })
+            .ToListAsync(ct);
+
         var data = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["email"] = dbUser.Email.Value,
@@ -58,6 +73,7 @@ public sealed class UsersPersonalDataExporter(UsersDbContext db) : IPersonalData
             ["termsAcceptances"] = termsAcceptances,
             ["twoFactor"] = twoFactorCredential,
             ["activeRecoveryCodeCount"] = activeRecoveryCodeCount,
+            ["invitations"] = invitations,
         };
 
         return new PersonalDataExport(user.UserId, "Users", data);

@@ -44,6 +44,12 @@ public sealed class ResetPasswordHandler(
         var newHash = new PasswordHash(passwordHasher.Hash(cmd.NewPassword));
         user.SetPassword(newHash);
 
+        await db.SingleUseTokens
+            .Where(t => t.UserId == user.Id &&
+                        t.Purpose == TokenPurpose.PasswordReset &&
+                        t.ConsumedAt == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.ConsumedAt, clock.UtcNow), ct);
+
         await tokenRevoker.RevokeAllForUserAsync(user.Id, ct);
 
         await db.SaveChangesAsync(ct);

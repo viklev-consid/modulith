@@ -1,10 +1,11 @@
 using FluentValidation;
+using Microsoft.Extensions.Options;
 
 namespace Modulith.Modules.Users.Features.Register;
 
 internal sealed class RegisterValidator : AbstractValidator<RegisterRequest>
 {
-    public RegisterValidator()
+    public RegisterValidator(IOptions<UsersOptions> options)
     {
         RuleFor(x => x.Email)
             .NotEmpty()
@@ -13,7 +14,7 @@ internal sealed class RegisterValidator : AbstractValidator<RegisterRequest>
 
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(8)
+            .MinimumLength(options.Value.MinPasswordLength)
             .MaximumLength(128);
 
         RuleFor(x => x.DisplayName)

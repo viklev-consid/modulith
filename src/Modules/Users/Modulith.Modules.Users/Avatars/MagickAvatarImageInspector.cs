@@ -30,16 +30,16 @@ public sealed class MagickAvatarImageInspector : IAvatarImageInspector
                 content.Position = 0;
             }
 
-            using var image = new MagickImage(content);
-            var detectedContentType = GetContentType(image.Format);
+            var imageInfo = new MagickImageInfo(content);
+            var detectedContentType = GetContentType(imageInfo.Format);
             if (detectedContentType is null ||
                 !string.Equals(detectedContentType, declaredContentType, StringComparison.OrdinalIgnoreCase))
             {
                 return Task.FromResult<ErrorOr<AvatarImageInfo>>(UsersErrors.AvatarContentTypeUnsupported);
             }
 
-            var width = checked((int)image.Width);
-            var height = checked((int)image.Height);
+            var width = checked((int)imageInfo.Width);
+            var height = checked((int)imageInfo.Height);
             if (width != height ||
                 width < AvatarConstants.MinDimensionPixels ||
                 width > AvatarConstants.MaxDimensionPixels)

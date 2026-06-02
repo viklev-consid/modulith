@@ -24,6 +24,8 @@ public sealed class UsersOptions
 
     public TimeSpan TwoFactorChallengeLifetime { get; init; } = TimeSpan.FromMinutes(5);
 
+    public string? DataProtectionKeyRingPath { get; init; }
+
     [Range(1, 20)]
     public int RecoveryCodeCount { get; init; } = 10;
 

@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -76,7 +77,20 @@ public static class UsersModule
             .ValidateDataAnnotations()
             .Validate(o => Enum.IsDefined(o.Registration.Mode), "Registration mode must be a valid value.")
             .Validate(o => o.Registration.InvitationTokenLifetime > TimeSpan.Zero, "Invitation token lifetime must be greater than zero.")
+            .Validate(o => o.PasswordResetTokenLifetime > TimeSpan.Zero, "Password reset token lifetime must be greater than zero.")
+            .Validate(o => o.EmailChangeTokenLifetime > TimeSpan.Zero, "Email change token lifetime must be greater than zero.")
+            .Validate(o => o.EmailConfirmationTokenLifetime > TimeSpan.Zero, "Email confirmation token lifetime must be greater than zero.")
+            .Validate(o => o.TwoFactorChallengeLifetime > TimeSpan.Zero, "Two-factor challenge lifetime must be greater than zero.")
+            .Validate(o => !environment.IsProduction() || !string.IsNullOrWhiteSpace(o.DataProtectionKeyRingPath),
+                "A shared data-protection key-ring path is required in production.")
             .ValidateOnStart();
+
+        var dataProtection = services.AddDataProtection().SetApplicationName("Modulith");
+        var dataProtectionKeyRingPath = configuration["Modules:Users:DataProtectionKeyRingPath"];
+        if (!string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
+        {
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeyRingPath));
+        }
 
         services.AddOptions<AdminBootstrapOptions>()
             .Bind(configuration.GetSection("Modules:Users:AdminBootstrap"))
