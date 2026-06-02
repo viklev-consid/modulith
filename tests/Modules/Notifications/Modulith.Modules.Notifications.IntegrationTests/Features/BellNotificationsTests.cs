@@ -277,7 +277,7 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
         var second = await client.PatchAsync($"/v1/me/notifications/{notificationId}/read", content: null);
         var secondReadAt = await fixture.QueryDbAsync<NotificationsDbContext, DateTimeOffset?>(
             (db, ct) => db.UserNotifications
-                .Where(n => n.Id == new UserNotificationId(notificationId.Value))
+                .Where(n => n.Id == new UserNotificationId(notificationId!.Value))
                 .Select(n => n.ReadAt)
                 .SingleAsync(ct));
 
@@ -297,8 +297,9 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
 
         var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
         var first = await client.GetFromJsonAsync<ListMyNotificationsResponse>("/v1/me/notifications?limit=2");
+        var before = Uri.EscapeDataString($"{first!.NextBefore:O}");
         var second = await client.GetFromJsonAsync<ListMyNotificationsResponse>(
-            $"/v1/me/notifications?limit=2&before={first!.NextBefore:O}&beforeId={first.NextBeforeId}");
+            $"/v1/me/notifications?limit=2&before={before}&beforeId={first.NextBeforeId}");
 
         Assert.Equal(2, first.Items.Count);
         Assert.NotNull(first.NextBefore);

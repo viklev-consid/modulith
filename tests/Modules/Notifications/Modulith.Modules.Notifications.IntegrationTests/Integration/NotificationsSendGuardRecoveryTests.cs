@@ -160,4 +160,48 @@ public sealed class NotificationsSendGuardRecoveryTests(NotificationsRecoveryFix
         Assert.NotNull(afterReplay.SendingLeaseToken);
         Assert.Equal(replayToken.Value, afterReplay.SendingLeaseToken.Value);
     }
+
+    [Fact]
+    public async Task SendWithLeaseRenewalAsync_DuringActiveDelivery_RefreshesClaimTimestamp()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+        var guard = scope.ServiceProvider.GetRequiredService<NotificationSendGuard>();
+
+        var idempotencyKey = Guid.NewGuid();
+        var log = NotificationLog.Create(
+            Guid.NewGuid(), "lease-renewal@example.com", NotificationType.WelcomeEmail,
+            "Subject", clock.UtcNow, idempotencyKey);
+        db.NotificationLogs.Add(log);
+        await db.SaveChangesAsync();
+
+        var leaseToken = await guard.TryClaimAsync(idempotencyKey, CancellationToken.None);
+        Assert.NotNull(leaseToken);
+        var originalClaimedAt = await db.NotificationLogs
+            .AsNoTracking()
+            .Where(l => l.IdempotencyKey == idempotencyKey)
+            .Select(l => l.SendingClaimedAt)
+            .SingleAsync();
+
+        await Task.Delay(10);
+        await guard.SendWithLeaseRenewalAsync(
+            idempotencyKey,
+            leaseToken.Value,
+            async token =>
+            {
+                fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+                await Task.Delay(40, token);
+            },
+            CancellationToken.None,
+            TimeSpan.FromMilliseconds(5));
+
+        var renewedClaimedAt = await db.NotificationLogs
+            .AsNoTracking()
+            .Where(l => l.IdempotencyKey == idempotencyKey)
+            .Select(l => l.SendingClaimedAt)
+            .SingleAsync();
+
+        Assert.True(renewedClaimedAt > originalClaimedAt);
+    }
 }

@@ -25,7 +25,7 @@ public sealed class OnOrganizationInvitationCreatedHandler(
         NotificationsTelemetry.EventsProcessed.Add(1, new KeyValuePair<string, object?>("event", nameof(OrganizationInvitationCreatedV1)));
 
         var log = NotificationLog.Create(
-            @event.InvitedByUserId,
+            Guid.Empty,
             @event.Email,
             NotificationType.OrganizationInvitation,
             OrganizationInvitationTemplate.Subject,
@@ -56,7 +56,9 @@ public sealed class OnOrganizationInvitationCreatedHandler(
 
         try
         {
-            await emailSender.SendAsync(message, ct);
+            await sendGuard.SendWithLeaseRenewalAsync(
+                @event.EventId, leaseToken,
+                token => emailSender.SendAsync(message, token), ct);
         }
         catch (RetryableSmtpException)
         {

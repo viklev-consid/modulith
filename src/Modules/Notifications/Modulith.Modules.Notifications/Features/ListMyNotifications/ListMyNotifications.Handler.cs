@@ -11,7 +11,16 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
     public async Task<ErrorOr<ListMyNotificationsResponse>> Handle(ListMyNotificationsQuery query, CancellationToken ct)
     {
         var limit = Math.Clamp(query.Limit, 1, 100);
-        var notifications = db.UserNotifications
+        var notifications = query.Before is not null && query.BeforeId is not null
+            ? db.UserNotifications.FromSqlInterpolated($"""
+                SELECT *
+                FROM notifications.user_notifications
+                WHERE created_at < {query.Before.Value}
+                   OR (created_at = {query.Before.Value} AND id < {query.BeforeId.Value})
+                """)
+            : db.UserNotifications;
+
+        notifications = notifications
             .AsNoTracking()
             .Where(n => n.RecipientUserId == query.UserId && n.ArchivedAt == null);
 
@@ -21,12 +30,6 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
             "read" => notifications.Where(n => n.ReadAt != null),
             _ => notifications,
         };
-
-        if (query.Before is not null && query.BeforeId is not null)
-        {
-            notifications = notifications.Where(n => n.CreatedAt < query.Before
-                                                       || (n.CreatedAt == query.Before && n.Id.Value.CompareTo(query.BeforeId.Value) < 0));
-        }
 
         var items = await notifications
             .OrderByDescending(n => n.CreatedAt)
