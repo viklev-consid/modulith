@@ -95,8 +95,11 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // All health checks must pass for app to be considered ready to accept traffic after starting.
-        app.MapHealthChecks(healthEndpointPath);
+        if (app.Environment.IsDevelopment())
+        {
+            // Readiness may probe backing services, so expose it only on the local development surface.
+            app.MapHealthChecks(healthEndpointPath);
+        }
 
         // Only health checks tagged with the "live" tag must pass for app to be considered alive.
         app.MapHealthChecks(alivenessEndpointPath, new HealthCheckOptions

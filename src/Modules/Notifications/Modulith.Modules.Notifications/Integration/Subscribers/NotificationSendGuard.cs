@@ -181,6 +181,9 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
         }
     }
 
+    /// <summary>
+    /// Runs delivery while renewing its lease. The callback must not use this guard's scoped DbContext.
+    /// </summary>
     public async Task SendWithLeaseRenewalAsync(
         Guid idempotencyKey,
         Guid leaseToken,

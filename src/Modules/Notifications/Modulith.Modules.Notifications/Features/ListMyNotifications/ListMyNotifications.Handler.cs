@@ -1,6 +1,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Notifications.Contracts.Dtos;
+using Modulith.Modules.Notifications.Errors;
 using Modulith.Modules.Notifications.Mapping;
 using Modulith.Modules.Notifications.Persistence;
 
@@ -10,6 +11,11 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
 {
     public async Task<ErrorOr<ListMyNotificationsResponse>> Handle(ListMyNotificationsQuery query, CancellationToken ct)
     {
+        if (query.Before.HasValue != query.BeforeId.HasValue)
+        {
+            return NotificationsErrors.CursorInvalid;
+        }
+
         var limit = Math.Clamp(query.Limit, 1, 100);
         var notifications = query.Before is not null && query.BeforeId is not null
             ? db.UserNotifications.FromSqlInterpolated($"""

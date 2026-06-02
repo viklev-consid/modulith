@@ -309,6 +309,27 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
     }
 
     [Fact]
+    public async Task ListNotifications_WithBeforeButNoBeforeId_ReturnsBadRequest()
+    {
+        var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
+        var before = Uri.EscapeDataString($"{DateTimeOffset.UtcNow:O}");
+
+        var response = await client.GetAsync($"/v1/me/notifications?before={before}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListNotifications_WithBeforeIdButNoBefore_ReturnsBadRequest()
+    {
+        var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
+
+        var response = await client.GetAsync($"/v1/me/notifications?beforeId={Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task CreateNotification_WithInvalidEnumValue_ReturnsValidationFailure()
     {
         var bus = fixture.ApplicationHost.Services.GetRequiredService<IMessageBus>();
