@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.3.0" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.3.0" />
+    <PackageVersion Include="Aspire.Hosting.Docker" Version="13.3.0" />
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.3.0" />
     <PackageVersion Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.3.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.MailPit" Version="13.1.1" />

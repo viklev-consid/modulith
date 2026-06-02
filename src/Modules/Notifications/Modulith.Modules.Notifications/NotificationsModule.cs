@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Modulith.Modules.Notifications.Contracts.Authorization;
 using Modulith.Modules.Notifications.Features.ArchiveNotification;
 using Modulith.Modules.Notifications.Features.CreateNotification;
@@ -48,6 +49,7 @@ public static class NotificationsModule
         services.AddOptions<SmtpOptions>()
             .Bind(configuration.GetSection("Modules:Notifications:Smtp"))
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SmtpOptions>, SmtpOptionsValidator>();
 
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddPermissions(NotificationsPermissions.All);

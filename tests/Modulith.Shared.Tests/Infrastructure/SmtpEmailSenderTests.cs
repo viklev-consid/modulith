@@ -41,4 +41,22 @@ public sealed class SmtpEmailSenderTests
 
         Assert.Equal("SMTP credentials require TLS.", exception.Message);
     }
+
+    [Fact]
+    public async Task SendAsync_WithImplicitTlsAndStartTls_ReturnsTerminalFailureBeforeConnecting()
+    {
+        var sender = new SmtpEmailSender(Options.Create(new SmtpOptions
+        {
+            Host = "127.0.0.1",
+            Port = 1,
+            UseSsl = true,
+            UseStartTls = true,
+        }));
+        var message = new EmailMessage("to@example.com", "subject", "body", "body");
+
+        var exception = await Assert.ThrowsAsync<TerminalSmtpException>(
+            () => sender.SendAsync(message, CancellationToken.None));
+
+        Assert.Equal("SMTP cannot use implicit TLS and STARTTLS at the same time.", exception.Message);
+    }
 }
