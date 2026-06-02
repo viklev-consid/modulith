@@ -36,5 +36,17 @@
       "include": ["**/*"],
       "exclude": [".template.config/**"]
     }
+  ],
+  "postActions": [
+    {
+      "description": "Register the generated Wolverine subscriber.",
+      "manualInstructions": [
+        {
+          "text": "Add opts.Discovery.IncludeType<OnEventNameHandler>(); to ModuleNameModule.AddModuleNameHandlers. If the subscriber consumes another module's event, move it to the consuming module and reference only the publisher's .Contracts project."
+        }
+      ],
+      "actionId": "AC1156D0-6A73-4C5B-8D16-2D5B5523B704",
+      "continueOnError": true
+    }
   ]
 }
