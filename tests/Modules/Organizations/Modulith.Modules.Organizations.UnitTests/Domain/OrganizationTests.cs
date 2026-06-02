@@ -70,6 +70,21 @@ public sealed class OrganizationTests
         Assert.True(result.IsError);
     }
 
+    [Fact]
+    public void RemoveMemberAsActor_WhenActorRankIsLowerThanTarget_ReturnsError()
+    {
+        var organization = CreateOrganization();
+        var adminId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        organization.AddMember(adminId, OrganizationRole.Admin, clock);
+        organization.AddMember(memberId, OrganizationRole.Member, clock);
+
+        var result = organization.RemoveMemberAsActor(memberId, adminId, clock);
+
+        Assert.True(result.IsError);
+        Assert.True(organization.FindActiveMembership(adminId)?.IsActive);
+    }
+
     private Organization CreateOrganization() =>
         Organization.Create("Acme", OrganizationSlug.Create("acme").Value, ownerId, clock).Value;
 }

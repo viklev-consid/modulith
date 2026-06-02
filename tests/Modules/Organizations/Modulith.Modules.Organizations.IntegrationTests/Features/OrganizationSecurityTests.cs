@@ -11,8 +11,10 @@ using Modulith.Modules.Organizations.Features.CreateOrganizationInvitation;
 using Modulith.Modules.Organizations.Features.GetOrganization;
 using Modulith.Modules.Organizations.Features.ListMyOrganizations;
 using Modulith.Modules.Organizations.Features.ListOrganizationMembers;
+using Modulith.Modules.Organizations.Gdpr;
 using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Features.Register;
+using Modulith.Shared.Kernel.Gdpr;
 using Wolverine;
 using Wolverine.Tracking;
 
@@ -203,6 +205,89 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
         var isActive = await fixture.QueryDbAsync<OrganizationsDbContext, bool>((db, ct) =>
             db.Memberships.AnyAsync(m => m.OrganizationId == org.Id && m.UserId == viewerId && m.IsActive, ct));
         Assert.False(isActive);
+    }
+
+    [Fact]
+    public async Task Member_CannotRemoveHigherRankedAdmin()
+    {
+        var ownerId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        await AddMemberAsync(org.Id, adminId, OrganizationRole.Admin);
+        await AddMemberAsync(org.Id, memberId, OrganizationRole.Member);
+        using var client = fixture.CreateAuthenticatedClient(memberId, "member@example.com", "Member");
+
+        var response = await client.DeleteAsync($"/v1/organizations/{org.Slug}/members/{adminId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PlatformOverride_CannotMutateOrganizationWithoutScopedPermission()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var client = fixture.CreateAuthenticatedClient(Guid.NewGuid(), "admin@example.com", "Admin", role: "admin");
+
+        var response = await client.DeleteAsync($"/v1/organizations/{org.Slug}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListMembers_RejectsUnboundedPageSize()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var client = fixture.CreateAuthenticatedClient(ownerId, "owner@example.com", "Owner");
+
+        var response = await client.GetAsync($"/v1/organizations/{org.Slug}/members?pageSize=10000");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListInvitations_RejectsUnboundedPageSize()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        using var client = fixture.CreateAuthenticatedClient(ownerId, "owner@example.com", "Owner");
+
+        var response = await client.GetAsync($"/v1/organizations/{org.Slug}/invitations?pageSize=10000");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ErasingLastOwner_RevalidatesOwnershipInvariant()
+    {
+        var ownerId = Guid.NewGuid();
+        await CreateOrganizationAsync(ownerId, "Acme", "acme");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fixture.ExecuteDbAsync<OrganizationsDbContext>(async (db, ct) =>
+            {
+                var clock = fixture.Services.GetRequiredService<Modulith.Shared.Kernel.Interfaces.IClock>();
+                var eraser = new OrganizationsPersonalDataEraser(db, clock);
+                await eraser.EraseAsync(new UserRef(ownerId), ErasureStrategy.Anonymize, ct);
+            }));
+    }
+
+    [Fact]
+    public async Task ExportPersonalData_ReturnsMembershipData()
+    {
+        var ownerId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+
+        var export = await fixture.QueryDbAsync<OrganizationsDbContext, PersonalDataExport>(async (db, ct) =>
+            await new OrganizationsPersonalDataExporter(db).ExportAsync(new UserRef(ownerId), ct));
+
+        var memberships = Assert.IsAssignableFrom<System.Collections.IEnumerable>(export.Data["memberships"]);
+        Assert.Single(memberships.Cast<object>());
+        Assert.Equal(ownerId, export.UserId);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(export.Data));
+        Assert.Equal(org.Id.Value, json.RootElement.GetProperty("memberships")[0].GetProperty("organizationId").GetGuid());
     }
 
     [Fact]
