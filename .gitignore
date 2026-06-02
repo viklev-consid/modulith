@@ -47,3 +47,5 @@ coverage/
 
 ## Aspire
 .aspire/
+# The Aspire SDK injects host RID-specific dashboard/orchestration packages.
+src/AppHost/packages.lock.json
