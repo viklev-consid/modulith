@@ -16,7 +16,7 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
 
         foreach (var entry in entries)
         {
-            var redacted = RedactPersonalDataFromPayload(entry.Payload);
+            var redacted = RedactPersonalDataFromPayload(entry.Payload, user.UserId);
             entry.Anonymize(user.UserId, redacted);
         }
 
@@ -26,7 +26,7 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
             "Actor and resource references anonymized; payload personal data redacted.");
     }
 
-    private static string RedactPersonalDataFromPayload(string payload)
+    private static string RedactPersonalDataFromPayload(string payload, Guid userId)
     {
         if (string.IsNullOrEmpty(payload))
         {
@@ -36,23 +36,37 @@ public sealed class AuditPersonalDataEraser(AuditDbContext db) : IPersonalDataEr
         try
         {
             using var doc = JsonDocument.Parse(payload);
-            var obj = doc.RootElement.EnumerateObject()
-                .ToDictionary(p => p.Name, p => (object?)p.Value.ToString(), StringComparer.Ordinal);
-
-            foreach (var key in obj.Keys.Where(
-                k => k.Contains("email", StringComparison.OrdinalIgnoreCase) ||
-                     k.Contains("mail", StringComparison.OrdinalIgnoreCase) ||
-                     k.Contains("ipAddress", StringComparison.OrdinalIgnoreCase) ||
-                     k.Contains("displayName", StringComparison.OrdinalIgnoreCase)).ToList())
-            {
-                obj[key] = "[REDACTED]";
-            }
-
-            return JsonSerializer.Serialize(obj);
+            return JsonSerializer.Serialize(RedactElement(doc.RootElement, userId));
         }
         catch (JsonException)
         {
             return "[REDACTED]";
         }
     }
+
+    private static object? RedactElement(JsonElement element, Guid userId, string? propertyName = null)
+        => element.ValueKind switch
+        {
+            JsonValueKind.Object => element.EnumerateObject()
+                .ToDictionary(p => p.Name, p => RedactElement(p.Value, userId, p.Name), StringComparer.Ordinal),
+            JsonValueKind.Array => element.EnumerateArray()
+                .Select(item => RedactElement(item, userId))
+                .ToList(),
+            JsonValueKind.String when IsPersonalDataProperty(propertyName) => "[REDACTED]",
+            JsonValueKind.String when string.Equals(element.GetString(), userId.ToString(), StringComparison.Ordinal) => "[REDACTED]",
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number when element.TryGetInt64(out var value) => value,
+            JsonValueKind.Number => element.GetDecimal(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            _ => element.ToString(),
+        };
+
+    private static bool IsPersonalDataProperty(string? propertyName)
+        => propertyName is not null &&
+           (propertyName.Contains("email", StringComparison.OrdinalIgnoreCase) ||
+            propertyName.Contains("mail", StringComparison.OrdinalIgnoreCase) ||
+            propertyName.Contains("ipAddress", StringComparison.OrdinalIgnoreCase) ||
+            propertyName.Contains("displayName", StringComparison.OrdinalIgnoreCase));
 }

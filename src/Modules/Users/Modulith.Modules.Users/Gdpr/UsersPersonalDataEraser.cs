@@ -42,6 +42,12 @@ public sealed class UsersPersonalDataEraser(UsersDbContext db, IUserAvatarStorag
         var dbUserForEmail = await db.Users.FindAsync([userId], ct);
         var avatarToDelete = (Container: dbUserForEmail?.AvatarContainer, Key: dbUserForEmail?.AvatarKey);
 
+        affected += await db.UserInvitations
+            .Where(i => i.InvitedByUserId == userId ||
+                        i.AcceptedUserId == userId ||
+                        (dbUserForEmail != null && i.Email == dbUserForEmail.Email.Value))
+            .ExecuteDeleteAsync(ct);
+
         affected += await db.TermsAcceptances
             .Where(t => t.UserId == userId)
             .ExecuteDeleteAsync(ct);

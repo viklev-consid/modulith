@@ -41,6 +41,9 @@ internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEn
         builder.HasIndex(e => e.ActorId);
         builder.HasIndex(e => e.OrganizationId);
         builder.HasIndex(e => e.OccurredAt);
+        builder.HasIndex(e => new { e.ActorId, e.OccurredAt });
+        builder.HasIndex(e => new { e.ResourceId, e.OccurredAt });
+        builder.HasIndex(e => new { e.OrganizationId, e.OccurredAt });
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique()
             .HasFilter("idempotency_key IS NOT NULL");

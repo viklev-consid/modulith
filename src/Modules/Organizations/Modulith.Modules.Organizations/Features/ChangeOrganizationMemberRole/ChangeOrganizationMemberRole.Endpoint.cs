@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Modulith.Modules.Organizations.Authorization;
 using Modulith.Modules.Organizations.Contracts.Authorization;
+using Modulith.Modules.Organizations.Errors;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Http;
 using Modulith.Shared.Kernel.Interfaces;
@@ -47,6 +48,10 @@ internal static class ChangeOrganizationMemberRoleEndpoint
                 if (!access.Succeeded)
                 {
                     return Results.Forbid();
+                }
+                if (access.AccessMode == ScopedAuthorizationAccessMode.PlatformOverride)
+                {
+                    return Results.Problem(title: "Forbidden", detail: OrganizationsErrors.PlatformOverrideMutationForbidden.Description, statusCode: StatusCodes.Status403Forbidden);
                 }
 
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<ChangeOrganizationMemberRoleResponse>>(

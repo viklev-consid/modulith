@@ -75,7 +75,7 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
     // ── 10.1c ────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task WelcomeEmailArrivesInMailpit_AfterRegister()
+    public async Task ConfirmationEmailArrivesInMailpit_AfterRegister()
     {
         using var http = new HttpClient();
         await http.DeleteAsync($"{fixture.MailpitApiUrl}/api/v1/messages");
@@ -95,17 +95,17 @@ public sealed class SmokeTests(SmokeTestFixture fixture) : IAsyncLifetime
             result = await http.GetFromJsonAsync<MailpitMessagesResponse>(
                 $"{fixture.MailpitApiUrl}/api/v1/messages");
 
-            if (result?.Messages?.Any(IsWelcomeEmailForRegisteredUser) == true)
+            if (result?.Messages?.Any(IsConfirmationEmailForRegisteredUser) == true)
             {
                 break;
             }
         }
 
         Assert.NotNull(result);
-        Assert.Contains(result.Messages ?? [], IsWelcomeEmailForRegisteredUser);
+        Assert.Contains(result.Messages ?? [], IsConfirmationEmailForRegisteredUser);
 
-        bool IsWelcomeEmailForRegisteredUser(MailpitMessage message) =>
-            string.Equals(message.Subject, "Welcome to Modulith!", StringComparison.Ordinal) &&
+        bool IsConfirmationEmailForRegisteredUser(MailpitMessage message) =>
+            string.Equals(message.Subject, "Confirm your email address", StringComparison.Ordinal) &&
             message.To?.Any(recipient => string.Equals(recipient.Address, email, StringComparison.OrdinalIgnoreCase)) == true;
     }
 

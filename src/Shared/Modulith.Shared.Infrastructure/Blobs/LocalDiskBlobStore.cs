@@ -7,7 +7,7 @@ namespace Modulith.Shared.Infrastructure.Blobs;
 
 public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> options) : IBlobStore
 {
-    private readonly string rootPath = options.Value.RootPath;
+    private readonly string rootPath = Path.GetFullPath(options.Value.RootPath);
     private readonly byte[] signingKey = Encoding.UTF8.GetBytes(options.Value.SigningKey);
 
     public async Task<BlobRef> PutAsync(Stream content, BlobMetadata metadata, CancellationToken ct)
@@ -89,10 +89,21 @@ public sealed class LocalDiskBlobStore(IOptions<LocalDiskBlobStoreOptions> optio
     }
 
     private string GetFilePath(string container, string key) =>
-        Path.Combine(rootPath, container, key);
+        GetContainedPath(container, key);
 
     private string GetMetaPath(string container, string key) =>
-        Path.Combine(rootPath, container, key + ".meta.json");
+        GetContainedPath(container, key + ".meta.json");
+
+    private string GetContainedPath(string container, string fileName)
+    {
+        var path = Path.GetFullPath(Path.Combine(rootPath, container, fileName));
+        if (!path.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Blob reference must resolve within the configured root path.", nameof(container));
+        }
+
+        return path;
+    }
 
     private static string SanitizeContainer(string value)
     {

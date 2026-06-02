@@ -60,7 +60,9 @@ public sealed class OnUserEmailConfirmedHandler(
 
         try
         {
-            await emailSender.SendAsync(message, ct);
+            await sendGuard.SendWithLeaseRenewalAsync(
+                @event.EventId, leaseToken,
+                token => emailSender.SendAsync(message, token), ct);
         }
         catch (RetryableSmtpException)
         {

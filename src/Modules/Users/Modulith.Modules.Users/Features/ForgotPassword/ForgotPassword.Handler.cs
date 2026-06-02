@@ -5,6 +5,7 @@ using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Modules.Users.Security;
+using Modulith.Shared.Kernel.Interfaces;
 using Wolverine;
 
 namespace Modulith.Modules.Users.Features.ForgotPassword;
@@ -13,6 +14,7 @@ public sealed class ForgotPasswordHandler(
     UsersDbContext db,
     ISingleUseTokenService tokenService,
     IOptions<UsersOptions> options,
+    IClock clock,
     IMessageBus bus)
 {
     public async Task<ErrorOr<ForgotPasswordResponse>> Handle(ForgotPasswordCommand cmd, CancellationToken ct)
@@ -32,6 +34,12 @@ public sealed class ForgotPasswordHandler(
 
         if (user is not null)
         {
+            await db.SingleUseTokens
+                .Where(t => t.UserId == user.Id &&
+                            t.Purpose == TokenPurpose.PasswordReset &&
+                            t.ConsumedAt == null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.ConsumedAt, clock.UtcNow), ct);
+
             var (_, rawToken) = tokenService.Create(
                 user.Id,
                 TokenPurpose.PasswordReset,

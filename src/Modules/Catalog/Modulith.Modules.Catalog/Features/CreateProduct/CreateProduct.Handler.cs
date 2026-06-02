@@ -4,6 +4,7 @@ using Modulith.Modules.Catalog.Contracts.Events;
 using Modulith.Modules.Catalog.Domain;
 using Modulith.Modules.Catalog.Errors;
 using Modulith.Modules.Catalog.Persistence;
+using Modulith.Shared.Infrastructure.Persistence;
 using Wolverine;
 
 namespace Modulith.Modules.Catalog.Features.CreateProduct;
@@ -42,7 +43,15 @@ public sealed class CreateProductHandler(CatalogDbContext db, IMessageBus bus)
 
         var product = productResult.Value;
         db.Products.Add(product);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+        {
+            db.Entry(product).State = EntityState.Detached;
+            return CatalogErrors.SkuAlreadyExists;
+        }
 
         await bus.PublishAsync(new ProductCreatedV1(
             product.Id.Value,

@@ -22,7 +22,7 @@ public abstract class Entity<TId> : IEquatable<Entity<TId>>
     public override int GetHashCode() => Id.GetHashCode();
 
     public static bool operator ==(Entity<TId>? left, Entity<TId>? right) =>
-        left is not null && left.Equals(right);
+        ReferenceEquals(left, right) || (left is not null && left.Equals(right));
 
     public static bool operator !=(Entity<TId>? left, Entity<TId>? right) =>
         !(left == right);

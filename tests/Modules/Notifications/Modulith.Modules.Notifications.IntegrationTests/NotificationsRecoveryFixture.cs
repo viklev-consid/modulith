@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Kernel.Interfaces;
@@ -42,8 +43,9 @@ public sealed class NotificationsRecoveryFixture : ApiTestFixture
         await services.GetRequiredService<UsersDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<CatalogDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<AuditDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<OrganizationsDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
     }
 
-    protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "notifications"];
+    protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "organizations", "notifications"];
 }

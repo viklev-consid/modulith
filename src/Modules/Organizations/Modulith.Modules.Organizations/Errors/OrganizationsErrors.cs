@@ -44,6 +44,15 @@ internal static class OrganizationsErrors
     public static readonly ErrorOr.Error RoleEscalationForbidden =
         ErrorOr.Error.Forbidden("Organizations.Role.EscalationForbidden", "Cannot grant or modify an organization role at or above your authority.");
 
+    public static readonly ErrorOr.Error PlatformOverrideMutationForbidden =
+        ErrorOr.Error.Forbidden("Organizations.PlatformOverride.MutationForbidden", "Platform override cannot mutate organization state.");
+
+    public static readonly ErrorOr.Error ConcurrencyConflict =
+        ErrorOr.Error.Conflict("Organizations.Organization.ConcurrencyConflict", "Organization membership changed concurrently. Retry the operation.");
+
+    public static readonly ErrorOr.Error PageSizeInvalid =
+        ErrorOr.Error.Validation("Organizations.Query.PageSizeInvalid", $"Page size must be between 1 and {Shared.Kernel.Pagination.PageRequest.MaxPageSize}.");
+
     public static readonly ErrorOr.Error InvitationInvalid =
         ErrorOr.Error.Validation("Organizations.Invitation.Invalid", "Organization invitation is invalid.");
 

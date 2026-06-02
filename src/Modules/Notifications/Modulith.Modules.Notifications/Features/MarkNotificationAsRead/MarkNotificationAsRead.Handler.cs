@@ -27,6 +27,11 @@ public sealed class MarkNotificationAsReadHandler(
             return NotificationsErrors.NotificationNotFound;
         }
 
+        if (notification.IsRead)
+        {
+            return Result.Success;
+        }
+
         var readAt = clock.UtcNow;
         notification.MarkRead(readAt, retentionPolicy.GetReadRetentionUntil(notification.Category, readAt));
         await db.SaveChangesAsync(ct);

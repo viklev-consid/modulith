@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/viktorlevine/Work/modulith/.codex/hooks/guard-paths.sh'"
+            "command": "\"$(git rev-parse --show-toplevel)/.codex/hooks/guard-paths.sh\""
           }
         ]
       }
@@ -17,11 +17,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/viktorlevine/Work/modulith/.codex/hooks/post-edit-dotnet.sh'"
+            "command": "\"$(git rev-parse --show-toplevel)/.codex/hooks/post-edit-dotnet.sh\""
           },
           {
             "type": "command",
-            "command": "'/Users/viktorlevine/Work/modulith/.codex/hooks/slice-completeness.sh'"
+            "command": "\"$(git rev-parse --show-toplevel)/.codex/hooks/slice-completeness.sh\""
           }
         ]
       }
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/viktorlevine/Work/modulith/.codex/hooks/session-context.sh'"
+            "command": "\"$(git rev-parse --show-toplevel)/.codex/hooks/session-context.sh\""
           }
         ]
       }
@@ -41,11 +41,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/viktorlevine/Work/modulith/.codex/hooks/stop-format.sh'"
+            "command": "\"$(git rev-parse --show-toplevel)/.codex/hooks/stop-format.sh\""
           },
           {
             "type": "command",
-            "command": "'/Users/viktorlevine/Work/modulith/.codex/hooks/stop-gate.sh'"
+            "command": "\"$(git rev-parse --show-toplevel)/.codex/hooks/stop-gate.sh\""
           }
         ]
       }

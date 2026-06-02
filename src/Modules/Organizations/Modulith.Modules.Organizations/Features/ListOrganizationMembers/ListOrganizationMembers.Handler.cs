@@ -1,7 +1,9 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Organizations.Errors;
 using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Contracts.Queries;
+using Modulith.Shared.Kernel.Pagination;
 using Wolverine;
 
 namespace Modulith.Modules.Organizations.Features.ListOrganizationMembers;
@@ -10,9 +12,23 @@ public sealed class ListOrganizationMembersHandler(OrganizationsDbContext db, IM
 {
     public async Task<ErrorOr<ListOrganizationMembersResponse>> Handle(ListOrganizationMembersQuery query, CancellationToken ct)
     {
+        if (query.PageSize <= 0 || query.PageSize > PageRequest.MaxPageSize)
+        {
+            return OrganizationsErrors.PageSizeInvalid;
+        }
+
+        var pagination = PageRequest.Of(query.Page, query.PageSize);
+        var baseQuery = db.Memberships
+            .AsNoTracking()
+            .Where(m => m.OrganizationId == query.OrganizationId && m.IsActive);
+        var total = await baseQuery.CountAsync(ct);
         var memberships = await db.Memberships
             .AsNoTracking()
             .Where(m => m.OrganizationId == query.OrganizationId && m.IsActive)
+            .OrderBy(m => m.Role)
+            .ThenBy(m => m.JoinedAt)
+            .Skip(pagination.Offset)
+            .Take(pagination.PageSize)
             .ToArrayAsync(ct);
 
         var userIdsToHydrate = memberships
@@ -53,6 +69,6 @@ public sealed class ListOrganizationMembersHandler(OrganizationsDbContext db, IM
             })
             .ToArray();
 
-        return new ListOrganizationMembersResponse(members);
+        return new ListOrganizationMembersResponse(members, pagination.Page, pagination.PageSize, total);
     }
 }

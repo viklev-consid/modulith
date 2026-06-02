@@ -1,5 +1,5 @@
-using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Modules.Organizations.Gdpr;
+using Modulith.Modules.Users.Contracts.Events;
 using Modulith.Shared.Kernel.Gdpr;
 using Modulith.Shared.Kernel.Interfaces;
 using Wolverine.Attributes;

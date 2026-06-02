@@ -182,6 +182,7 @@ builder.Services.AddRateLimiter(opts =>
     opts.AddPolicy("write", ctx => PerUserPartition("write", ctx, 60));
     opts.AddPolicy("read", ctx => PerUserPartition("read", ctx, 300));
     opts.AddPolicy("expensive", ctx => PerUserPartition("expensive", ctx, 10));
+    opts.AddPolicy("operator", ctx => PerUserPartition("operator", ctx, 30));
 
     opts.OnRejected = async (ctx, token) =>
     {
@@ -322,13 +323,13 @@ app.UseExceptionHandler();
 var corsOptions = app.Services.GetRequiredService<IOptions<CorsOptions>>().Value;
 app.UseCors(corsOptions.PolicyName);
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 if (!app.Environment.IsEnvironment("Test"))
 {
     app.UseRateLimiter();
 }
-
-app.UseAuthentication();
-app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {

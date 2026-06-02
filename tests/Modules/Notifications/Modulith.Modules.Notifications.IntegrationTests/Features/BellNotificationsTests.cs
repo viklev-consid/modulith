@@ -261,6 +261,120 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
     }
 
     [Fact]
+    public async Task MarkRead_WhenAlreadyRead_DoesNotChangeReadTimestamp()
+    {
+        var notificationId = await CreateProductNotificationAsync(userId, "ticket.reply.created", Guid.NewGuid());
+        var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
+
+        var first = await client.PatchAsync($"/v1/me/notifications/{notificationId}/read", content: null);
+        var firstReadAt = await fixture.QueryDbAsync<NotificationsDbContext, DateTimeOffset?>(
+            (db, ct) => db.UserNotifications
+                .Where(n => n.Id == new UserNotificationId(notificationId!.Value))
+                .Select(n => n.ReadAt)
+                .SingleAsync(ct));
+
+        await Task.Delay(10);
+        var second = await client.PatchAsync($"/v1/me/notifications/{notificationId}/read", content: null);
+        var secondReadAt = await fixture.QueryDbAsync<NotificationsDbContext, DateTimeOffset?>(
+            (db, ct) => db.UserNotifications
+                .Where(n => n.Id == new UserNotificationId(notificationId!.Value))
+                .Select(n => n.ReadAt)
+                .SingleAsync(ct));
+
+        Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, second.StatusCode);
+        Assert.Equal(firstReadAt, secondReadAt);
+    }
+
+    [Fact]
+    public async Task ListNotifications_WithTiedTimestamps_PaginatesWithoutSkipping()
+    {
+        var occurredAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        for (var index = 0; index < 3; index++)
+        {
+            await CreateProductNotificationAsync(userId, $"ticket.reply.{index}", Guid.NewGuid(), occurredAt);
+        }
+
+        var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
+        var first = await client.GetFromJsonAsync<ListMyNotificationsResponse>("/v1/me/notifications?limit=2");
+        var before = Uri.EscapeDataString($"{first!.NextBefore:O}");
+        var second = await client.GetFromJsonAsync<ListMyNotificationsResponse>(
+            $"/v1/me/notifications?limit=2&before={before}&beforeId={first.NextBeforeId}");
+
+        Assert.Equal(2, first.Items.Count);
+        Assert.NotNull(first.NextBefore);
+        Assert.NotNull(first.NextBeforeId);
+        Assert.Single(second!.Items);
+        Assert.Empty(first.Items.Select(item => item.Id).Intersect(second.Items.Select(item => item.Id)));
+    }
+
+    [Fact]
+    public async Task ListNotifications_WithBeforeButNoBeforeId_ReturnsBadRequest()
+    {
+        var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
+        var before = Uri.EscapeDataString($"{DateTimeOffset.UtcNow:O}");
+
+        var response = await client.GetAsync($"/v1/me/notifications?before={before}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListNotifications_WithBeforeIdButNoBefore_ReturnsBadRequest()
+    {
+        var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
+
+        var response = await client.GetAsync($"/v1/me/notifications?beforeId={Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateNotification_WithInvalidEnumValue_ReturnsValidationFailure()
+    {
+        var bus = fixture.ApplicationHost.Services.GetRequiredService<IMessageBus>();
+
+        var result = await bus.InvokeAsync<ErrorOr<CreateNotificationResponse>>(
+            CreateProductNotificationCommand(userId, "ticket.reply.created", Guid.NewGuid(), DateTimeOffset.UtcNow) with
+            {
+                Category = (NotificationCategory)999,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ErrorType.Validation, result.FirstError.Type);
+    }
+
+    [Fact]
+    public async Task CreateNotification_WithOversizedTitle_ReturnsValidationFailure()
+    {
+        var bus = fixture.ApplicationHost.Services.GetRequiredService<IMessageBus>();
+
+        var result = await bus.InvokeAsync<ErrorOr<CreateNotificationResponse>>(
+            CreateProductNotificationCommand(userId, "ticket.reply.created", Guid.NewGuid(), DateTimeOffset.UtcNow) with
+            {
+                Title = new string('x', 241),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ErrorType.Validation, result.FirstError.Type);
+    }
+
+    [Fact]
+    public async Task CreateNotification_WithFutureTimestamp_ReturnsValidationFailure()
+    {
+        var bus = fixture.ApplicationHost.Services.GetRequiredService<IMessageBus>();
+
+        var result = await bus.InvokeAsync<ErrorOr<CreateNotificationResponse>>(
+            CreateProductNotificationCommand(userId, "ticket.reply.created", Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(1)),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ErrorType.Validation, result.FirstError.Type);
+    }
+
+    [Fact]
     public async Task Preferences_DisableProductBellNotifications()
     {
         var client = fixture.CreateAuthenticatedClient(userId, "owner@example.test", "Owner");
@@ -327,24 +441,35 @@ public sealed class BellNotificationsTests(NotificationsCrossModuleFixture fixtu
         Assert.Equal(0, remaining);
     }
 
-    private async Task<Guid?> CreateProductNotificationAsync(Guid recipientUserId, string type, Guid idempotencyKey)
+    private async Task<Guid?> CreateProductNotificationAsync(
+        Guid recipientUserId,
+        string type,
+        Guid idempotencyKey,
+        DateTimeOffset? occurredAt = null)
     {
         var bus = fixture.ApplicationHost.Services.GetRequiredService<IMessageBus>();
         var result = await bus.InvokeAsync<ErrorOr<CreateNotificationResponse>>(
-            new CreateNotificationCommand(
-                recipientUserId,
-                type,
-                NotificationCategory.Product,
-                NotificationSeverity.Info,
-                "Alice replied to your ticket",
-                "There is a new reply on Billing issue.",
-                new NotificationLinkDto("/tickets/123", "Open ticket"),
-                Channels: null,
-                idempotencyKey,
-                DateTimeOffset.UtcNow),
+            CreateProductNotificationCommand(recipientUserId, type, idempotencyKey, occurredAt ?? DateTimeOffset.UtcNow),
             CancellationToken.None);
 
         Assert.False(result.IsError);
         return result.Value.BellNotificationId;
     }
+
+    private static CreateNotificationCommand CreateProductNotificationCommand(
+        Guid recipientUserId,
+        string type,
+        Guid idempotencyKey,
+        DateTimeOffset occurredAt) =>
+        new(
+            recipientUserId,
+            type,
+            NotificationCategory.Product,
+            NotificationSeverity.Info,
+            "Alice replied to your ticket",
+            "There is a new reply on Billing issue.",
+            new NotificationLinkDto("/tickets/123", "Open ticket"),
+            Channels: null,
+            idempotencyKey,
+            occurredAt);
 }

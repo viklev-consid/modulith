@@ -10,12 +10,15 @@ namespace Modulith.Api.Infrastructure.DeadLetters;
 /// </summary>
 internal static class DeadLetterAdminEndpoints
 {
+    private const int maxPageSize = 100;
+    private const int maxMessageIds = 100;
+
     internal static IEndpointRouteBuilder MapDeadLetterAdminEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/v1/admin/dead-letters")
             .RequireAuthorization("Admin")
             .WithTags("Admin — Dead Letters")
-            .DisableRateLimiting();
+            .RequireRateLimiting("operator");
 
         // ── List ──────────────────────────────────────────────────────────────
         group.MapGet("/", async (
@@ -26,6 +29,11 @@ internal static class DeadLetterAdminEndpoints
                 string? exceptionType = null,
                 CancellationToken ct = default) =>
             {
+                if (pageNumber < 1 || pageSize is < 1 or > maxPageSize)
+                {
+                    return Results.BadRequest("pageNumber must be positive and pageSize must be between 1 and 100.");
+                }
+
                 var query = new DeadLetterEnvelopeQuery
                 {
                     PageNumber = pageNumber,
@@ -64,11 +72,21 @@ internal static class DeadLetterAdminEndpoints
                 IMessageStore store,
                 CancellationToken ct) =>
             {
+                if (query.MessageIds.Length == 0)
+                {
+                    return Results.BadRequest("Replay requires at least one message ID.");
+                }
+
+                if (query.MessageIds.Length > maxMessageIds)
+                {
+                    return Results.BadRequest("At most 100 message IDs can be replayed at once.");
+                }
+
                 await store.DeadLetters.ReplayAsync(query, ct);
                 return Results.Accepted();
             })
             .WithName("ReplayDeadLetters")
-            .WithSummary("Re-enqueue dead-lettered messages matching the query for reprocessing.")
+            .WithSummary("Re-enqueue dead-lettered messages by ID for reprocessing.")
             .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
@@ -79,11 +97,21 @@ internal static class DeadLetterAdminEndpoints
                 IMessageStore store,
                 CancellationToken ct) =>
             {
+                if (query.MessageIds.Length == 0)
+                {
+                    return Results.BadRequest("Discard requires at least one message ID.");
+                }
+
+                if (query.MessageIds.Length > maxMessageIds)
+                {
+                    return Results.BadRequest("At most 100 message IDs can be discarded at once.");
+                }
+
                 await store.DeadLetters.DiscardAsync(query, ct);
                 return Results.NoContent();
             })
             .WithName("DiscardDeadLetters")
-            .WithSummary("Permanently delete dead-lettered messages matching the query.")
+            .WithSummary("Permanently delete dead-lettered messages by ID.")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);

@@ -36,6 +36,23 @@ public sealed class CreateNotificationHandler(
             return NotificationsErrors.NotificationTitleRequired;
         }
 
+        if (command.Body is null
+            || command.Link is { Href: null }
+            || command.Type.Length > 200
+            || command.Title.Length > 240
+            || command.Body.Length > 2_000
+            || command.Link?.Href.Length > 1_000
+            || command.Link?.Label?.Length > 120
+            || command.IdempotencyKey == Guid.Empty
+            || command.OccurredAt == default
+            || command.OccurredAt > clock.UtcNow
+            || !Enum.IsDefined(command.Category)
+            || !Enum.IsDefined(command.Severity)
+            || command.Channels?.Any(channel => !Enum.IsDefined(channel)) == true)
+        {
+            return NotificationsErrors.NotificationInvalid;
+        }
+
         var category = command.Category.ToDomain();
         var requestedChannels = command.Channels ?? GetDefaultChannels(category);
 
@@ -56,7 +73,7 @@ public sealed class CreateNotificationHandler(
             return new CreateNotificationResponse(null);
         }
 
-        var createdAt = command.OccurredAt == default ? clock.UtcNow : command.OccurredAt;
+        var createdAt = command.OccurredAt;
         var notification = UserNotification.Create(
             command.RecipientUserId,
             command.Type.Trim(),

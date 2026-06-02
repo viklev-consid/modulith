@@ -35,6 +35,12 @@ public sealed class RefreshTokenHandler(
             return UsersErrors.RefreshTokenNotFound;
         }
 
+        // Serialize rotations with login and refresh issuance for this user, then reload the
+        // presented token so a waiter cannot rotate state that changed while it was blocked.
+        await db.Database.ExecuteSqlAsync(
+            $"SELECT 1 FROM users.users WHERE id = {existing.UserId.Value} FOR UPDATE", ct);
+        await db.Entry(existing).ReloadAsync(ct);
+
         // Reuse detection: a rotated token being presented again means the old token
         // was stolen. Revoke the entire chain and force re-login.
         if (existing.RevokedAt is not null && existing.RotatedTo is not null)

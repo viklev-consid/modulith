@@ -42,8 +42,9 @@ msgs=()
 fail=0
 
 # 1. Format check (fast) — scoped to the project
-fmt_out=$(cd "$PROJECT_DIR" && dotnet format "$csproj" --verify-no-changes --verbosity quiet 2>&1 || true)
-if [[ $? -ne 0 ]] && printf '%s' "$fmt_out" | grep -q "error\|needs formatting"; then
+fmt_status=0
+fmt_out=$(cd "$PROJECT_DIR" && dotnet format "$csproj" --verify-no-changes --verbosity quiet 2>&1) || fmt_status=$?
+if [[ $fmt_status -ne 0 ]]; then
   msgs+=("Format drift in $(basename "$csproj"). Run: dotnet format $csproj")
   fail=1
 fi

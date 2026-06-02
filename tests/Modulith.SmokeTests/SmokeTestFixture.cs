@@ -3,9 +3,11 @@ using DotNet.Testcontainers.Containers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Persistence;
 using Modulith.TestSupport;
 
@@ -21,7 +23,7 @@ public sealed class SmokeCollection : ICollectionFixture<SmokeTestFixture> { }
 public sealed class SmokeTestFixture : ApiTestFixture
 {
     // Mailpit: SMTP on 1025, HTTP API on 8025.
-    private readonly IContainer mailpit = new ContainerBuilder("axllent/mailpit:latest")
+    private readonly IContainer mailpit = new ContainerBuilder("axllent/mailpit:v1.30.0")
         .WithPortBinding(1025, assignRandomHostPort: true)
         .WithPortBinding(8025, assignRandomHostPort: true)
         .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8025, _ => { }))
@@ -46,6 +48,24 @@ public sealed class SmokeTestFixture : ApiTestFixture
         builder.UseSetting("Modules:Notifications:Smtp:Host", "127.0.0.1");
         builder.UseSetting("Modules:Notifications:Smtp:Port",
             mailpit.GetMappedPublicPort(1025).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.UseSetting("Modules:Notifications:Smtp:AllowInsecureTransport", "true");
+
+        builder.ConfigureServices(services =>
+        {
+            var legalDocumentBootstrappers = services
+                .Where(descriptor =>
+                    descriptor.ServiceType == typeof(IHostedService) &&
+                    string.Equals(
+                        descriptor.ImplementationType?.Name,
+                        "LegalDocumentsBootstrapper",
+                        StringComparison.Ordinal))
+                .ToArray();
+
+            foreach (var descriptor in legalDocumentBootstrappers)
+            {
+                services.Remove(descriptor);
+            }
+        });
     }
 
     protected override async Task StartAdditionalContainersAsync()
@@ -64,8 +84,9 @@ public sealed class SmokeTestFixture : ApiTestFixture
         await services.GetRequiredService<CatalogDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<AuditDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<OrganizationsDbContext>().Database.MigrateAsync();
     }
 
     protected override string[] GetSchemasToReset() =>
-        ["users", "catalog", "audit", "notifications"];
+        ["users", "catalog", "audit", "notifications", "organizations"];
 }

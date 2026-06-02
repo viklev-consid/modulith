@@ -1,10 +1,11 @@
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Modulith.MigrationService;
 using Modulith.Api.Infrastructure.Scheduling;
+using Modulith.MigrationService;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
@@ -55,6 +56,8 @@ var logger = scope.ServiceProvider
     .GetRequiredService<ILoggerFactory>()
     .CreateLogger("Modulith.MigrationService");
 
+EnsureAllModuleDbContextsAreRegistered(scope.ServiceProvider);
+
 await MigrateAsync<UsersDbContext>(scope.ServiceProvider, logger);
 await MigrateAsync<CatalogDbContext>(scope.ServiceProvider, logger);
 await MigrateAsync<AuditDbContext>(scope.ServiceProvider, logger);
@@ -70,4 +73,47 @@ static async Task MigrateAsync<TDbContext>(IServiceProvider services, ILogger lo
     var db = services.GetRequiredService<TDbContext>();
     MigrationLog.Applying(logger, typeof(TDbContext).Name);
     await db.Database.MigrateAsync();
+}
+
+static void EnsureAllModuleDbContextsAreRegistered(IServiceProvider services)
+{
+    var missing = DiscoverModuleDbContexts()
+        .Where(type => services.GetService(type) is null)
+        .Select(type => type.FullName)
+        .Order(StringComparer.Ordinal)
+        .ToArray();
+
+    if (missing.Length > 0)
+    {
+        throw new InvalidOperationException(
+            $"Module DbContexts are missing from the migration plan: {string.Join(", ", missing)}.");
+    }
+}
+
+static IEnumerable<Type> DiscoverModuleDbContexts()
+{
+    const string moduleAssemblyPrefix = "Modulith.Modules.";
+    const string contractsAssemblySuffix = ".Contracts";
+
+    return Directory
+        .EnumerateFiles(AppContext.BaseDirectory, $"{moduleAssemblyPrefix}*.dll")
+        .Select(AssemblyName.GetAssemblyName)
+        .Where(name => name.Name is { } assemblyName
+            && !assemblyName.EndsWith(contractsAssemblySuffix, StringComparison.Ordinal))
+        .Select(Assembly.Load)
+        .SelectMany(GetLoadableTypes)
+        .Where(type => type is { IsAbstract: false }
+            && type.IsAssignableTo(typeof(DbContext)));
+}
+
+static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+{
+    try
+    {
+        return assembly.GetTypes();
+    }
+    catch (ReflectionTypeLoadException ex)
+    {
+        return ex.Types.Where(type => type is not null)!;
+    }
 }

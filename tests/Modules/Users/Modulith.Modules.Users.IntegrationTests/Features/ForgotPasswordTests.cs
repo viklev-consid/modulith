@@ -146,4 +146,39 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
 
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
     }
+
+    [Fact]
+    public async Task ResetPassword_WhenNewerTokenExists_OlderTokenIsRejected()
+    {
+        await client.PostAsJsonAsync("/v1/users/register",
+            new RegisterRequest("alice@example.com", "Password1!", "Alice"));
+
+        string olderToken;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var tokenService = scope.ServiceProvider.GetRequiredService<ISingleUseTokenService>();
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var user = await db.Users.FirstAsync(u => u.Email == Domain.Email.Create("alice@example.com").Value);
+            var (_, older) = tokenService.Create(user.Id, Domain.TokenPurpose.PasswordReset, TimeSpan.FromMinutes(30));
+            await db.SaveChangesAsync();
+            olderToken = older;
+        }
+
+        await client.PostAsJsonAsync("/v1/users/password/forgot",
+            new ForgotPasswordRequest("alice@example.com"));
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+            var token = await db.SingleUseTokens
+                .Where(t => t.Purpose == Domain.TokenPurpose.PasswordReset && t.ConsumedAt == null)
+                .SingleAsync();
+            Assert.NotNull(token);
+        }
+
+        var response = await client.PostAsJsonAsync("/v1/users/password/reset",
+            new ResetPasswordRequest(olderToken, "NewPassword1!"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

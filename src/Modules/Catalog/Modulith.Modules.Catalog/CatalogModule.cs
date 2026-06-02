@@ -73,6 +73,8 @@ public static class CatalogModule
         opts.Discovery.IncludeType<ListProductsHandler>();
         opts.Discovery.IncludeType<OnUserRegisteredHandler>();
         opts.Discovery.IncludeType<OnUserErasureRequestedHandler>();
+        opts.Discovery.IncludeType<OnEmailChangedHandler>();
+        opts.Discovery.IncludeType<OnUserProfileUpdatedHandler>();
         return opts;
     }
 

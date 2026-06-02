@@ -29,6 +29,7 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
     public string? CreatedBy { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public string? UpdatedBy { get; private set; }
+    public int OwnerMutationVersion { get; private set; }
     public IReadOnlyCollection<OrganizationMembership> Memberships => memberships;
 
     public static ErrorOr<Organization> Create(
@@ -107,6 +108,7 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
         }
 
         membership.ChangeRole(role);
+        OwnerMutationVersion++;
         return Result.Success;
     }
 
@@ -167,7 +169,30 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
         }
 
         membership.Remove(removedByUserId, clock);
+        OwnerMutationVersion++;
         return Result.Success;
+    }
+
+    public ErrorOr<Success> RemoveMemberAsActor(Guid actorUserId, Guid targetUserId, IClock clock)
+    {
+        var actor = FindActiveMembership(actorUserId);
+        if (actor is null)
+        {
+            return OrganizationsErrors.MemberNotFound;
+        }
+
+        var target = FindActiveMembership(targetUserId);
+        if (target is null)
+        {
+            return OrganizationsErrors.MemberNotFound;
+        }
+
+        if (actorUserId != targetUserId && actor.Role.Rank < target.Role.Rank)
+        {
+            return OrganizationsErrors.RoleEscalationForbidden;
+        }
+
+        return RemoveMember(targetUserId, actorUserId, clock);
     }
 
     public ErrorOr<Success> Delete(Guid deletedByUserId, IClock clock)
@@ -186,6 +211,7 @@ public sealed class Organization : AggregateRoot<OrganizationId>, IAuditableEnti
             membership.Remove(deletedByUserId, clock);
         }
 
+        OwnerMutationVersion++;
         return Result.Success;
     }
 

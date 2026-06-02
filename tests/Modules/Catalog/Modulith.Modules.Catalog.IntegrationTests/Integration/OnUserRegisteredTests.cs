@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Catalog.Domain;
 using Modulith.Modules.Catalog.Persistence;
+using Modulith.Modules.Users.Contracts.Events;
 using Wolverine.Tracking;
 
 namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
@@ -46,5 +47,44 @@ public sealed class OnUserRegisteredTests(CrossModuleApiFixture fixture) : IAsyn
         Assert.Equal("cross-module@example.com", customer.Email);
         Assert.Equal("Cross Module", customer.DisplayName);
         Assert.Equal(userId, customer.UserId);
+    }
+
+    [Fact]
+    public async Task UserProjectionChanges_UpdateCatalogCustomer()
+    {
+        var request = new { Email = "projection@example.com", Password = "Password1!", DisplayName = "Before" };
+        Guid userId = Guid.Empty;
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .ExecuteAndWaitAsync((Func<Wolverine.IMessageContext, Task>)(async _ =>
+            {
+                var response = await client.PostAsJsonAsync("/v1/users/register", request);
+                var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
+                userId = body!.RootElement.GetProperty("userId").GetGuid();
+            }));
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .InvokeMessageAndWaitAsync(new EmailChangedV1(
+                userId,
+                request.Email,
+                "projection-updated@example.com",
+                Guid.NewGuid()));
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .InvokeMessageAndWaitAsync(new UserProfileUpdatedV1(
+                userId,
+                request.DisplayName,
+                "After",
+                Guid.NewGuid()));
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        var customer = await db.Customers.SingleAsync(c => c.UserId == userId);
+
+        Assert.Equal("projection-updated@example.com", customer.Email);
+        Assert.Equal("After", customer.DisplayName);
     }
 }

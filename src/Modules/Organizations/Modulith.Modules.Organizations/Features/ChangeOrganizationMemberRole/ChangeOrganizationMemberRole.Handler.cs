@@ -32,7 +32,15 @@ public sealed class ChangeOrganizationMemberRoleHandler(OrganizationsDbContext d
             return change.Errors;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.ChangeTracker.Clear();
+            return OrganizationsErrors.ConcurrencyConflict;
+        }
         await bus.PublishAsync(new OrganizationMemberRoleChangedV1(
             organization.Id.Value,
             cmd.UserId,

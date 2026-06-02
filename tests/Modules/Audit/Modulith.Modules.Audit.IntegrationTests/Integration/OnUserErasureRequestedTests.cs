@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulith.Modules.Audit.Persistence;
@@ -99,5 +100,39 @@ public sealed class OnUserErasureRequestedTests(AuditCrossModuleFixture fixture)
             .ToListAsync();
 
         Assert.Empty(remaining);
+    }
+
+    [Fact]
+    public async Task UserErasureRequested_RedactsNestedPayloadUserIdsAndPersonalData()
+    {
+        var userId = Guid.NewGuid();
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+            db.AuditEntries.Add(Domain.AuditEntry.Create(
+                "user.test",
+                userId,
+                "User",
+                userId,
+                $$"""{"userId":"{{userId}}","nested":{"changedBy":"{{userId}}","email":"private@example.com"},"ids":["{{userId}}"],"count":1}""",
+                DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .InvokeMessageAndWaitAsync(new UserErasureRequestedV1(userId, "Erase Me", Guid.NewGuid()));
+
+        using var assertScope = fixture.Services.CreateScope();
+        var assertDb = assertScope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var entry = await assertDb.AuditEntries.SingleAsync(e => e.EventType == "user.test");
+        using var payload = JsonDocument.Parse(entry.Payload);
+
+        Assert.Equal("[REDACTED]", payload.RootElement.GetProperty("userId").GetString());
+        Assert.Equal("[REDACTED]", payload.RootElement.GetProperty("nested").GetProperty("changedBy").GetString());
+        Assert.Equal("[REDACTED]", payload.RootElement.GetProperty("nested").GetProperty("email").GetString());
+        Assert.Equal("[REDACTED]", payload.RootElement.GetProperty("ids")[0].GetString());
+        Assert.Equal(1, payload.RootElement.GetProperty("count").GetInt32());
     }
 }

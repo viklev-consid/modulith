@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Modulith.Modules.Notifications.Templates;
 
 internal static class WelcomeEmailTemplate
@@ -8,7 +10,7 @@ internal static class WelcomeEmailTemplate
         $"""
         <html>
         <body>
-          <h1>Welcome, {displayName}!</h1>
+          <h1>Welcome, {WebUtility.HtmlEncode(displayName)}!</h1>
           <p>Your account has been created. You can now sign in and start using the platform.</p>
         </body>
         </html>

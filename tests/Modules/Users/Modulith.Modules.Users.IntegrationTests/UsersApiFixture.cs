@@ -1,10 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Modulith.Modules.Audit.Persistence;
+using Modulith.Modules.Catalog.Persistence;
+using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Domain;
 using Modulith.Modules.Users.Persistence;
+using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Kernel.Interfaces;
 using Modulith.TestSupport;
+using Modulith.TestSupport.Fakes;
 
 namespace Modulith.Modules.Users.IntegrationTests;
 
@@ -36,15 +42,19 @@ public class UsersApiFixture : ApiTestFixture
     {
         services.RemoveAll<IClock>();
         services.AddSingleton<IClock>(Clock);
+        services.AddSingleton<IEmailSender, FakeEmailSender>();
     }
 
     protected override async Task MigrateAsync(IServiceProvider services)
     {
-        var db = services.GetRequiredService<UsersDbContext>();
-        await db.Database.MigrateAsync();
+        await services.GetRequiredService<UsersDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<CatalogDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<AuditDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<OrganizationsDbContext>().Database.MigrateAsync();
     }
 
-    protected override string[] GetSchemasToReset() => ["users"];
+    protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "notifications", "organizations"];
 }
 
 public sealed class InviteOnlyUsersApiFixture : UsersApiFixture

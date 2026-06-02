@@ -30,6 +30,10 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(o => o.IsDeleted)
             .IsRequired();
 
+        builder.Property(o => o.OwnerMutationVersion)
+            .IsConcurrencyToken()
+            .IsRequired();
+
         builder.Property(o => o.CreatedAt).IsRequired();
         builder.Property(o => o.CreatedBy).HasMaxLength(100);
         builder.Property(o => o.UpdatedAt);

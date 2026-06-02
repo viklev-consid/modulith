@@ -17,6 +17,12 @@ internal static class NotificationsErrors
     public static readonly Error NotificationTitleRequired =
         Error.Validation("Notifications.Bell.TitleRequired", "The notification title is required.");
 
+    public static readonly Error NotificationInvalid =
+        Error.Validation("Notifications.Bell.Invalid", "The notification contains invalid values.");
+
+    public static readonly Error CursorInvalid =
+        Error.Validation("Notifications.Bell.CursorInvalid", "The before and beforeId cursor values must be supplied together.");
+
     public static readonly Error NotificationNotFound =
         Error.NotFound("Notifications.Bell.NotFound", "The notification was not found.");
 

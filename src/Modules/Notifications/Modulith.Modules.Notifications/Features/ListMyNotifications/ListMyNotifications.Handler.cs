@@ -1,6 +1,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Notifications.Contracts.Dtos;
+using Modulith.Modules.Notifications.Errors;
 using Modulith.Modules.Notifications.Mapping;
 using Modulith.Modules.Notifications.Persistence;
 
@@ -10,8 +11,22 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
 {
     public async Task<ErrorOr<ListMyNotificationsResponse>> Handle(ListMyNotificationsQuery query, CancellationToken ct)
     {
+        if (query.Before.HasValue != query.BeforeId.HasValue)
+        {
+            return NotificationsErrors.CursorInvalid;
+        }
+
         var limit = Math.Clamp(query.Limit, 1, 100);
-        var notifications = db.UserNotifications
+        var notifications = query.Before is not null && query.BeforeId is not null
+            ? db.UserNotifications.FromSqlInterpolated($"""
+                SELECT *
+                FROM notifications.user_notifications
+                WHERE created_at < {query.Before.Value}
+                   OR (created_at = {query.Before.Value} AND id < {query.BeforeId.Value})
+                """)
+            : db.UserNotifications;
+
+        notifications = notifications
             .AsNoTracking()
             .Where(n => n.RecipientUserId == query.UserId && n.ArchivedAt == null);
 
@@ -22,13 +37,9 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
             _ => notifications,
         };
 
-        if (query.Before is not null)
-        {
-            notifications = notifications.Where(n => n.CreatedAt < query.Before);
-        }
-
         var items = await notifications
             .OrderByDescending(n => n.CreatedAt)
+            .ThenByDescending(n => n.Id)
             .Take(limit + 1)
             .Select(n => new
             {
@@ -45,10 +56,13 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
             })
             .ToListAsync(ct);
 
-        var nextBefore = items.Count > limit ? items[^1].CreatedAt : (DateTimeOffset?)null;
+        var hasMore = items.Count > limit;
+        var returnedItems = items.Take(limit).ToList();
+        var nextBefore = hasMore ? returnedItems[^1].CreatedAt : (DateTimeOffset?)null;
+        var nextBeforeId = hasMore ? returnedItems[^1].Id.Value : (Guid?)null;
 
         return new ListMyNotificationsResponse(
-            items.Take(limit).Select(n => new MyNotificationResponse(
+            returnedItems.Select(n => new MyNotificationResponse(
                 n.Id.Value,
                 n.Type,
                 n.Category.ToContract(),
@@ -59,6 +73,7 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
                 n.ReadAt is not null,
                 n.CreatedAt,
                 n.ReadAt)).ToList(),
-            nextBefore);
+            nextBefore,
+            nextBeforeId);
     }
 }

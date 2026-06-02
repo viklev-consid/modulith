@@ -14,7 +14,7 @@ namespace Modulith.Modules.Catalog.IntegrationTests.Integration;
 /// <summary>
 /// Integration tests for <c>/v1/admin/dead-letters</c>.
 /// Uses <see cref="WolverineDeadLetterFixture"/> because it injects
-/// <see cref="AlwaysThrowConsentRegistry"/>, which guarantees exactly one dead letter
+/// <see cref="AlwaysThrowEmailSender"/>, which guarantees exactly one dead letter
 /// is produced per user registration — making the test state deterministic.
 /// </summary>
 [Collection("WolverineDeadLetter")]
@@ -40,7 +40,7 @@ public sealed class DeadLetterAdminTests(WolverineDeadLetterFixture fixture) : I
 
     /// <summary>
     /// Registers a user and waits for the Wolverine pipeline to settle.
-    /// AlwaysThrowConsentRegistry causes the Notifications handler to throw
+    /// AlwaysThrowEmailSender causes the Notifications handler to throw
     /// InvalidOperationException, which the MoveToErrorQueue policy moves to the
     /// dead-letter table — exactly one dead letter per call.
     /// </summary>

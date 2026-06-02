@@ -42,7 +42,7 @@ public sealed class InvitationEmailNotificationTests(NotificationsCrossModuleFix
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
         var log = await db.NotificationLogs.SingleAsync(l => l.IdempotencyKey == eventId);
-        Assert.Equal(invitedByUserId, log.UserId);
+        Assert.Equal(Guid.Empty, log.UserId);
         Assert.Equal(NotificationType.UserInvitation, log.NotificationType);
         Assert.Equal(NotificationDeliveryStatus.Sent, log.DeliveryStatus);
     }
@@ -75,8 +75,30 @@ public sealed class InvitationEmailNotificationTests(NotificationsCrossModuleFix
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
         var log = await db.NotificationLogs.SingleAsync(l => l.IdempotencyKey == eventId);
-        Assert.Equal(invitedByUserId, log.UserId);
+        Assert.Equal(Guid.Empty, log.UserId);
         Assert.Equal(NotificationType.OrganizationInvitation, log.NotificationType);
         Assert.Equal(NotificationDeliveryStatus.Sent, log.DeliveryStatus);
+    }
+
+    [Fact]
+    public async Task OrganizationInvitationCreated_HtmlEncodesUntrustedTemplateValues()
+    {
+        var invitation = new OrganizationInvitationCreatedV1(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "xss-org-invitee@example.com",
+            "<script>alert('role')</script>",
+            "<script>alert('token')</script>",
+            Guid.NewGuid(),
+            Guid.NewGuid());
+
+        await fixture.ApplicationHost.TrackActivity()
+            .Timeout(TimeSpan.FromSeconds(10))
+            .PublishMessageAndWaitAsync(invitation);
+
+        var sent = fixture.EmailSender.SentMessages.Single(m =>
+            string.Equals(m.To, "xss-org-invitee@example.com", StringComparison.Ordinal));
+        Assert.DoesNotContain("<script>", sent.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("&lt;script&gt;", sent.HtmlBody, StringComparison.Ordinal);
     }
 }

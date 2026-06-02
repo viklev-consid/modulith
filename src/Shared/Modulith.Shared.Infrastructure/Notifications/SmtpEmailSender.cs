@@ -12,6 +12,16 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
 
     public async Task SendAsync(EmailMessage message, CancellationToken ct)
     {
+        if (!options.UseSsl && (options.Username is not null || options.Password is not null))
+        {
+            throw new TerminalSmtpException("SMTP credentials require TLS.");
+        }
+
+        if (!options.UseSsl && !options.AllowInsecureTransport)
+        {
+            throw new TerminalSmtpException("SMTP TLS is required unless insecure transport is explicitly allowed.");
+        }
+
         var mail = new MimeMessage();
         mail.From.Add(MailboxAddress.Parse(message.From ?? options.DefaultFrom));
         mail.To.Add(MailboxAddress.Parse(message.To));

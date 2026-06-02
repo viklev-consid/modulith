@@ -20,7 +20,9 @@ internal static class ListOrganizationInvitationsEndpoint
                 IScopedAuthorizationService<OrganizationScope> authorization,
                 ICurrentUser currentUser,
                 IMessageBus bus,
-                CancellationToken ct) =>
+                CancellationToken ct,
+                int page = 1,
+                int pageSize = 20) =>
             {
                 var organization = await resolver.ResolveAsync(organizationRef, ct);
                 if (organization.IsError)
@@ -35,7 +37,7 @@ internal static class ListOrganizationInvitationsEndpoint
                 }
 
                 var result = await bus.InvokeAsync<ErrorOr.ErrorOr<ListOrganizationInvitationsResponse>>(
-                    new ListOrganizationInvitationsQuery(organization.Value.Id),
+                    new ListOrganizationInvitationsQuery(organization.Value.Id, page, pageSize),
                     ct);
                 return result.ToProblemDetailsOr(Results.Ok);
             })

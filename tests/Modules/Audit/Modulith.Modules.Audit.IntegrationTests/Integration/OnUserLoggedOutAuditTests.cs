@@ -149,6 +149,7 @@ public sealed class OnUserLoggedOutAuditTests(AuditCrossModuleFixture fixture) :
         Assert.Equal(HttpStatusCode.Created, registerResponse!.StatusCode);
         var body = await registerResponse.Content.ReadFromJsonAsync<JsonDocument>();
         var userId = body!.RootElement.GetProperty("userId").GetGuid();
+        await fixture.ConfirmEmailAsync(email);
 
         var loginResp = await client.PostAsJsonAsync("/v1/users/login", new LoginRequest(email, "Password1!"));
         var login = await loginResp.Content.ReadFromJsonAsync<LoginResponse>();

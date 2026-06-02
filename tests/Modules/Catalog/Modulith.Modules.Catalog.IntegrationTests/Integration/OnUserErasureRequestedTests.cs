@@ -51,10 +51,11 @@ public sealed class OnUserErasureRequestedTests(CrossModuleApiFixture fixture) :
         // Assert — customer should be anonymized
         using var assertScope = fixture.Services.CreateScope();
         var assertDb = assertScope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-        var anonymized = await assertDb.Customers.FirstOrDefaultAsync(c => c.UserId == userId);
+        var anonymized = await assertDb.Customers.SingleAsync();
 
-        Assert.NotNull(anonymized);
-        Assert.Equal("deleted@example.com", anonymized.Email);
+        Assert.NotEqual(userId, anonymized.UserId);
+        Assert.StartsWith("deleted-", anonymized.Email, StringComparison.Ordinal);
+        Assert.EndsWith("@example.invalid", anonymized.Email, StringComparison.Ordinal);
         Assert.Equal("Deleted User", anonymized.DisplayName);
     }
 
@@ -105,8 +106,8 @@ public sealed class OnUserErasureRequestedTests(CrossModuleApiFixture fixture) :
         // Assert — still anonymized, no reversion
         using var assertScope = fixture.Services.CreateScope();
         var assertDb = assertScope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-        var customer = await assertDb.Customers.FirstOrDefaultAsync(c => c.UserId == userId);
-        Assert.NotNull(customer);
-        Assert.Equal("deleted@example.com", customer.Email);
+        var customer = await assertDb.Customers.SingleAsync();
+        Assert.NotEqual(userId, customer.UserId);
+        Assert.StartsWith("deleted-", customer.Email, StringComparison.Ordinal);
     }
 }

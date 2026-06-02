@@ -87,6 +87,15 @@ namespace Modulith.Modules.Audit.Persistence.Migrations
                     b.HasIndex("OrganizationId")
                         .HasDatabaseName("ix_audit_entries_organization_id");
 
+                    b.HasIndex("ActorId", "OccurredAt")
+                        .HasDatabaseName("ix_audit_entries_actor_id_occurred_at");
+
+                    b.HasIndex("OrganizationId", "OccurredAt")
+                        .HasDatabaseName("ix_audit_entries_organization_id_occurred_at");
+
+                    b.HasIndex("ResourceId", "OccurredAt")
+                        .HasDatabaseName("ix_audit_entries_resource_id_occurred_at");
+
                     b.ToTable("audit_entries", "audit");
                 });
 #pragma warning restore 612, 618

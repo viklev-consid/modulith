@@ -54,6 +54,7 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
 {
     /// <summary>Rows stuck in Sending for longer than this are eligible for automatic recovery.</summary>
     private static readonly TimeSpan stuckSendingThreshold = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan leaseRenewalInterval = TimeSpan.FromMinutes(1);
 
     /// <summary>
     /// Attempts to atomically claim the send slot for <paramref name="idempotencyKey"/>.
@@ -180,6 +181,34 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
         }
     }
 
+    /// <summary>
+    /// Runs delivery while renewing its lease. The callback must not use this guard's scoped DbContext.
+    /// </summary>
+    public async Task SendWithLeaseRenewalAsync(
+        Guid idempotencyKey,
+        Guid leaseToken,
+        Func<CancellationToken, Task> sendAsync,
+        CancellationToken ct,
+        TimeSpan? renewalInterval = null)
+    {
+        using var renewalCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var renewalTask = RenewLeaseUntilCancelledAsync(
+            idempotencyKey,
+            leaseToken,
+            renewalInterval ?? leaseRenewalInterval,
+            renewalCts.Token);
+
+        try
+        {
+            await sendAsync(ct);
+        }
+        finally
+        {
+            await renewalCts.CancelAsync();
+            await renewalTask;
+        }
+    }
+
     private async Task<Guid?> AtomicClaimAsync(Guid idempotencyKey, CancellationToken ct)
     {
         var leaseToken = Guid.NewGuid();
@@ -199,5 +228,30 @@ public sealed class NotificationSendGuard(NotificationsDbContext db, IClock cloc
 
         return null;
 
+    }
+
+    private async Task RenewLeaseUntilCancelledAsync(
+        Guid idempotencyKey,
+        Guid leaseToken,
+        TimeSpan renewalInterval,
+        CancellationToken ct)
+    {
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(renewalInterval, ct);
+                await db.NotificationLogs
+                    .Where(l => l.IdempotencyKey == idempotencyKey
+                                && l.DeliveryStatus == NotificationDeliveryStatus.Sending
+                                && l.SendingLeaseToken == leaseToken)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(l => l.SendingClaimedAt, clock.UtcNow), ct);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Normal completion: SMTP delivery ended, so lease renewal is no longer needed.
+        }
     }
 }
