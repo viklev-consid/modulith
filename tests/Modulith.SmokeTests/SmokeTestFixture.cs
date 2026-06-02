@@ -3,6 +3,7 @@ using DotNet.Testcontainers.Containers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Persistence;
@@ -48,6 +49,23 @@ public sealed class SmokeTestFixture : ApiTestFixture
         builder.UseSetting("Modules:Notifications:Smtp:Port",
             mailpit.GetMappedPublicPort(1025).ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.UseSetting("Modules:Notifications:Smtp:AllowInsecureTransport", "true");
+
+        builder.ConfigureServices(services =>
+        {
+            var legalDocumentBootstrappers = services
+                .Where(descriptor =>
+                    descriptor.ServiceType == typeof(IHostedService) &&
+                    string.Equals(
+                        descriptor.ImplementationType?.Name,
+                        "LegalDocumentsBootstrapper",
+                        StringComparison.Ordinal))
+                .ToArray();
+
+            foreach (var descriptor in legalDocumentBootstrappers)
+            {
+                services.Remove(descriptor);
+            }
+        });
     }
 
     protected override async Task StartAdditionalContainersAsync()

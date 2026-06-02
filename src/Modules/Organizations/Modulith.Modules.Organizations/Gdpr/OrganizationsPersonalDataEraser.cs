@@ -1,8 +1,8 @@
+using Microsoft.EntityFrameworkCore;
+using Modulith.Modules.Organizations.Errors;
+using Modulith.Modules.Organizations.Persistence;
 using Modulith.Shared.Kernel.Gdpr;
 using Modulith.Shared.Kernel.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using Modulith.Modules.Organizations.Persistence;
-using Modulith.Modules.Organizations.Errors;
 
 namespace Modulith.Modules.Organizations.Gdpr;
 

@@ -11,7 +11,7 @@ namespace Modulith.Modules.Notifications.Features.StreamMyNotifications;
 
 internal static class StreamMyNotificationsEndpoint
 {
-    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(25);
+    private static readonly TimeSpan heartbeatInterval = TimeSpan.FromSeconds(25);
 
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapGet(NotificationsRoutes.MyNotificationsStream,
@@ -45,7 +45,7 @@ internal static class StreamMyNotificationsEndpoint
                 http.Response.ContentType = "text/event-stream";
 
                 using var subscription = result.Value.Subscription;
-                using var heartbeat = new PeriodicTimer(HeartbeatInterval);
+                using var heartbeat = new PeriodicTimer(heartbeatInterval);
                 var readTask = result.Value.Reader.WaitToReadAsync(ct).AsTask();
                 var heartbeatTask = WaitForHeartbeatAsync(heartbeat, ct);
 

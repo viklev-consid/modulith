@@ -1,7 +1,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
-using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Organizations.Errors;
+using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Contracts.Queries;
 using Modulith.Shared.Kernel.Pagination;
 using Wolverine;

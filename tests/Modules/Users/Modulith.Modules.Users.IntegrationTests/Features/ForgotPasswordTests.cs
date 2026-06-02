@@ -171,7 +171,7 @@ public sealed class ForgotPasswordTests(UsersApiFixture fixture) : IAsyncLifetim
         {
             var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
             var token = await db.SingleUseTokens
-                .Where(t => t.ConsumedAt == null)
+                .Where(t => t.Purpose == Domain.TokenPurpose.PasswordReset && t.ConsumedAt == null)
                 .SingleAsync();
             Assert.NotNull(token);
         }

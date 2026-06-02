@@ -13,7 +13,7 @@ public sealed partial class LegalComplianceService(
     HybridCache cache,
     ILogger<LegalComplianceService> logger) : ILegalComplianceService
 {
-    private static readonly HybridCacheEntryOptions CacheOptions = new()
+    private static readonly HybridCacheEntryOptions cacheOptions = new()
     {
         Expiration = TimeSpan.FromHours(1),
         // Legal documents change rarely, but per-replica L1 entries stay short so a
@@ -25,7 +25,7 @@ public sealed partial class LegalComplianceService(
         => await cache.GetOrCreateAsync(
             GetCacheKey(userId),
             async token => await GetContinuedUseComplianceCoreAsync(userId, token),
-            CacheOptions,
+            cacheOptions,
             tags: ["users:legal-compliance"],
             cancellationToken: ct);
 
