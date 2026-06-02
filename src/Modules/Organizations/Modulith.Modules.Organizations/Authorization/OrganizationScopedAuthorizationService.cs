@@ -28,6 +28,14 @@ internal sealed class OrganizationScopedAuthorizationService(OrganizationsDbCont
         }
 
         var organizationId = new OrganizationId(scope.OrganizationId);
+        var organizationExists = await db.Organizations
+            .AsNoTracking()
+            .AnyAsync(o => o.Id == organizationId && !o.IsDeleted, ct);
+        if (!organizationExists)
+        {
+            return ScopedAuthorizationResult.Denied;
+        }
+
         var membership = await db.Memberships
             .AsNoTracking()
             .Where(m => m.OrganizationId == organizationId && m.UserId == userId && m.IsActive)

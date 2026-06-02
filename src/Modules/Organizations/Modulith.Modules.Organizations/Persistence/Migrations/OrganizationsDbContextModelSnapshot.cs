@@ -56,6 +56,11 @@ namespace Modulith.Modules.Organizations.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<int>("OwnerMutationVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("owner_mutation_version");
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(100)

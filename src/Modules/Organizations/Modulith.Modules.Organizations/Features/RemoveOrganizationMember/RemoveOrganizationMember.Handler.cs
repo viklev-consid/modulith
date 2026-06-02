@@ -20,13 +20,21 @@ public sealed class RemoveOrganizationMemberHandler(OrganizationsDbContext db, I
             return OrganizationsErrors.OrganizationNotFound;
         }
 
-        var remove = organization.RemoveMember(cmd.UserId, cmd.RemovedByUserId, clock);
+        var remove = organization.RemoveMemberAsActor(cmd.RemovedByUserId, cmd.UserId, clock);
         if (remove.IsError)
         {
             return remove.Errors;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.ChangeTracker.Clear();
+            return OrganizationsErrors.ConcurrencyConflict;
+        }
         await bus.PublishAsync(new OrganizationMemberRemovedV1(
             organization.Id.Value,
             cmd.UserId,
