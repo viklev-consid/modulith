@@ -2,6 +2,7 @@ using Modulith.Shared.Kernel.Gdpr;
 using Modulith.Shared.Kernel.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Modulith.Modules.Organizations.Persistence;
+using Modulith.Modules.Organizations.Errors;
 
 namespace Modulith.Modules.Organizations.Gdpr;
 
@@ -15,11 +16,30 @@ public sealed class OrganizationsPersonalDataEraser(OrganizationsDbContext db, I
             .Where(m => m.UserId == user.UserId)
             .ToListAsync(ct);
 
-        foreach (var membership in memberships)
+        var activeOrganizationIds = memberships
+            .Where(m => m.IsActive)
+            .Select(m => m.OrganizationId)
+            .Distinct()
+            .ToArray();
+        var organizationsWithActiveMembership = await db.Organizations
+            .Include(o => o.Memberships)
+            .Where(o => activeOrganizationIds.Contains(o.Id))
+            .ToDictionaryAsync(o => o.Id, ct);
+
+        foreach (var membership in memberships.Where(m => !m.IsActive))
         {
-            if (membership.IsActive)
+            membership.Anonymize();
+            recordsAffected++;
+        }
+
+        foreach (var organization in organizationsWithActiveMembership.Values)
+        {
+            var membership = organization.FindActiveMembership(user.UserId)!;
+            var remove = organization.RemoveMember(user.UserId, user.UserId, clock);
+            if (remove.IsError)
             {
-                membership.Remove(user.UserId, clock);
+                throw new InvalidOperationException(
+                    $"{OrganizationsErrors.OwnedOrganizationsBlockUserErasure.Code}: {remove.FirstError.Description}");
             }
 
             membership.Anonymize();
@@ -38,17 +58,27 @@ public sealed class OrganizationsPersonalDataEraser(OrganizationsDbContext db, I
             recordsAffected++;
         }
 
-        var organizations = await db.Organizations
+        var deletedOrganizations = await db.Organizations
             .Where(o => o.DeletedByUserId == user.UserId)
             .ToListAsync(ct);
 
-        foreach (var organization in organizations)
+        foreach (var organization in deletedOrganizations)
         {
             organization.AnonymizeUserReferences(user.UserId);
             recordsAffected++;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            db.ChangeTracker.Clear();
+            throw new InvalidOperationException(
+                $"{OrganizationsErrors.OwnedOrganizationsBlockUserErasure.Code}: Organization ownership changed concurrently.",
+                ex);
+        }
         return new ErasureResult(user.UserId, strategy, recordsAffected);
     }
 }
