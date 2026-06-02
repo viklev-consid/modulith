@@ -41,6 +41,15 @@ public sealed class ListProductsTests(CatalogApiFixture fixture) : IAsyncLifetim
         var body = await response.Content.ReadFromJsonAsync<ListProductsResponse>();
         Assert.NotNull(body);
         Assert.Equal(2, body.Products.Count);
+        Assert.Equal(2, body.Total);
+    }
+
+    [Fact]
+    public async Task ListProducts_WhenPageSizeExceedsConfiguredMaximum_ReturnsValidationProblem()
+    {
+        var response = await anonClient.GetAsync("/v1/catalog/products?pageSize=501");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

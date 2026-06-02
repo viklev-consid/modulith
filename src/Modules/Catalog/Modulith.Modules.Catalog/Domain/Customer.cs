@@ -1,4 +1,5 @@
 using Modulith.Shared.Kernel.Domain;
+using Modulith.Shared.Kernel.Gdpr;
 using Modulith.Shared.Kernel.Interfaces;
 
 namespace Modulith.Modules.Catalog.Domain;
@@ -15,8 +16,13 @@ public sealed class Customer : Entity<CustomerId>, IAuditableEntity
 
     private Customer() : base(default!) { }
 
+    [PersonalData]
     public Guid UserId { get; private set; }
+
+    [PersonalData]
     public string Email { get; private set; } = null!;
+
+    [PersonalData]
     public string DisplayName { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -29,7 +35,12 @@ public sealed class Customer : Entity<CustomerId>, IAuditableEntity
 
     public void Anonymize()
     {
-        Email = "deleted@example.com";
+        UserId = Guid.NewGuid();
+        Email = $"deleted-{Id.Value:N}@example.invalid";
         DisplayName = "Deleted User";
     }
+
+    public void UpdateEmail(string email) => Email = email;
+
+    public void UpdateDisplayName(string displayName) => DisplayName = displayName;
 }

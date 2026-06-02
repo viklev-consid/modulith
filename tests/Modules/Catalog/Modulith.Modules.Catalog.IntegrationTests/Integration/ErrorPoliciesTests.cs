@@ -6,6 +6,7 @@ using Modulith.Modules.Audit.Persistence;
 using Modulith.Modules.Catalog.Persistence;
 using Modulith.Modules.Notifications.Domain;
 using Modulith.Modules.Notifications.Persistence;
+using Modulith.Modules.Organizations.Persistence;
 using Modulith.Modules.Users.Persistence;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Kernel.Interfaces;
@@ -54,9 +55,10 @@ public sealed class WolverineRetryPolicyFixture : ApiTestFixture
         await services.GetRequiredService<CatalogDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<AuditDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<OrganizationsDbContext>().Database.MigrateAsync();
     }
 
-    protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "notifications"];
+    protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "notifications", "organizations"];
 }
 
 // ── Dead-letter fixture ─────────────────────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ public sealed class WolverineDeadLetterCollection : ICollectionFixture<Wolverine
 
 /// <summary>
 /// Fixture for Wolverine dead-letter integration tests.
-/// Replaces <see cref="IConsentRegistry"/> with a double that throws
+/// Replaces <see cref="IEmailSender"/> with a double that throws
 /// <see cref="InvalidOperationException"/> on every call. This triggers the explicit
 /// <c>InvalidOperationException → MoveToErrorQueue</c> policy configured in <c>Program.cs</c>,
 /// moving the Notifications envelope to <c>wolverine.wolverine_dead_letters</c> without retries.
@@ -75,8 +77,7 @@ public sealed class WolverineDeadLetterFixture : ApiTestFixture
 {
     protected override void ConfigureTestServices(IServiceCollection services)
     {
-        services.AddSingleton<IEmailSender, FakeEmailSender>();
-        services.AddSingleton<IConsentRegistry, AlwaysThrowConsentRegistry>();
+        services.AddSingleton<IEmailSender, AlwaysThrowEmailSender>();
     }
 
     protected override async Task MigrateAsync(IServiceProvider services)
@@ -85,9 +86,10 @@ public sealed class WolverineDeadLetterFixture : ApiTestFixture
         await services.GetRequiredService<CatalogDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<AuditDbContext>().Database.MigrateAsync();
         await services.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
+        await services.GetRequiredService<OrganizationsDbContext>().Database.MigrateAsync();
     }
 
-    protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "notifications"];
+    protected override string[] GetSchemasToReset() => ["users", "catalog", "audit", "notifications", "organizations"];
 }
 
 /// <summary>
@@ -96,18 +98,10 @@ public sealed class WolverineDeadLetterFixture : ApiTestFixture
 /// <c>InvalidOperationException → MoveToErrorQueue</c> Wolverine error policy in
 /// the Notifications handler before any state is committed (no side effects to undo).
 /// </summary>
-public sealed class AlwaysThrowConsentRegistry : IConsentRegistry
+public sealed class AlwaysThrowEmailSender : IEmailSender
 {
-    public Task<bool> HasConsentedAsync(Guid userId, string consentKey, CancellationToken ct = default) =>
-        throw new InvalidOperationException("Consent registry unavailable — error-policy test double");
-
-    // Registration still works: Users module adds consent directly via db.Consents.Add, not
-    // via IConsentRegistry.GrantAsync. GrantAsync / RevokeAsync are no-ops here.
-    public Task GrantAsync(Guid userId, string consentKey, CancellationToken ct = default) =>
-        Task.CompletedTask;
-
-    public Task RevokeAsync(Guid userId, string consentKey, CancellationToken ct = default) =>
-        Task.CompletedTask;
+    public Task SendAsync(EmailMessage message, CancellationToken ct) =>
+        throw new InvalidOperationException("Email delivery unavailable — error-policy test double");
 }
 
 // ── Test 1: transient retry ─────────────────────────────────────────────────────────────────────
@@ -193,8 +187,8 @@ public sealed class DeadLetterPolicyTests(WolverineDeadLetterFixture fixture) : 
         // Arrange
         var request = new { Email = "dead-letter-policy@example.com", Password = "Password1!", DisplayName = "Dead Letter Test" };
 
-        // Act — AlwaysThrowConsentRegistry throws InvalidOperationException before the
-        // Notifications handler writes any state. The MoveToErrorQueue policy fires
+        // Act — AlwaysThrowEmailSender throws InvalidOperationException during delivery.
+        // The MoveToErrorQueue policy fires
         // immediately (no retries), placing exactly one envelope in the dead-letter table.
         Func<IMessageContext, Task> act = async _ =>
         {
@@ -214,15 +208,14 @@ public sealed class DeadLetterPolicyTests(WolverineDeadLetterFixture fixture) : 
         var dead = (long)(await cmd.ExecuteScalarAsync())!;
         Assert.Equal(1L, dead);
 
-        // Assert — no email attempted (handler never reached emailSender.SendAsync)
+        // Assert — the throwing sender remains installed.
         using var scope = fixture.Services.CreateScope();
-        var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>() as FakeEmailSender;
+        var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>() as AlwaysThrowEmailSender;
         Assert.NotNull(emailSender);
-        Assert.Empty(emailSender.SentMessages);
 
-        // Assert — no notification log row written (handler threw before SaveChangesAsync)
+        // Assert — the log is retained for operational investigation.
         var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
         var logCount = await db.NotificationLogs.CountAsync();
-        Assert.Equal(0, logCount);
+        Assert.Equal(1, logCount);
     }
 }
