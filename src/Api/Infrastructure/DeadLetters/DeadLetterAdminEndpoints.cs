@@ -10,12 +10,15 @@ namespace Modulith.Api.Infrastructure.DeadLetters;
 /// </summary>
 internal static class DeadLetterAdminEndpoints
 {
+    private const int maxPageSize = 100;
+    private const int maxMessageIds = 100;
+
     internal static IEndpointRouteBuilder MapDeadLetterAdminEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/v1/admin/dead-letters")
             .RequireAuthorization("Admin")
             .WithTags("Admin — Dead Letters")
-            .DisableRateLimiting();
+            .RequireRateLimiting("operator");
 
         // ── List ──────────────────────────────────────────────────────────────
         group.MapGet("/", async (
@@ -26,6 +29,11 @@ internal static class DeadLetterAdminEndpoints
                 string? exceptionType = null,
                 CancellationToken ct = default) =>
             {
+                if (pageNumber < 1 || pageSize is < 1 or > maxPageSize)
+                {
+                    return Results.BadRequest("pageNumber must be positive and pageSize must be between 1 and 100.");
+                }
+
                 var query = new DeadLetterEnvelopeQuery
                 {
                     PageNumber = pageNumber,
@@ -64,6 +72,16 @@ internal static class DeadLetterAdminEndpoints
                 IMessageStore store,
                 CancellationToken ct) =>
             {
+                if (query.MessageIds.Length == 0 && query.MessageType is null && query.ExceptionType is null)
+                {
+                    return Results.BadRequest("Replay requires at least one message ID, message type, or exception type.");
+                }
+
+                if (query.MessageIds.Length > maxMessageIds)
+                {
+                    return Results.BadRequest("At most 100 message IDs can be replayed at once.");
+                }
+
                 await store.DeadLetters.ReplayAsync(query, ct);
                 return Results.Accepted();
             })
@@ -79,6 +97,16 @@ internal static class DeadLetterAdminEndpoints
                 IMessageStore store,
                 CancellationToken ct) =>
             {
+                if (query.MessageIds.Length == 0 && query.MessageType is null && query.ExceptionType is null)
+                {
+                    return Results.BadRequest("Discard requires at least one message ID, message type, or exception type.");
+                }
+
+                if (query.MessageIds.Length > maxMessageIds)
+                {
+                    return Results.BadRequest("At most 100 message IDs can be discarded at once.");
+                }
+
                 await store.DeadLetters.DiscardAsync(query, ct);
                 return Results.NoContent();
             })

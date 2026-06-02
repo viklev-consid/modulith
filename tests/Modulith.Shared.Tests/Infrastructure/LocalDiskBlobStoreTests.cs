@@ -117,4 +117,13 @@ public sealed class LocalDiskBlobStoreTests : IDisposable
         Assert.Equal("file1"u8.ToArray(), buf1);
         Assert.Equal("file2"u8.ToArray(), buf2);
     }
+
+    [Fact]
+    public async Task GetAsync_WithTraversalReference_RejectsEscapingRoot()
+    {
+        var reference = new BlobRef("..", "outside");
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => store.GetAsync(reference, CancellationToken.None));
+    }
 }
