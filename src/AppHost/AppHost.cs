@@ -18,6 +18,7 @@ _ = builder.AddProject<Projects.Modulith_Api>("api")
     .WithReference(postgres)
     .WithReference(redis)
     .WithReference(mailpit)
+    .WithEnvironment("Modules__Notifications__Smtp__AllowInsecureTransport", "true")
     .WaitFor(postgres)
     .WaitFor(redis)
     .WaitForCompletion(migrations);

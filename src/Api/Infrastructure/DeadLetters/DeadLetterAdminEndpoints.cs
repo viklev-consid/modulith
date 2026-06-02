@@ -72,9 +72,9 @@ internal static class DeadLetterAdminEndpoints
                 IMessageStore store,
                 CancellationToken ct) =>
             {
-                if (query.MessageIds.Length == 0 && query.MessageType is null && query.ExceptionType is null)
+                if (query.MessageIds.Length == 0)
                 {
-                    return Results.BadRequest("Replay requires at least one message ID, message type, or exception type.");
+                    return Results.BadRequest("Replay requires at least one message ID.");
                 }
 
                 if (query.MessageIds.Length > maxMessageIds)
@@ -86,7 +86,7 @@ internal static class DeadLetterAdminEndpoints
                 return Results.Accepted();
             })
             .WithName("ReplayDeadLetters")
-            .WithSummary("Re-enqueue dead-lettered messages matching the query for reprocessing.")
+            .WithSummary("Re-enqueue dead-lettered messages by ID for reprocessing.")
             .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
@@ -97,9 +97,9 @@ internal static class DeadLetterAdminEndpoints
                 IMessageStore store,
                 CancellationToken ct) =>
             {
-                if (query.MessageIds.Length == 0 && query.MessageType is null && query.ExceptionType is null)
+                if (query.MessageIds.Length == 0)
                 {
-                    return Results.BadRequest("Discard requires at least one message ID, message type, or exception type.");
+                    return Results.BadRequest("Discard requires at least one message ID.");
                 }
 
                 if (query.MessageIds.Length > maxMessageIds)
@@ -111,7 +111,7 @@ internal static class DeadLetterAdminEndpoints
                 return Results.NoContent();
             })
             .WithName("DiscardDeadLetters")
-            .WithSummary("Permanently delete dead-lettered messages matching the query.")
+            .WithSummary("Permanently delete dead-lettered messages by ID.")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);

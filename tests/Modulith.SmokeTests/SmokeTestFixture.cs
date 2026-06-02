@@ -47,6 +47,7 @@ public sealed class SmokeTestFixture : ApiTestFixture
         builder.UseSetting("Modules:Notifications:Smtp:Host", "127.0.0.1");
         builder.UseSetting("Modules:Notifications:Smtp:Port",
             mailpit.GetMappedPublicPort(1025).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.UseSetting("Modules:Notifications:Smtp:AllowInsecureTransport", "true");
     }
 
     protected override async Task StartAdditionalContainersAsync()
