@@ -14,7 +14,7 @@ internal static class EmailChangeRequestTemplate
           <p>We received a request to change the email address on your account. Use the link below to confirm. It expires in 30 minutes.</p>
           <p><a href="{WebUtility.HtmlEncode(confirmationUrl)}">Confirm email address change</a></p>
           <p>If the link does not work, copy this token into the confirmation screen:</p>
-          <p><code>{token}</code></p>
+          <p><code>{WebUtility.HtmlEncode(token)}</code></p>
           <p>If you did not make this request, you can safely ignore this email. Your email address will not change.</p>
         </body>
         </html>

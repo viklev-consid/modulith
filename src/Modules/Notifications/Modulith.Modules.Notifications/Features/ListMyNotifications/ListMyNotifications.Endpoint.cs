@@ -12,7 +12,7 @@ internal static class ListMyNotificationsEndpoint
 {
     public static void Map(IEndpointRouteBuilder app) =>
         app.MapGet(NotificationsRoutes.MyNotifications,
-            async (ICurrentUser currentUser, IMessageBus bus, CancellationToken ct, string? status = null, int limit = 20, DateTimeOffset? before = null) =>
+            async (ICurrentUser currentUser, IMessageBus bus, CancellationToken ct, string? status = null, int limit = 20, DateTimeOffset? before = null, Guid? beforeId = null) =>
             {
                 if (currentUser.Id is null || !Guid.TryParse(currentUser.Id, out var userId))
                 {
@@ -20,7 +20,7 @@ internal static class ListMyNotificationsEndpoint
                 }
 
                 var result = await bus.InvokeAsync<ErrorOr<ListMyNotificationsResponse>>(
-                    new ListMyNotificationsQuery(userId, status, limit, before),
+                    new ListMyNotificationsQuery(userId, status, limit, before, beforeId),
                     ct);
 
                 return result.ToProblemDetailsOr(Results.Ok);

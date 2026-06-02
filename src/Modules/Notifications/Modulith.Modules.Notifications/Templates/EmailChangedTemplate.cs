@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Modulith.Modules.Notifications.Templates;
 
 internal static class EmailChangedTemplate
@@ -9,7 +11,7 @@ internal static class EmailChangedTemplate
         <html>
         <body>
           <h1>Email address changed</h1>
-          <p>The email address on your account has been changed to <strong>{newEmail}</strong>.</p>
+          <p>The email address on your account has been changed to <strong>{WebUtility.HtmlEncode(newEmail)}</strong>.</p>
           <p>If you did not make this change, contact support immediately — your account may be compromised.</p>
         </body>
         </html>

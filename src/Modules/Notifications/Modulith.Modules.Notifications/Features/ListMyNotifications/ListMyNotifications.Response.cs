@@ -4,7 +4,8 @@ namespace Modulith.Modules.Notifications.Features.ListMyNotifications;
 
 public sealed record ListMyNotificationsResponse(
     IReadOnlyList<MyNotificationResponse> Items,
-    DateTimeOffset? NextBefore);
+    DateTimeOffset? NextBefore,
+    Guid? NextBeforeId);
 
 public sealed record MyNotificationResponse(
     Guid Id,

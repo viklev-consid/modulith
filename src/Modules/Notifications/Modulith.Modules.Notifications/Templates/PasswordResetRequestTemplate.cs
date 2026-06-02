@@ -14,7 +14,7 @@ internal static class PasswordResetRequestTemplate
           <p>We received a request to reset the password for your account. Use the link below to complete the reset. It expires in 30 minutes.</p>
           <p><a href="{WebUtility.HtmlEncode(resetUrl)}">Reset your password</a></p>
           <p>If the link does not work, copy this token into the reset screen:</p>
-          <p><code>{token}</code></p>
+          <p><code>{WebUtility.HtmlEncode(token)}</code></p>
           <p>If you did not request a password reset, you can safely ignore this email.</p>
         </body>
         </html>

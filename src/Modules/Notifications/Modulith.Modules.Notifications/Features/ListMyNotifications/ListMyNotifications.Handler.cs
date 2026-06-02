@@ -22,13 +22,15 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
             _ => notifications,
         };
 
-        if (query.Before is not null)
+        if (query.Before is not null && query.BeforeId is not null)
         {
-            notifications = notifications.Where(n => n.CreatedAt < query.Before);
+            notifications = notifications.Where(n => n.CreatedAt < query.Before
+                                                       || (n.CreatedAt == query.Before && n.Id.Value.CompareTo(query.BeforeId.Value) < 0));
         }
 
         var items = await notifications
             .OrderByDescending(n => n.CreatedAt)
+            .ThenByDescending(n => n.Id)
             .Take(limit + 1)
             .Select(n => new
             {
@@ -45,10 +47,13 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
             })
             .ToListAsync(ct);
 
-        var nextBefore = items.Count > limit ? items[^1].CreatedAt : (DateTimeOffset?)null;
+        var hasMore = items.Count > limit;
+        var returnedItems = items.Take(limit).ToList();
+        var nextBefore = hasMore ? returnedItems[^1].CreatedAt : (DateTimeOffset?)null;
+        var nextBeforeId = hasMore ? returnedItems[^1].Id.Value : (Guid?)null;
 
         return new ListMyNotificationsResponse(
-            items.Take(limit).Select(n => new MyNotificationResponse(
+            returnedItems.Select(n => new MyNotificationResponse(
                 n.Id.Value,
                 n.Type,
                 n.Category.ToContract(),
@@ -59,6 +64,7 @@ public sealed class ListMyNotificationsHandler(NotificationsDbContext db)
                 n.ReadAt is not null,
                 n.CreatedAt,
                 n.ReadAt)).ToList(),
-            nextBefore);
+            nextBefore,
+            nextBeforeId);
     }
 }
