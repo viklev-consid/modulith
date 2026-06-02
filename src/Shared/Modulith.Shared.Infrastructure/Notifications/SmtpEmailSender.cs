@@ -12,12 +12,17 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
 
     public async Task SendAsync(EmailMessage message, CancellationToken ct)
     {
-        if (!options.UseSsl && (options.Username is not null || options.Password is not null))
+        if (options.UseSsl && options.UseStartTls)
+        {
+            throw new TerminalSmtpException("SMTP cannot use implicit TLS and STARTTLS at the same time.");
+        }
+
+        if (!options.UseSsl && !options.UseStartTls && (options.Username is not null || options.Password is not null))
         {
             throw new TerminalSmtpException("SMTP credentials require TLS.");
         }
 
-        if (!options.UseSsl && !options.AllowInsecureTransport)
+        if (!options.UseSsl && !options.UseStartTls && !options.AllowInsecureTransport)
         {
             throw new TerminalSmtpException("SMTP TLS is required unless insecure transport is explicitly allowed.");
         }
@@ -36,9 +41,15 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
 
         using var client = new SmtpClient();
 
-        var secureSocketOptions = options.UseSsl
-            ? SecureSocketOptions.SslOnConnect
-            : SecureSocketOptions.None;
+        var secureSocketOptions = SecureSocketOptions.None;
+        if (options.UseSsl)
+        {
+            secureSocketOptions = SecureSocketOptions.SslOnConnect;
+        }
+        else if (options.UseStartTls)
+        {
+            secureSocketOptions = SecureSocketOptions.StartTls;
+        }
 
         // --- Connect ---
         // SslHandshakeException (bad cert, wrong protocol) and AuthenticationException (TLS auth

@@ -293,13 +293,18 @@ Dev: Mailpit via Aspire. No credentials.
 Prod: provider-specific. Example for SMTP:
 
 ```
-Notifications:Smtp:Host = smtp.provider.com
-Notifications:Smtp:Port = 587
-Notifications:Smtp:Username = <secret>
-Notifications:Smtp:Password = <secret>
+Modules:Notifications:Smtp:Host = smtp.provider.com
+Modules:Notifications:Smtp:Port = 587
+Modules:Notifications:Smtp:UseStartTls = true
+Modules:Notifications:Smtp:Username = <secret>
+Modules:Notifications:Smtp:Password = <secret>
 ```
 
 Or API-based (SendGrid, SES): override `IEmailSender` registration in prod to use a provider-specific implementation.
+
+Set `UseStartTls = true` for explicit STARTTLS, commonly on port `587`. Set `UseSsl = true`
+for implicit TLS, commonly on port `465`. Do not enable both. Plaintext SMTP is disabled
+unless `AllowInsecureTransport = true`, which is intended for local Mailpit only.
 
 ## Frontend links and browser CORS
 

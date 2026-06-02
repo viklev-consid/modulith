@@ -1,5 +1,7 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
+builder.AddDockerComposeEnvironment("compose");
+
 var dbPassword = builder.AddParameter("db-password", secret: true);
 
 var postgres = builder.AddPostgres("db", password: dbPassword)

@@ -1,0 +1,105 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-modulith}
+      POSTGRES_USER: ${POSTGRES_USER:-modulith}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - redis-data:/data
+
+  migrations:
+    # Coolify Compose extension: ignore this successful one-shot container in overall health.
+    exclude_from_hc: true
+    build:
+      context: .
+      dockerfile: src/MigrationService/Dockerfile
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ConnectionStrings__db: Host=db;Port=5432;Database=${POSTGRES_DB:-modulith};Username=${POSTGRES_USER:-modulith};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  volume-permissions:
+    # Coolify Compose extension: ignore this successful one-shot container in overall health.
+    exclude_from_hc: true
+    image: alpine:3.22
+    restart: "no"
+    command: ["sh", "-c", "chown -R 1654:1654 /var/lib/modulith"]
+    volumes:
+      - blob-data:/var/lib/modulith/blobs
+      - dataprotection-keys:/var/lib/modulith/dataprotection
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Api/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__db: Host=db;Port=5432;Database=${POSTGRES_DB:-modulith};Username=${POSTGRES_USER:-modulith};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+      ConnectionStrings__cache: cache:6379
+      Jwt__Issuer: ${JWT_ISSUER:-https://modulith-api.intraktiv.com}
+      Jwt__Audience: ${JWT_AUDIENCE:-modulith-api}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in Coolify}
+      Frontend__BaseUrl: ${FRONTEND_BASE_URL:-https://modulith.intraktiv.com}
+      Cors__AllowedOrigins__0: ${FRONTEND_BASE_URL:-https://modulith.intraktiv.com}
+      Blob__RootPath: /var/lib/modulith/blobs
+      Blob__SigningKey: ${BLOB_SIGNING_KEY:?Set BLOB_SIGNING_KEY in Coolify}
+      Modules__Users__DataProtectionKeyRingPath: /var/lib/modulith/dataprotection
+      Modules__Users__TotpIssuer: ${TOTP_ISSUER:-Intraktiv Modulith}
+      Modules__Users__AdminBootstrap__Enabled: ${ADMIN_BOOTSTRAP_ENABLED:-false}
+      Modules__Notifications__Smtp__Host: ${SMTP_HOST:?Set SMTP_HOST in Coolify}
+      Modules__Notifications__Smtp__Port: ${SMTP_PORT:-587}
+      Modules__Notifications__Smtp__UseStartTls: ${SMTP_USE_STARTTLS:-true}
+      Modules__Notifications__Smtp__UseSsl: ${SMTP_USE_SSL:-false}
+      Modules__Notifications__Smtp__DefaultFrom: ${SMTP_DEFAULT_FROM:?Set SMTP_DEFAULT_FROM in Coolify}
+      Modules__Notifications__Smtp__Username: ${SMTP_USERNAME:?Set SMTP_USERNAME in Coolify}
+      Modules__Notifications__Smtp__Password: ${SMTP_PASSWORD:?Set SMTP_PASSWORD in Coolify}
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+      volume-permissions:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--header", "X-Forwarded-Proto: https", "http://127.0.0.1:8080/alive"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - blob-data:/var/lib/modulith/blobs
+      - dataprotection-keys:/var/lib/modulith/dataprotection
+
+volumes:
+  postgres-data:
+  redis-data:
+  blob-data:
+  dataprotection-keys:

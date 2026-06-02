@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -39,6 +40,16 @@ using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
 var modules = ModuleCatalog.DiscoverInstallers();
+
+builder.Services.Configure<ForwardedHeadersOptions>(opts =>
+{
+    opts.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // Coolify's Traefik container can move between Docker network addresses. The API port
+    // remains internal to the Compose network, so forwarded headers can be trusted here.
+    opts.KnownIPNetworks.Clear();
+    opts.KnownProxies.Clear();
+});
 
 // 1. Aspire service defaults (OTel, health checks, resilience, service discovery)
 builder.AddServiceDefaults();
@@ -313,6 +324,8 @@ builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddBlobStorage(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // Health and liveness endpoints — exempt from rate limiting via Aspire ServiceDefaults
 app.MapDefaultEndpoints();
