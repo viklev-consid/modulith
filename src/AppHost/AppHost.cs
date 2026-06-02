@@ -7,7 +7,8 @@ var postgres = builder.AddPostgres("db", password: dbPassword)
 
 var redis = builder.AddRedis("cache");
 
-var mailpit = builder.AddMailPit("mailpit", httpPort: 8025, smtpPort: 1025);
+var mailpit = builder.AddMailPit("mailpit", httpPort: 8025, smtpPort: 1025)
+    .WithImageTag("v1.30.0");
 
 var migrations = builder.AddProject<Projects.Modulith_MigrationService>("migrations")
     .WithReference(postgres)

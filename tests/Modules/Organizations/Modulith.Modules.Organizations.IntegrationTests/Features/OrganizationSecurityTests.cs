@@ -224,6 +224,20 @@ public sealed class OrganizationSecurityTests(OrganizationsApiFixture fixture) :
     }
 
     [Fact]
+    public async Task Admin_CannotRemoveOwner()
+    {
+        var ownerId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var org = await CreateOrganizationAsync(ownerId, "Acme", "acme");
+        await AddMemberAsync(org.Id, adminId, OrganizationRole.Admin);
+        using var client = fixture.CreateAuthenticatedClient(adminId, "admin@example.com", "Admin");
+
+        var response = await client.DeleteAsync($"/v1/organizations/{org.Slug}/members/{ownerId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PlatformOverride_CannotMutateOrganizationWithoutScopedPermission()
     {
         var ownerId = Guid.NewGuid();
