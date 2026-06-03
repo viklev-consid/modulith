@@ -18,7 +18,8 @@ public sealed class OnPasswordResetRequestedHandler(
     IEmailSender emailSender,
     IClock clock,
     NotificationSendGuard sendGuard,
-    IFrontendUrlBuilder frontendUrls)
+    IFrontendUrlBuilder frontendUrls,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(PasswordResetRequestedV1 @event, CancellationToken ct)
     {
@@ -45,10 +46,19 @@ public sealed class OnPasswordResetRequestedHandler(
         }
 
         var resetUrl = frontendUrls.ResetPassword(@event.RawToken);
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.PasswordResetRequest,
+            new PasswordResetRequestModel(@event.RawToken, resetUrl));
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.Email,
-            Subject: PasswordResetRequestTemplate.Subject,
-            HtmlBody: PasswordResetRequestTemplate.HtmlBody(@event.RawToken, resetUrl),
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: PasswordResetRequestTemplate.PlainTextBody(@event.RawToken, resetUrl));
 
         try

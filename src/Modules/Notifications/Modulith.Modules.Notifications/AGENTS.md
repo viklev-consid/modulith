@@ -42,9 +42,10 @@ For general module conventions, see [`../../AGENTS.md`](../../AGENTS.md).
 ### Email notification
 
 1. Add an entry to the `NotificationType` enum.
-2. Add a template in `Templates/` with `Subject`, `HtmlBody`, and `PlainTextBody`.
-3. Write a handler in `Integration/Subscribers/` subscribing to the triggering event.
-4. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
+2. Add the HTML template in `tools/email-templates/src/templates/` and run `pnpm email:export`.
+3. Add or update the C# template ID/model in `Templates/`, keeping subject/plain-text rendering in C#.
+4. Write a handler in `Integration/Subscribers/` subscribing to the triggering event.
+5. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
 
 Key handler rules:
 

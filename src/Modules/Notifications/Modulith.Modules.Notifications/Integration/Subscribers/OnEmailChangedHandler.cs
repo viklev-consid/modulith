@@ -20,7 +20,8 @@ public sealed class OnEmailChangedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(EmailChangedV1 @event, CancellationToken ct)
     {
@@ -47,10 +48,19 @@ public sealed class OnEmailChangedHandler(
             return;
         }
 
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.EmailChanged,
+            new EmailChangedModel(@event.NewEmail));
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.OldEmail,
-            Subject: EmailChangedTemplate.Subject,
-            HtmlBody: EmailChangedTemplate.HtmlBody(@event.NewEmail),
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: EmailChangedTemplate.PlainTextBody(@event.NewEmail));
 
         try

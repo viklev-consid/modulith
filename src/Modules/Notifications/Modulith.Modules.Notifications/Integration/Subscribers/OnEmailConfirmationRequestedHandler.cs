@@ -17,7 +17,8 @@ public sealed class OnEmailConfirmationRequestedHandler(
     IEmailSender emailSender,
     IClock clock,
     NotificationSendGuard sendGuard,
-    IFrontendUrlBuilder frontendUrls)
+    IFrontendUrlBuilder frontendUrls,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(EmailConfirmationRequestedV1 @event, CancellationToken ct)
     {
@@ -48,10 +49,19 @@ public sealed class OnEmailConfirmationRequestedHandler(
         }
 
         var confirmationUrl = frontendUrls.ConfirmEmail(@event.RawToken);
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.EmailConfirmationRequest,
+            new EmailConfirmationRequestModel(@event.DisplayName, @event.RawToken, confirmationUrl));
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.Email,
-            Subject: EmailConfirmationRequestTemplate.Subject,
-            HtmlBody: EmailConfirmationRequestTemplate.HtmlBody(@event.DisplayName, @event.RawToken, confirmationUrl),
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: EmailConfirmationRequestTemplate.PlainTextBody(@event.DisplayName, @event.RawToken, confirmationUrl));
 
         try

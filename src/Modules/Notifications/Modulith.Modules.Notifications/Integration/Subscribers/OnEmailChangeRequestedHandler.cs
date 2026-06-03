@@ -18,7 +18,8 @@ public sealed class OnEmailChangeRequestedHandler(
     IEmailSender emailSender,
     IClock clock,
     NotificationSendGuard sendGuard,
-    IFrontendUrlBuilder frontendUrls)
+    IFrontendUrlBuilder frontendUrls,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(EmailChangeRequestedV1 @event, CancellationToken ct)
     {
@@ -45,10 +46,19 @@ public sealed class OnEmailChangeRequestedHandler(
         }
 
         var confirmationUrl = frontendUrls.ConfirmEmailChange(@event.RawToken);
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.EmailChangeRequest,
+            new EmailChangeRequestModel(@event.RawToken, confirmationUrl));
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.NewEmail,
-            Subject: EmailChangeRequestTemplate.Subject,
-            HtmlBody: EmailChangeRequestTemplate.HtmlBody(@event.RawToken, confirmationUrl),
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: EmailChangeRequestTemplate.PlainTextBody(@event.RawToken, confirmationUrl));
 
         try

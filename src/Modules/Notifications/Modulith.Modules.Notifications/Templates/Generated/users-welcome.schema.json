@@ -1,0 +1,9 @@
+{
+  "id": "users.welcome",
+  "variables": {
+    "displayName": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

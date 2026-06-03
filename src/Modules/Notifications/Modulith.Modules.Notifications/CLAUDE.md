@@ -39,9 +39,10 @@ Do not automatically mirror email notifications into bell notifications. Account
 ### Email notification
 
 1. Add an entry to the `NotificationType` enum.
-2. Add a template in `Templates/` (static class with `Subject`, `HtmlBody`, `PlainTextBody`).
-3. Write a handler in `Integration/Subscribers/` subscribing to the triggering event. Copy from any existing handler (e.g. `OnUserEmailConfirmedHandler.cs`).
-4. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
+2. Add the HTML template in `tools/email-templates/src/templates/` and run `pnpm email:export`.
+3. Add or update the C# template ID/model in `Templates/`, keeping subject/plain-text rendering in C#.
+4. Write a handler in `Integration/Subscribers/` subscribing to the triggering event. Copy from any existing handler (e.g. `OnUserEmailConfirmedHandler.cs`).
+5. Register the handler in `NotificationsModule.AddNotificationsHandlers`.
 
 Key rules when writing the handler:
 - **Always detach the failed entity** (`db.Entry(log).State = EntityState.Detached`) before the claim; otherwise Wolverine's `AutoApplyTransactions` middleware will try to re-insert the `Added` entity on any subsequent `SaveChangesAsync`.

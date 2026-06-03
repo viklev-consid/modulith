@@ -1,0 +1,21 @@
+{
+  "name": "@modulith/email-templates",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "email:dev": "email dev --dir src/templates",
+    "email:export": "tsx src/scripts/export-email-templates.ts",
+    "email:check": "tsx src/scripts/check-email-templates.ts"
+  },
+  "dependencies": {
+    "@react-email/components": "^0.1.1",
+    "@react-email/render": "^1.4.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "react-email": "^4.3.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

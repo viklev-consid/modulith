@@ -17,7 +17,8 @@ public sealed class OnOrganizationInvitationCreatedHandler(
     IEmailSender emailSender,
     IClock clock,
     NotificationSendGuard sendGuard,
-    IFrontendUrlBuilder frontendUrls)
+    IFrontendUrlBuilder frontendUrls,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(OrganizationInvitationCreatedV1 @event, CancellationToken ct)
     {
@@ -48,10 +49,19 @@ public sealed class OnOrganizationInvitationCreatedHandler(
         }
 
         var invitationUrl = frontendUrls.AcceptOrganizationInvitation(@event.RawToken, @event.Email);
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.OrganizationInvitation,
+            new OrganizationInvitationModel(@event.Role, @event.RawToken, invitationUrl));
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.Email,
-            Subject: OrganizationInvitationTemplate.Subject,
-            HtmlBody: OrganizationInvitationTemplate.HtmlBody(@event.Role, @event.RawToken, invitationUrl),
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: OrganizationInvitationTemplate.PlainTextBody(@event.Role, @event.RawToken, invitationUrl));
 
         try

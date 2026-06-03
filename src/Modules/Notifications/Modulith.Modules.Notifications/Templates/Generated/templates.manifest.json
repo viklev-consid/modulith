@@ -1,0 +1,76 @@
+{
+  "templates": [
+    {
+      "id": "organizations.invitation",
+      "subject": "You're invited to an organization",
+      "html": "organizations-invitation.html",
+      "schema": "organizations-invitation.schema.json"
+    },
+    {
+      "id": "users.email-change-request",
+      "subject": "Confirm your email address change",
+      "html": "users-email-change-request.html",
+      "schema": "users-email-change-request.schema.json"
+    },
+    {
+      "id": "users.email-changed",
+      "subject": "Your email address has been changed",
+      "html": "users-email-changed.html",
+      "schema": "users-email-changed.schema.json"
+    },
+    {
+      "id": "users.email-confirmation-request",
+      "subject": "Confirm your email address",
+      "html": "users-email-confirmation-request.html",
+      "schema": "users-email-confirmation-request.schema.json"
+    },
+    {
+      "id": "users.invitation",
+      "subject": "You're invited to join",
+      "html": "users-invitation.html",
+      "schema": "users-invitation.schema.json"
+    },
+    {
+      "id": "users.password-changed",
+      "subject": "Your password has been changed",
+      "html": "users-password-changed.html",
+      "schema": "users-password-changed.schema.json"
+    },
+    {
+      "id": "users.password-reset-confirmation",
+      "subject": "Your password has been reset",
+      "html": "users-password-reset-confirmation.html",
+      "schema": "users-password-reset-confirmation.schema.json"
+    },
+    {
+      "id": "users.password-reset-request",
+      "subject": "Reset your password",
+      "html": "users-password-reset-request.html",
+      "schema": "users-password-reset-request.schema.json"
+    },
+    {
+      "id": "users.recovery-codes-regenerated",
+      "subject": "Recovery codes regenerated",
+      "html": "users-recovery-codes-regenerated.html",
+      "schema": "users-recovery-codes-regenerated.schema.json"
+    },
+    {
+      "id": "users.two-factor-disabled",
+      "subject": "Two-factor authentication disabled",
+      "html": "users-two-factor-disabled.html",
+      "schema": "users-two-factor-disabled.schema.json"
+    },
+    {
+      "id": "users.two-factor-enabled",
+      "subject": "Two-factor authentication enabled",
+      "html": "users-two-factor-enabled.html",
+      "schema": "users-two-factor-enabled.schema.json"
+    },
+    {
+      "id": "users.welcome",
+      "subject": "Welcome to Modulith!",
+      "html": "users-welcome.html",
+      "schema": "users-welcome.schema.json"
+    }
+  ]
+}
