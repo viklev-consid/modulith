@@ -1,0 +1,10 @@
+{
+  "templates": [
+    {
+      "id": "users.welcome",
+      "subject": "Welcome to Modulith!",
+      "html": "users-welcome.html",
+      "schema": "users-welcome.schema.json"
+    }
+  ]
+}

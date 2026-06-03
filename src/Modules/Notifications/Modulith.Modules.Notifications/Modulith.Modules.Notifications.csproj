@@ -31,4 +31,8 @@
     <PackageReference Include="WolverineFx.EntityFrameworkCore" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Templates/Generated/**/*" />
+  </ItemGroup>
+
 </Project>

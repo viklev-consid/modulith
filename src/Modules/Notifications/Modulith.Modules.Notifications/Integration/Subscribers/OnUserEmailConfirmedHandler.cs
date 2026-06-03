@@ -17,7 +17,8 @@ public sealed class OnUserEmailConfirmedHandler(
     IEmailSender emailSender,
     IConsentRegistry consentRegistry,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(UserEmailConfirmedV1 @event, CancellationToken ct)
     {
@@ -52,10 +53,19 @@ public sealed class OnUserEmailConfirmedHandler(
             return;
         }
 
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.WelcomeEmail,
+            new WelcomeEmailModel(@event.DisplayName));
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.Email,
-            Subject: WelcomeEmailTemplate.Subject,
-            HtmlBody: WelcomeEmailTemplate.HtmlBody(@event.DisplayName),
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: WelcomeEmailTemplate.PlainTextBody(@event.DisplayName));
 
         try

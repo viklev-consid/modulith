@@ -19,6 +19,7 @@ using Modulith.Modules.Notifications.Jobs;
 using Modulith.Modules.Notifications.Persistence;
 using Modulith.Modules.Notifications.Policies;
 using Modulith.Modules.Notifications.Streaming;
+using Modulith.Modules.Notifications.Templates;
 using Modulith.Shared.Infrastructure.Authorization;
 using Modulith.Shared.Infrastructure.Notifications;
 using Modulith.Shared.Infrastructure.Persistence;
@@ -71,6 +72,7 @@ public static class NotificationsModule
         services.AddScoped<NotificationsPersonalDataEraser>();
         services.AddScoped<IPersonalDataEraser>(sp => sp.GetRequiredService<NotificationsPersonalDataEraser>());
         services.AddScoped<NotificationSendGuard>();
+        services.AddSingleton<IEmailTemplateRenderer, FileEmailTemplateRenderer>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<NotificationsDbContext>("notifications-db", tags: ["ready"]);
