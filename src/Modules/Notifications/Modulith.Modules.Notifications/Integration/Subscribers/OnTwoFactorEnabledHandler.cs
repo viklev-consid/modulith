@@ -15,7 +15,8 @@ public sealed class OnTwoFactorEnabledHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(TwoFactorEnabledV1 @event, CancellationToken ct)
     {
@@ -39,7 +40,16 @@ public sealed class OnTwoFactorEnabledHandler(
             return;
         }
 
-        var message = new EmailMessage(@event.Email, TwoFactorEnabledTemplate.Subject, TwoFactorEnabledTemplate.HtmlBody, TwoFactorEnabledTemplate.PlainTextBody);
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.TwoFactorEnabled,
+            EmptyEmailTemplateModel.Instance);
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
+        var message = new EmailMessage(@event.Email, renderedTemplate.Value.Subject, renderedTemplate.Value.HtmlBody, TwoFactorEnabledTemplate.PlainTextBody);
         try
         {
             await sendGuard.SendWithLeaseRenewalAsync(

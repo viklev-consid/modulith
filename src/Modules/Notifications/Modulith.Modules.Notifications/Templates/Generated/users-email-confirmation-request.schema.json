@@ -1,0 +1,17 @@
+{
+  "id": "users.email-confirmation-request",
+  "variables": {
+    "confirmationUrl": {
+      "type": "url",
+      "required": true
+    },
+    "displayName": {
+      "type": "string",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

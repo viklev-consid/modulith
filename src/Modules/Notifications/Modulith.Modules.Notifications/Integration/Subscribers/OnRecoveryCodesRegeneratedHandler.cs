@@ -15,7 +15,8 @@ public sealed class OnRecoveryCodesRegeneratedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(RecoveryCodesRegeneratedV1 @event, CancellationToken ct)
     {
@@ -39,7 +40,16 @@ public sealed class OnRecoveryCodesRegeneratedHandler(
             return;
         }
 
-        var message = new EmailMessage(@event.Email, RecoveryCodesRegeneratedTemplate.Subject, RecoveryCodesRegeneratedTemplate.HtmlBody, RecoveryCodesRegeneratedTemplate.PlainTextBody);
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.RecoveryCodesRegenerated,
+            EmptyEmailTemplateModel.Instance);
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
+        var message = new EmailMessage(@event.Email, renderedTemplate.Value.Subject, renderedTemplate.Value.HtmlBody, RecoveryCodesRegeneratedTemplate.PlainTextBody);
         try
         {
             await sendGuard.SendWithLeaseRenewalAsync(

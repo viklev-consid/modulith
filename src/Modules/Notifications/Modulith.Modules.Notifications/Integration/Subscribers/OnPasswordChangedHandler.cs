@@ -16,7 +16,8 @@ public sealed class OnPasswordChangedHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(PasswordChangedV1 @event, CancellationToken ct)
     {
@@ -42,10 +43,19 @@ public sealed class OnPasswordChangedHandler(
             return;
         }
 
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.PasswordChanged,
+            EmptyEmailTemplateModel.Instance);
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.Email,
-            Subject: PasswordChangedTemplate.Subject,
-            HtmlBody: PasswordChangedTemplate.HtmlBody,
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: PasswordChangedTemplate.PlainTextBody);
 
         try

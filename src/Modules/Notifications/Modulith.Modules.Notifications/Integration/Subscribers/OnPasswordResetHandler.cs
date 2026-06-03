@@ -16,7 +16,8 @@ public sealed class OnPasswordResetHandler(
     NotificationsDbContext db,
     IEmailSender emailSender,
     IClock clock,
-    NotificationSendGuard sendGuard)
+    NotificationSendGuard sendGuard,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(PasswordResetV1 @event, CancellationToken ct)
     {
@@ -42,10 +43,19 @@ public sealed class OnPasswordResetHandler(
             return;
         }
 
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.PasswordResetConfirmation,
+            EmptyEmailTemplateModel.Instance);
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.EventId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.Email,
-            Subject: PasswordResetConfirmationTemplate.Subject,
-            HtmlBody: PasswordResetConfirmationTemplate.HtmlBody,
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: PasswordResetConfirmationTemplate.PlainTextBody);
 
         try

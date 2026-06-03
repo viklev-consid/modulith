@@ -17,7 +17,8 @@ public sealed class OnUserInvitationCreatedHandler(
     IEmailSender emailSender,
     IClock clock,
     NotificationSendGuard sendGuard,
-    IFrontendUrlBuilder frontendUrls)
+    IFrontendUrlBuilder frontendUrls,
+    IEmailTemplateRenderer templateRenderer)
 {
     public async Task Handle(UserInvitationCreatedV1 @event, CancellationToken ct)
     {
@@ -48,10 +49,19 @@ public sealed class OnUserInvitationCreatedHandler(
         }
 
         var invitationUrl = frontendUrls.AcceptUserInvitation(@event.Token, @event.Email);
+        var renderedTemplate = templateRenderer.Render(
+            EmailTemplateId.UserInvitation,
+            new UserInvitationModel(@event.Token, invitationUrl));
+        if (renderedTemplate.IsError)
+        {
+            await sendGuard.MarkFailedAsync(@event.MessageId, leaseToken, ct);
+            return;
+        }
+
         var message = new EmailMessage(
             To: @event.Email,
-            Subject: UserInvitationTemplate.Subject,
-            HtmlBody: UserInvitationTemplate.HtmlBody(@event.Token, invitationUrl),
+            Subject: renderedTemplate.Value.Subject,
+            HtmlBody: renderedTemplate.Value.HtmlBody,
             PlainTextBody: UserInvitationTemplate.PlainTextBody(@event.Token, invitationUrl));
 
         try

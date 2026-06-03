@@ -1,0 +1,13 @@
+{
+  "id": "users.invitation",
+  "variables": {
+    "invitationUrl": {
+      "type": "url",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

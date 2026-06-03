@@ -1,0 +1,13 @@
+{
+  "id": "users.email-change-request",
+  "variables": {
+    "confirmationUrl": {
+      "type": "url",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "organizations.invitation",
+  "variables": {
+    "invitationUrl": {
+      "type": "url",
+      "required": true
+    },
+    "role": {
+      "type": "string",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "required": true
+    }
+  }
+}
